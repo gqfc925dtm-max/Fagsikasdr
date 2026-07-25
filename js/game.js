@@ -17,9 +17,10 @@ const SUPPORT_URL = `${SHARE_URL}support.html`;
 const THEME_NAMES = ["уголь", "глубина", "янтарь", "мох", "дымка", "пыльца"];
 const ONBOARD_STEPS = [
   "Удерживай палец — существо живёт только в касании.",
-  "Ешь свет. Стойка жжёт голод быстрее.",
-  "Охотник ест тело и след. Один второй шанс — бесплатно.",
+  "Замри на секунду — можно провалиться в чернила.",
+  "Отпущенный след иногда оживает и идёт за тобой.",
 ];
+const SECRET_WORD = "ЯЕЩЁЗДЕСЬ";
 const SCORE_MILESTONES = [
   { at: 10, marks: 2, text: "первый ритм" },
   { at: 25, marks: 3, text: "след держится" },
@@ -72,6 +73,8 @@ const heatFillEl = document.getElementById("heat-fill");
 const heatPctEl = document.getElementById("heat-pct");
 const mutTrackFillEl = document.getElementById("mut-track-fill");
 const nextMutEl = document.getElementById("next-mut");
+const diveMeterEl = document.getElementById("dive-meter");
+const diveFillEl = document.getElementById("dive-fill");
 const holdFillEl = document.getElementById("hold-fill");
 const holdFillOverEl = document.getElementById("hold-fill-over");
 const screenStartEl = document.getElementById("screen-start");
@@ -220,11 +223,23 @@ const state = {
   pulseCd: 0,
   holdLifeTime: 0,
   fever: false,
+  stillAcc: 0,
+  inkDive: 0,
+  inkDiveCd: 0,
+  glyphs: [],
+  glyphIndex: 0,
+  glyphSpawnAcc: 0,
+  wordDone: false,
+  stains: [],
+  symbiote: null,
   tipFlags: {
     move: false,
     hunter: false,
     hunger: false,
     echo: false,
+    dive: false,
+    shadow: false,
+    word: false,
   },
   stats: {
     sparkEats: 0,
@@ -232,6 +247,8 @@ const state = {
     hunterEats: 0,
     maxCombo: 0,
     nearMisses: 0,
+    shadowsSpawned: 0,
+    glyphsTaken: 0,
   },
   audio: null,
   humNode: null,
@@ -406,6 +423,11 @@ function playSparkTone(type) {
   } else if (type === "comet") {
     tone(740, 0.08, "triangle", 0.034);
     tone(1100, 0.12, "sine", 0.03, 0.07);
+  } else if (type === "deep") {
+    tone(260, 0.12, "sine", 0.03);
+    tone(390, 0.14, "triangle", 0.024, 0.08);
+  } else if (type === "seed") {
+    tone(860, 0.09, "sine", 0.028);
   } else {
     tone(620 + Math.min(12, state.combo) * 18, 0.055, "sine", 0.028);
   }
@@ -478,6 +500,202 @@ function updateRunEvents(dt) {
   if (state.eventAcc < state.eventNext) return;
   const pick = RUN_EVENTS[Math.floor(Math.random() * RUN_EVENTS.length)];
   startRunEvent(pick);
+}
+
+function inInkDive() {
+  return state.inkDive > 0;
+}
+
+function setDiveMeter(progress) {
+  if (!diveMeterEl || !diveFillEl) return;
+  const show = progress > 0.05 && progress < 1 && !inInkDive();
+  diveMeterEl.classList.toggle("show", show);
+  diveFillEl.style.width = `${Math.round(clamp(progress, 0, 1) * 100)}%`;
+}
+
+function enterInkDive() {
+  if (inInkDive() || state.inkDiveCd > 0 || !state.life) return;
+  state.inkDive = 5.2;
+  state.inkDiveCd = 16;
+  state.stillAcc = 0;
+  setDiveMeter(0);
+  app.classList.add("ink-dive");
+  setEventChip("чернила");
+  showToast("провал в чернила");
+  tipOnce("dive", "ЗДЕСЬ ТИХО", 1600);
+  tone(220, 0.16, "sine", 0.03);
+  tone(140, 0.22, "triangle", 0.024, 0.08);
+  buzz([12, 20, 12]);
+  state.flash = Math.max(state.flash, 0.16);
+  for (let i = 0; i < 5; i += 1) spawnSpark({ edge: true, type: "deep" });
+}
+
+function exitInkDive() {
+  state.inkDive = 0;
+  app.classList.remove("ink-dive");
+  if (!state.event) setEventChip("");
+  showToast("снова наверху");
+  tone(480, 0.08, "triangle", 0.026);
+}
+
+function spawnShadowHunter(x, y) {
+  state.stats.shadowsSpawned += 1;
+  state.hunters.push({
+    x,
+    y,
+    vx: 0,
+    vy: 0,
+    r: 15,
+    anger: 0.78,
+    slow: false,
+    warn: 1,
+    phase: Math.random() * Math.PI * 2,
+    nearMissed: false,
+    shadow: true,
+    wobble: Math.random() * Math.PI * 2,
+  });
+  tipOnce("shadow", "СЛЕД ОЖИЛ", 1700);
+  showToast("твой след ожил");
+  tone(160, 0.14, "sawtooth", 0.028);
+  buzz([16, 24, 16]);
+}
+
+function maybeAwakenEcho() {
+  if (!state.echo) return;
+  if (state.score < 10) return;
+  if (state.stats.shadowsSpawned >= 3) return;
+  const chance = 0.42 + Math.min(0.25, state.score * 0.002);
+  if (Math.random() > chance) return;
+  spawnShadowHunter(state.echo.x, state.echo.y);
+}
+
+function pushStain(x, y) {
+  if (!state.life || (state.life.speed || 0) < 8) return;
+  const last = state.stains[state.stains.length - 1];
+  if (last && dist(last.x, last.y, x, y) < 18) return;
+  state.stains.push({ x, y, life: 1, r: rand(10, 16) });
+  if (state.stains.length > 90) state.stains.shift();
+}
+
+function spawnGlyph(x, y) {
+  if (state.wordDone || state.glyphIndex >= SECRET_WORD.length) return;
+  const ch = SECRET_WORD[state.glyphIndex];
+  state.glyphs.push({
+    x: clamp(x + rand(-26, 26), 24, state.width - 24),
+    y: clamp(y + rand(-26, 26), 40, state.height - 24),
+    ch,
+    index: state.glyphIndex,
+    life: 1,
+    pulse: Math.random() * Math.PI * 2,
+  });
+}
+
+function updateGlyphs(dt) {
+  for (let i = state.glyphs.length - 1; i >= 0; i -= 1) {
+    const g = state.glyphs[i];
+    g.pulse += dt * 4;
+    g.life -= dt * 0.12;
+    if (g.life <= 0) {
+      state.glyphs.splice(i, 1);
+      continue;
+    }
+    if (!state.life) continue;
+    if (dist(g.x, g.y, state.life.x, state.life.y) > state.life.r * 0.85) continue;
+    if (g.index !== state.glyphIndex) {
+      burst(g.x, g.y, cssVar("--danger", "#e2556d"), 6, 2.5);
+      state.glyphs.splice(i, 1);
+      continue;
+    }
+    state.glyphs.splice(i, 1);
+    state.glyphIndex += 1;
+    state.stats.glyphsTaken += 1;
+    state.hunger = clamp(state.hunger + 12, 0, 100);
+    updateHungerUi();
+    floatText(g.x, g.y - 10, g.ch, cssVar("--foam", "#f3eee8"), 20);
+    tone(520 + state.glyphIndex * 40, 0.07, "triangle", 0.03);
+    tipOnce("word", "БУКВЫ ЖИВЫЕ", 1500);
+    if (state.glyphIndex >= SECRET_WORD.length) {
+      state.wordDone = true;
+      showToast("я ещё здесь");
+      goalChime();
+      awardMarks(12, {
+        x: state.width * 0.5,
+        y: state.height * 0.2,
+        color: cssVar("--life", "#6fd9b0"),
+        size: 17,
+      });
+      addScore(15, state.width * 0.5, state.height * 0.28, {
+        combo: false,
+        color: cssVar("--life", "#6fd9b0"),
+      });
+      state.safeUntil = performance.now() + 1800;
+      burst(state.life.x, state.life.y, cssVar("--life", "#6fd9b0"), 28, 5.5);
+    } else {
+      showToast(SECRET_WORD.slice(0, state.glyphIndex));
+    }
+  }
+}
+
+function attachSymbiote(x, y) {
+  state.symbiote = { ang: Math.random() * Math.PI * 2, life: 1 };
+  showToast("симбионт");
+  burst(x, y, "#9cf0d0", 12, 3.5);
+  tone(900, 0.08, "sine", 0.03);
+}
+
+function consumeSymbioteShield(hunter) {
+  if (!state.symbiote || !state.life) return false;
+  state.symbiote = null;
+  showToast("симбионт спас");
+  buzz([10, 18, 10]);
+  tone(240, 0.1, "square", 0.03);
+  burst(state.life.x, state.life.y, "#9cf0d0", 16, 4.5);
+  const ang = Math.atan2(hunter.y - state.life.y, hunter.x - state.life.x);
+  hunter.vx += Math.cos(ang) * 8;
+  hunter.vy += Math.sin(ang) * 8;
+  hunter.warn = 1;
+  state.safeUntil = performance.now() + 700;
+  return true;
+}
+
+function updateWeirdSystems(dt) {
+  state.inkDiveCd = Math.max(0, state.inkDiveCd - dt);
+  if (inInkDive()) {
+    state.inkDive -= dt;
+    if (state.inkDive <= 0) exitInkDive();
+    else if (Math.random() < dt * 1.4) spawnSpark({ edge: true, type: "deep" });
+  }
+
+  if (state.life && !inInkDive() && state.inkDiveCd <= 0 && state.elapsed > 7) {
+    const still = (state.life.speed || 0) < 5.5;
+    state.stillAcc = still ? state.stillAcc + dt : Math.max(0, state.stillAcc - dt * 1.8);
+    setDiveMeter(state.stillAcc / 1.05);
+    if (state.stillAcc >= 1.05) enterInkDive();
+  } else {
+    state.stillAcc = 0;
+    setDiveMeter(0);
+  }
+
+  if (state.life) {
+    pushStain(state.life.x, state.life.y);
+    state.glyphSpawnAcc += dt * clamp((state.life.speed || 0) / 18, 0, 1);
+    if (!state.wordDone && state.glyphSpawnAcc > 1.35 && state.glyphs.length < 2 && state.elapsed > 6) {
+      state.glyphSpawnAcc = 0;
+      if (Math.random() < 0.55) spawnGlyph(state.life.x, state.life.y);
+    }
+  }
+
+  for (let i = state.stains.length - 1; i >= 0; i -= 1) {
+    state.stains[i].life -= dt * 0.08;
+    if (state.stains[i].life <= 0) state.stains.splice(i, 1);
+  }
+
+  if (state.symbiote) {
+    state.symbiote.ang += dt * 3.4;
+    state.symbiote.life = Math.min(1, state.symbiote.life + dt * 0.05);
+  }
+
+  updateGlyphs(dt);
 }
 
 function showToast(text, ms = 1450) {
@@ -1353,6 +1571,9 @@ function releaseLife() {
   const wobble = state.life.wobble;
   const r = state.life.r * 0.92;
   releasePulse(x, y);
+  if (inInkDive()) exitInkDive();
+  state.stillAcc = 0;
+  setDiveMeter(0);
   state.echo = {
     x,
     y,
@@ -1543,14 +1764,22 @@ function sparkProfile(type) {
   if (type === "comet") {
     return { type, worth: 5, restore: 28, color: "#ffe08a", r: rand(8, 10.5), comet: true };
   }
+  if (type === "deep") {
+    return { type, worth: 4, restore: 32, color: "#c4b5ff", r: rand(7, 9.2), deep: true };
+  }
+  if (type === "seed") {
+    return { type, worth: 2, restore: 16, color: "#9cf0d0", r: rand(6.5, 8.2), seed: true };
+  }
   return { type: "normal", worth: 1, restore: 18, color: "#ffe2b0", r: rand(5.5, 7.6) };
 }
 
 function rollSparkType() {
+  if (inInkDive()) return Math.random() < 0.7 ? "deep" : "rare";
   const r = Math.random();
-  if (r < 0.08) return "rare";
-  if (r < 0.18) return "cool";
-  if (r < 0.26) return "bait";
+  if (r < 0.07) return "rare";
+  if (r < 0.15) return "cool";
+  if (r < 0.22) return "bait";
+  if (r < 0.27 && !state.symbiote) return "seed";
   return "normal";
 }
 
@@ -1665,6 +1894,8 @@ function resetStats() {
   state.stats.hunterEats = 0;
   state.stats.maxCombo = 0;
   state.stats.nearMisses = 0;
+  state.stats.shadowsSpawned = 0;
+  state.stats.glyphsTaken = 0;
 }
 
 function resetRun() {
@@ -1705,7 +1936,7 @@ function resetRun() {
   state.milestonesHit = [];
   state.hungerWarnClock = 0;
   state.coachCount = 0;
-  state.tipFlags = { move: false, hunter: false, hunger: false, echo: false };
+  state.tipFlags = { move: false, hunter: false, hunger: false, echo: false, dive: false, shadow: false, word: false };
   state.event = null;
   state.eventAcc = 0;
   state.eventNext = rand(9, 13);
@@ -1713,6 +1944,17 @@ function resetRun() {
   state.pulseCd = 0;
   state.holdLifeTime = 0;
   state.fever = false;
+  state.stillAcc = 0;
+  state.inkDive = 0;
+  state.inkDiveCd = 0;
+  state.glyphs = [];
+  state.glyphIndex = 0;
+  state.glyphSpawnAcc = 0;
+  state.wordDone = false;
+  state.stains = [];
+  state.symbiote = null;
+  app.classList.remove("ink-dive");
+  setDiveMeter(0);
   resetStats();
   clearHold();
   applyThemeFromScore(false);
@@ -1786,6 +2028,9 @@ function finishRun(reason) {
   state.pointerId = null;
   state.deathReason = reason;
   hum(false);
+  if (inInkDive()) exitInkDive();
+  app.classList.remove("ink-dive");
+  setDiveMeter(0);
   buzz([20, 40, 36]);
   tone(108, 0.28, "sawtooth", 0.04, 0);
   tone(82, 0.34, "triangle", 0.028, 0.06);
@@ -1793,9 +2038,15 @@ function finishRun(reason) {
   if (state.echo) burst(state.echo.x, state.echo.y, cssVar("--danger", "#e2556d"), 18, 4.2);
   state.life = null;
   state.echo = null;
+  state.symbiote = null;
   state.shake = 10;
   state.flash = 0.22;
-  if (canOfferContinue() && (reason === DEATH.HUNTER || reason === DEATH.ECHO || reason === DEATH.HUNGER)) {
+  const canContinueDeath =
+    reason === DEATH.HUNTER ||
+    reason === DEATH.ECHO ||
+    reason === DEATH.HUNGER ||
+    reason === "твой старый след догнал тебя";
+  if (canOfferContinue() && canContinueDeath) {
     showContinueScreen(reason);
     return;
   }
@@ -1954,12 +2205,20 @@ function eatSpark(index, spark) {
     showToast("приманка");
     spawnHunter(false);
     buzz([10, 20, 10]);
+  } else if (spark.type === "comet") {
+    showToast("комета");
+    buzz([8, 12, 8]);
+  } else if (spark.type === "deep") {
+    showToast("глубина");
+    buzz(6);
+  } else if (spark.type === "seed") {
+    attachSymbiote(spark.x, spark.y);
   } else {
     buzz(5);
   }
   playSparkTone(spark.type);
   burst(spark.x, spark.y, spark.color, 10 + spark.worth * 2, 3.8);
-  state.flash = Math.max(state.flash, 0.08);
+  state.flash = Math.max(state.flash, spark.comet ? 0.14 : 0.08);
   addScore(spark.worth, spark.x, spark.y - 12, { color: spark.color });
 }
 
@@ -1984,6 +2243,7 @@ function updateHunters(dt) {
   for (let i = state.hunters.length - 1; i >= 0; i -= 1) {
     const hunter = state.hunters[i];
     hunter.phase += dt * 5;
+    if (hunter.shadow) hunter.wobble = (hunter.wobble || 0) + dt * 5.5;
     hunter.warn = Math.max(0, hunter.warn - dt * 1.45);
     let tx = state.width * 0.5;
     let ty = state.height * 0.5;
@@ -1996,9 +2256,11 @@ function updateHunters(dt) {
     }
     const ang = Math.atan2(ty - hunter.y, tx - hunter.x);
     let speed = (0.95 + state.score * 0.012) * hunter.anger;
+    if (hunter.shadow) speed *= 0.9;
     if (hasMut("cool") && state.hunger < 50) speed *= 0.85;
     if (activeEventId() === "calm") speed *= 0.62;
     if (activeEventId() === "raid") speed *= 1.12;
+    if (inInkDive()) speed *= 0.35;
     hunter.vx += Math.cos(ang) * speed * dt * 3.1;
     hunter.vy += Math.sin(ang) * speed * dt * 3.1;
     hunter.vx *= 0.955;
@@ -2016,6 +2278,11 @@ function updateHunters(dt) {
         hunter.nearMissed = false;
       }
       if (d < killR) {
+        if (inInkDive()) {
+          // In the ink they pass through you like smoke.
+          hunter.warn = 0.4;
+          continue;
+        }
         if (state.safeUntil > performance.now()) {
           hunter.warn = 1;
           const push = 2.4;
@@ -2023,21 +2290,24 @@ function updateHunters(dt) {
           hunter.vy -= Math.sin(ang) * push;
           continue;
         }
+        if (consumeSymbioteShield(hunter)) continue;
         if (hasMut("fang") && state.combo >= 4) {
           state.hunters.splice(i, 1);
           state.stats.hunterEats += 1;
-          showToast("клык");
+          showToast(hunter.shadow ? "съел свой след" : "клык");
           tone(165, 0.09, "square", 0.035);
           tone(122, 0.1, "sawtooth", 0.028, 0.05);
           buzz([12, 12, 12]);
-          burst(hunter.x, hunter.y, cssVar("--danger", "#e2556d"), 18, 5);
-          addScore(3, hunter.x, hunter.y, { color: cssVar("--danger", "#e2556d") });
+          burst(hunter.x, hunter.y, hunter.shadow ? cssVar("--foam", "#f3eee8") : cssVar("--danger", "#e2556d"), 18, 5);
+          addScore(hunter.shadow ? 5 : 3, hunter.x, hunter.y, {
+            color: hunter.shadow ? cssVar("--foam", "#f3eee8") : cssVar("--danger", "#e2556d"),
+          });
           continue;
         }
-        finishRun(DEATH.HUNTER);
+        finishRun(hunter.shadow ? "твой старый след догнал тебя" : DEATH.HUNTER);
         return;
       }
-    } else if (state.echo) {
+    } else if (state.echo && !inInkDive()) {
       const d = dist(hunter.x, hunter.y, state.echo.x, state.echo.y);
       const killR = hunter.r * 0.72 + state.echo.r * 0.78;
       if (d < killR + 16 && d >= killR) {
@@ -2114,14 +2384,20 @@ function updateRun(dt) {
     state.echo.wobble += dt * 4.2;
     state.echo.life = Math.max(0, (state.echo.life ?? 1) - dt / ECHO_FADE_SEC);
     state.echo.r = Math.max(8, state.echo.r * (1 - dt * 0.08));
-    if (state.echo.life <= 0) state.echo = null;
+    if (state.echo.life <= 0) {
+      maybeAwakenEcho();
+      state.echo = null;
+    }
   }
   state.guideSpark = state.life ? nearestSpark(state.life.x, state.life.y) : null;
-  // Standing still drains hunger faster — no AFK farming
-  const stillPenalty = state.life && (state.life.speed || 0) < 6 ? 1.55 : 1;
+  updateWeirdSystems(dt);
+  // Standing still drains hunger faster — except while charging / inside ink dive
+  const chargingDive = !!state.life && state.stillAcc > 0.15 && !inInkDive();
+  const stillPenalty = state.life && (state.life.speed || 0) < 6 && !chargingDive && !inInkDive() ? 1.55 : 1;
   const calmMul = activeEventId() === "calm" ? 0.55 : 1;
+  const diveMul = inInkDive() ? 0.72 : 1;
   if (state.life) {
-    state.hunger -= HUNGER_DRAIN_PER_SEC * dt * (hasMut("cool") ? 0.7 : 1) * stillPenalty * calmMul;
+    state.hunger -= HUNGER_DRAIN_PER_SEC * dt * (hasMut("cool") ? 0.7 : 1) * stillPenalty * calmMul * diveMul;
     state.hunger = Math.max(0, state.hunger);
   }
   updateHungerUi();
@@ -2207,23 +2483,79 @@ function lifeInkColor() {
 }
 
 function drawBackground() {
-  const grad = ctx.createLinearGradient(0, 0, 0, state.height);
-  grad.addColorStop(0, cssVar("--bg1", "#1c1820"));
-  grad.addColorStop(1, cssVar("--bg0", "#121014"));
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, state.width, state.height);
+  if (inInkDive()) {
+    const grad = ctx.createLinearGradient(0, state.height, 0, 0);
+    grad.addColorStop(0, "#1a1228");
+    grad.addColorStop(0.55, "#0c1822");
+    grad.addColorStop(1, "#140c18");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, state.width, state.height);
+    ctx.fillStyle = `rgba(180, 140, 255, ${0.04 + Math.sin(state.time * 2.2) * 0.02})`;
+    ctx.fillRect(0, 0, state.width, state.height);
+  } else {
+    const grad = ctx.createLinearGradient(0, 0, 0, state.height);
+    grad.addColorStop(0, cssVar("--bg1", "#1c1820"));
+    grad.addColorStop(1, cssVar("--bg0", "#121014"));
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, state.width, state.height);
+  }
   if (state.bloomPulse > 0) {
     ctx.fillStyle = cssVar("--gold", "#e6c07b");
     ctx.globalAlpha = state.bloomPulse * 0.05;
     ctx.fillRect(0, 0, state.width, state.height);
     ctx.globalAlpha = 1;
   }
+  for (const stain of state.stains) {
+    ctx.globalAlpha = 0.07 * stain.life;
+    ctx.fillStyle = inInkDive() ? "#b8a0ff" : activeSkin().color;
+    ctx.beginPath();
+    ctx.ellipse(stain.x, stain.y, stain.r, stain.r * 0.72, 0.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
   for (const a of state.ash) {
-    ctx.globalAlpha = a.a;
-    ctx.fillStyle = "#f6efe6";
+    ctx.globalAlpha = inInkDive() ? a.a * 1.4 : a.a;
+    ctx.fillStyle = inInkDive() ? "#d7c8ff" : "#f6efe6";
     ctx.fillRect(a.x, a.y, a.r, a.r);
   }
   ctx.globalAlpha = 1;
+}
+
+function drawGlyphs() {
+  for (const g of state.glyphs) {
+    const pulse = 1 + Math.sin(g.pulse) * 0.08;
+    ctx.save();
+    ctx.globalAlpha = 0.35 + g.life * 0.55;
+    ctx.fillStyle = g.index === state.glyphIndex ? cssVar("--gold", "#e6c07b") : cssVar("--sand", "#a89b90");
+    ctx.font = `800 ${Math.round(22 * pulse)}px Syne, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(g.ch, g.x, g.y);
+    ctx.strokeStyle = "rgba(243,238,232,0.25)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(g.x, g.y, 16 * pulse, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawSymbiote() {
+  if (!state.symbiote || !state.life) return;
+  const ang = state.symbiote.ang;
+  const x = state.life.x + Math.cos(ang) * (state.life.r + 14);
+  const y = state.life.y + Math.sin(ang) * (state.life.r + 14);
+  ctx.save();
+  ctx.globalAlpha = 0.85;
+  ctx.fillStyle = "#9cf0d0";
+  ctx.beginPath();
+  ctx.arc(x, y, 4.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(156,240,208,0.45)";
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.arc(state.life.x, state.life.y, state.life.r + 14, ang - 0.4, ang + 0.4);
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawVeins() {
@@ -2243,6 +2575,24 @@ function drawVeins() {
 function drawSpark(spark) {
   const pulse = 1 + Math.sin(spark.pulse) * 0.15;
   const r = spark.r * pulse;
+  if (spark.comet) {
+    const ang = Math.atan2(spark.vy, spark.vx || 0.001);
+    ctx.save();
+    ctx.translate(spark.x, spark.y);
+    ctx.rotate(ang);
+    const trail = ctx.createLinearGradient(-28, 0, 10, 0);
+    trail.addColorStop(0, "transparent");
+    trail.addColorStop(1, spark.color);
+    ctx.fillStyle = trail;
+    ctx.globalAlpha = 0.72;
+    ctx.beginPath();
+    ctx.moveTo(-30, 0);
+    ctx.lineTo(4, -4.5);
+    ctx.lineTo(4, 4.5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
   const glow = ctx.createRadialGradient(spark.x, spark.y, 0, spark.x, spark.y, r * 3.4);
   glow.addColorStop(0, spark.color);
   glow.addColorStop(0.32, spark.color);
@@ -2257,7 +2607,7 @@ function drawSpark(spark) {
   ctx.beginPath();
   ctx.arc(spark.x, spark.y, Math.max(1.6, r * 0.42), 0, Math.PI * 2);
   ctx.fill();
-  if (spark.type === "rare") {
+  if (spark.type === "rare" || spark.comet) {
     ctx.strokeStyle = "rgba(242,193,90,0.7)";
     ctx.lineWidth = 1.25;
     ctx.beginPath();
@@ -2280,8 +2630,33 @@ function drawSpark(spark) {
 }
 
 function drawHunter(hunter) {
+  if (hunter.shadow) {
+    ctx.save();
+    ctx.globalAlpha = inInkDive() ? 0.2 : 0.72;
+    ctx.strokeStyle = cssVar("--foam", "#f3eee8");
+    ctx.lineWidth = 1.6;
+    ctx.setLineDash([4, 5]);
+    ctx.beginPath();
+    ctx.ellipse(
+      hunter.x,
+      hunter.y,
+      hunter.r * 0.9,
+      hunter.r * 1.1,
+      Math.sin(hunter.wobble || 0) * 0.2,
+      0.2,
+      Math.PI * 1.85
+    );
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(hunter.x, hunter.y, hunter.r * 0.45, hunter.r * 0.62, 0.15, 0.3, Math.PI * 1.7);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+    return;
+  }
   const angle = Math.atan2(hunter.vy || 0.001, hunter.vx || 0.001);
   ctx.save();
+  ctx.globalAlpha = inInkDive() ? 0.28 : 1;
   ctx.translate(hunter.x, hunter.y);
   ctx.rotate(angle);
   ctx.fillStyle = cssVar("--danger", "#e2556d");
@@ -2301,7 +2676,7 @@ function drawHunter(hunter) {
   ctx.arc(-hunter.r * 0.06, 0, hunter.r * 0.16, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
-  if (hunter.warn > 0) {
+  if (hunter.warn > 0 && !inInkDive()) {
     ctx.save();
     ctx.globalAlpha = hunter.warn * 0.55;
     ctx.strokeStyle = cssVar("--danger", "#e2556d");
@@ -2399,7 +2774,16 @@ function drawSafeShield() {
 }
 
 function drawHungerVignette() {
-  if (!state.running || state.hunger >= 28 || !state.life) return;
+  if (!state.running) return;
+  if (state.fever) {
+    ctx.fillStyle = `rgba(232, 106, 58, ${0.045 + Math.sin(state.time * 8) * 0.02})`;
+    ctx.fillRect(0, 0, state.width, state.height);
+  }
+  if (activeEventId() === "calm") {
+    ctx.fillStyle = "rgba(111, 217, 176, 0.04)";
+    ctx.fillRect(0, 0, state.width, state.height);
+  }
+  if (state.hunger >= 28 || !state.life) return;
   const strength = clamp((28 - state.hunger) / 28, 0, 1);
   const grad = ctx.createRadialGradient(
     state.width * 0.5,
@@ -2501,6 +2885,7 @@ function draw() {
   ctx.translate(sx, sy);
   drawBackground();
   drawVeins();
+  drawGlyphs();
   for (const spark of state.sparks) drawSpark(spark);
   for (const hunter of state.hunters) drawHunter(hunter);
   drawEcho();
@@ -2508,6 +2893,7 @@ function draw() {
   if (state.life) {
     drawSafeShield();
     drawLifeBody(state.life);
+    drawSymbiote();
   } else if (state.running && !state.hasTouchedCanvas) {
     drawHoldHint();
   } else if (!state.running && state.demo && state.life) {

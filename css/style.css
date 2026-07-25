@@ -48,6 +48,31 @@ body {
   transition: background 0.55s ease, color 0.55s ease;
 }
 
+#app.ink-dive .stage .aura {
+  background:
+    radial-gradient(80% 55% at 50% 100%, rgba(180, 140, 255, 0.18), transparent 60%),
+    linear-gradient(0deg, transparent 60%, rgba(40, 28, 60, 0.45));
+}
+
+.dive-meter {
+  width: 72px;
+  height: 3px;
+  margin-top: 6px;
+  background: rgba(243, 238, 232, 0.08);
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.dive-meter.show { opacity: 1; }
+
+.dive-meter i {
+  display: block;
+  width: 0%;
+  height: 100%;
+  background: #b8a0ff;
+}
+
 #app[data-theme="0"] {
   --bg0: #121014; --bg1: #1c1820; --ember: #e86a3a; --gold: #e6c07b; --life: #6fd9b0; --danger: #e2556d; --panel: #16131a;
 }
