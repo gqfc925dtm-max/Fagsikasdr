@@ -265,10 +265,10 @@ function pulseUnlock(color = cssVar("--life", "#7affd4"), strength = 0.14) {
 }
 
 function spawnOpeningRing(x, y) {
-  const count = 4;
+  const count = 2;
   for (let i = 0; i < count; i += 1) {
-    const a = (i / count) * Math.PI * 2 + rand(-0.1, 0.1);
-    const d = rand(110, 165);
+    const a = (i / count) * Math.PI * 2 + rand(-0.12, 0.12);
+    const d = rand(130, 190);
     spawnSpark({
       near: { x: x + Math.cos(a) * d, y: y + Math.sin(a) * d },
       type: i === 0 ? "rare" : "normal",
@@ -483,7 +483,7 @@ function startRunEvent(def) {
     spawnComet();
   } else if (def.id === "rain") {
     state.eventRainAcc = 0;
-    for (let i = 0; i < 3; i += 1) spawnSpark({ edge: true });
+    for (let i = 0; i < 2; i += 1) spawnSpark({ edge: true });
   }
 }
 
@@ -1301,7 +1301,7 @@ function addScore(amount, x, y, opts = {}) {
     if (hasMut("bloom") && state.combo > 0 && state.combo % 6 === 0 && state.life) {
       state.bloomPulse = 1;
       // Spawn at edges — never on top of the player (prevents AFK magnet farm)
-      for (let i = 0; i < 4; i += 1) spawnSpark({ edge: true, type: Math.random() < 0.12 ? "rare" : null });
+      for (let i = 0; i < 2; i += 1) spawnSpark({ edge: true, type: Math.random() < 0.12 ? "rare" : null });
       pulseUnlock(cssVar("--gold", "#ffe898"), 0.1);
     }
   }
@@ -1493,7 +1493,7 @@ function createLife(x, y, opts = {}) {
     px: x,
     py: y,
     speed: 0,
-    r: 28,
+    r: 32,
     wobble: Math.random() * Math.PI * 2,
     aim: -Math.PI / 2,
     teeth: 0,
@@ -1734,22 +1734,22 @@ async function shareRun() {
 
 function sparkProfile(type) {
   if (type === "rare") {
-    return { type, worth: 3, restore: 35, color: "#ffcc44", r: rand(8.5, 11) };
+    return { type, worth: 3, restore: 35, color: "#ffcc44", r: rand(15, 19) };
   }
   if (type === "cool") {
-    return { type, worth: 1, restore: 25, color: "#58c8ff", r: rand(7.5, 9.5) };
+    return { type, worth: 1, restore: 25, color: "#58c8ff", r: rand(13.5, 17) };
   }
   if (type === "bait") {
-    return { type, worth: 1, restore: 12, color: "#ff58d0", r: rand(7.5, 9.5) };
+    return { type, worth: 1, restore: 12, color: "#ff58d0", r: rand(13.5, 17) };
   }
   if (type === "comet") {
-    return { type, worth: 5, restore: 28, color: "#ffd840", r: rand(9, 11.5), comet: true };
+    return { type, worth: 5, restore: 28, color: "#ffd840", r: rand(16, 20), comet: true };
   }
   if (type === "deep") {
-    return { type, worth: 4, restore: 32, color: "#70d8ff", r: rand(8, 10), deep: true };
+    return { type, worth: 4, restore: 32, color: "#70d8ff", r: rand(14.5, 18) };
   }
   if (type === "seed") {
-    return { type, worth: 2, restore: 16, color: "#58ffb0", r: rand(7.8, 9.8), seed: true };
+    return { type, worth: 2, restore: 16, color: "#58ffb0", r: rand(14, 17.5), seed: true };
   }
   const normals = ["#ffd080", "#ffb868", "#fff0a0", cssVar("--accent-b", "#62f0c8")];
   return {
@@ -1757,7 +1757,7 @@ function sparkProfile(type) {
     worth: 1,
     restore: 18,
     color: normals[Math.floor(Math.random() * normals.length)],
-    r: rand(7.5, 10),
+    r: rand(13, 17),
   };
 }
 
@@ -1962,7 +1962,7 @@ function resetRun() {
   dailyResultEl.textContent = "";
   if (marksResultEl) marksResultEl.textContent = "";
   screenContinueEl?.classList.add("hidden");
-  for (let i = 0; i < 4; i += 1) spawnSpark();
+  for (let i = 0; i < 2; i += 1) spawnSpark();
   spawnSpark({ tutorial: true, type: "normal", near: { x: state.width * 0.5, y: state.height * 0.42 } });
 }
 
@@ -1982,7 +1982,7 @@ function resetDemo() {
   state.demoClock = 0;
   state.demoDownClock = 0;
   applyThemeFromScore(false);
-  for (let i = 0; i < 7; i += 1) spawnSpark();
+  for (let i = 0; i < 3; i += 1) spawnSpark();
   spawnSpark({ tutorial: true, type: "normal", near: { x: state.width * 0.48, y: state.height * 0.44 } });
 }
 
@@ -2364,7 +2364,7 @@ function updateRun(dt) {
     state.life.px = state.life.x;
     state.life.py = state.life.y;
     state.life.wobble += dt * 7.2;
-    state.life.r = 24 + Math.min(8, state.combo * 0.75) + Math.sin(state.life.wobble) * 1.1;
+    state.life.r = 28 + Math.min(8, state.combo * 0.75) + Math.sin(state.life.wobble) * 1.1;
     if (state.fever) state.life.r += 2.2;
     state.life.teeth = hasMut("fang") && state.combo >= 4 ? Math.min(1, state.life.teeth + dt * 3) : Math.max(0, state.life.teeth - dt * 3);
     clampLife();
@@ -2402,17 +2402,15 @@ function updateRun(dt) {
   }
   updateParticles(dt);
   const opening = inOpening();
-  const targetSparkCount = opening ? 5 : 7 + Math.min(3, Math.floor(state.score / 80));
-  const spawnInterval = opening ? 0.9 : 0.55;
+  const targetSparkCount = opening ? 3 : 4 + Math.min(2, Math.floor(state.score / 120));
+  const spawnInterval = opening ? 1.6 : 0.95;
   while (state.spawnAcc >= spawnInterval) {
     state.spawnAcc -= spawnInterval;
     if (state.sparks.length < targetSparkCount) {
-      const nearPlayer = opening && state.life && state.elapsed > 4 && Math.random() < 0.22;
       spawnSpark({
-        edge: !nearPlayer,
-        near: nearPlayer ? { x: state.life.x, y: state.life.y } : undefined,
+        edge: true,
         opening,
-        type: opening && Math.random() < 0.1 ? "rare" : null,
+        type: !opening && Math.random() < 0.08 ? "rare" : null,
       });
     }
   }
@@ -2432,7 +2430,7 @@ function updateRun(dt) {
 function updateDemo(dt) {
   state.time += dt;
   state.demoClock += dt;
-  if (state.sparks.length < 8 && Math.random() < 0.04) spawnSpark();
+  if (state.sparks.length < 4 && Math.random() < 0.025) spawnSpark();
   for (const spark of state.sparks) updateSparkMotion(spark, dt * 0.7);
   if (state.life) {
     state.life.wobble += dt * 6;
@@ -2444,7 +2442,7 @@ function updateDemo(dt) {
       if (dist(spark.x, spark.y, state.life.x, state.life.y) < state.life.r * 0.72 + spark.r) {
         burst(spark.x, spark.y, spark.color, 8, 3);
         state.sparks.splice(i, 1);
-        if (state.sparks.length < 8) spawnSpark();
+        if (state.sparks.length < 4) spawnSpark();
       }
     }
     state.demoDownClock -= dt;
