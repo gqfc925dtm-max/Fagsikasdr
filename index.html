@@ -18,37 +18,37 @@
   <title>ОТТИСК</title>
 </head>
 <body>
-  <div id="app">
-    <div class="aura" aria-hidden="true"></div>
-    <canvas id="game" aria-label="Игровое поле ОТТИСК"></canvas>
+  <div id="app" data-theme="0">
+    <header id="status" class="status hidden">
+      <div class="status-score">
+        <span class="hud-label">след</span>
+        <span id="score">0</span>
+      </div>
+      <div class="status-main">
+        <div class="status-row">
+          <div id="mut-badge" class="mut-badge">искра</div>
+          <div id="theme-chip" class="theme-chip">тон 1</div>
+          <div id="next-mut" class="next-mut"></div>
+        </div>
+        <div class="heat-wrap">
+          <span class="heat-label">жар</span>
+          <div id="heat" class="heat"><i id="heat-fill"></i></div>
+        </div>
+        <div class="mut-track">
+          <div id="mut-track-fill" class="mut-track-fill"></div>
+        </div>
+      </div>
+    </header>
 
-    <div id="hud" class="hud hidden">
-      <div class="hud-float">
+    <main id="stage" class="stage">
+      <div class="aura" aria-hidden="true"></div>
+      <canvas id="game" aria-label="Игровое поле ОТТИСК"></canvas>
+      <div id="float-layer" class="float-layer">
         <div id="combo" class="combo"></div>
         <div id="toast" class="toast"></div>
         <div id="coach" class="coach"></div>
       </div>
-
-      <div class="hud-dock">
-        <div class="hud-score">
-          <span class="hud-label">след</span>
-          <span id="score">0</span>
-        </div>
-        <div class="hud-dock-main">
-          <div class="hud-dock-row">
-            <div id="mut-badge" class="mut-badge">искра</div>
-            <div id="next-mut" class="next-mut"></div>
-          </div>
-          <div class="heat-wrap">
-            <span class="heat-label">жар</span>
-            <div id="heat" class="heat"><i id="heat-fill"></i></div>
-          </div>
-          <div class="mut-track">
-            <div id="mut-track-fill" class="mut-track-fill"></div>
-          </div>
-        </div>
-      </div>
-    </div>
+    </main>
 
     <div id="screen-start" class="screen">
       <div class="screen-bg" aria-hidden="true"></div>
@@ -56,7 +56,7 @@
         <p class="eyebrow">не кликай — держи</p>
         <p class="brand">ОТТИСК</p>
         <h1 class="tagline">Живёт только под пальцем.</h1>
-        <p class="hint">Зажми и води по свету. Отпустил — исчезло. Стой на месте — сгорает. Красные охотники идут на тепло.</p>
+        <p class="hint">Зажми и води по свету. Отпустил — исчезло. Стой на месте — сгорает. Каждые 100 света мир меняет цвет.</p>
       </div>
       <div class="actions">
         <button id="btn-start" class="btn btn-primary" type="button">

@@ -1,13 +1,16 @@
 const BEST_KEY = "ottisk-best-v2";
 
+const app = document.getElementById("app");
+const stage = document.getElementById("stage");
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-const hud = document.getElementById("hud");
+const statusEl = document.getElementById("status");
 const scoreEl = document.getElementById("score");
 const comboEl = document.getElementById("combo");
 const toastEl = document.getElementById("toast");
 const mutBadge = document.getElementById("mut-badge");
+const themeChip = document.getElementById("theme-chip");
 const heatFill = document.getElementById("heat-fill");
 const mutTrackFill = document.getElementById("mut-track-fill");
 const nextMutEl = document.getElementById("next-mut");
@@ -23,6 +26,9 @@ const deathReason = document.getElementById("death-reason");
 const mutSummary = document.getElementById("mut-summary");
 const btnStart = document.getElementById("btn-start");
 const btnRetry = document.getElementById("btn-retry");
+
+const THEME_COUNT = 6;
+const THEME_NAMES = ["уголь", "глубина", "янтарь", "мох", "дымка", "пыльца"];
 
 const MUTATIONS = [
   { at: 0, id: "spark", name: "искра", blurb: "только рождается" },
@@ -80,18 +86,53 @@ const state = {
   guideSpark: null,
   safeUntil: 0,
   relocateCool: 0,
+  theme: 0,
 };
 
 function resize() {
   state.dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-  state.width = window.innerWidth;
-  state.height = window.innerHeight;
+  const rect = stage.getBoundingClientRect();
+  state.width = Math.max(1, Math.floor(rect.width));
+  state.height = Math.max(1, Math.floor(rect.height));
   canvas.width = Math.floor(state.width * state.dpr);
   canvas.height = Math.floor(state.height * state.dpr);
   canvas.style.width = `${state.width}px`;
   canvas.style.height = `${state.height}px`;
   ctx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
   if (!state.ash.length) seedAsh();
+}
+
+function pointerPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = state.width / Math.max(1, rect.width);
+  const scaleY = state.height / Math.max(1, rect.height);
+  return {
+    x: (e.clientX - rect.left) * scaleX,
+    y: (e.clientY - rect.top) * scaleY,
+  };
+}
+
+function cssVar(name, fallback) {
+  const v = getComputedStyle(app).getPropertyValue(name).trim();
+  return v || fallback;
+}
+
+function applyTheme(score, announce = false) {
+  // Every 100 points cycles the whole game palette
+  const theme = Math.floor(score / 100) % THEME_COUNT;
+  const changed = theme !== state.theme;
+  if (!changed && !announce) return;
+  state.theme = theme;
+  app.dataset.theme = String(theme);
+  themeChip.textContent = `тон ${theme + 1} · ${THEME_NAMES[theme]}`;
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", cssVar("--bg0", "#120d14"));
+  if (changed && announce && score >= 100) {
+    showToast(`новый цвет: ${THEME_NAMES[theme]}`);
+    state.bloom = 1;
+    state.flash = 0.45;
+    tone(740, 0.1, "triangle", 0.04);
+    buzz([8, 24, 10]);
+  }
 }
 
 function rand(a, b) {
@@ -293,6 +334,7 @@ function resetWorld() {
   state.safeUntil = 0;
   state.relocateCool = 0;
   state.guideSpark = null;
+  applyTheme(0, false);
   updateMutTrack();
   for (let i = 0; i < 8; i++) spawnSpark(true);
   // First sparks near center so tutorial is obvious
@@ -398,7 +440,7 @@ function kill(reason) {
   mutSummary.textContent = gained.length
     ? `мутации: ${gained.map((id) => MUTATIONS.find((m) => m.id === id).name).join(" · ")}`
     : "мутаций не успело случиться";
-  hud.classList.add("hidden");
+  statusEl.classList.add("hidden");
   screenOver.classList.remove("hidden");
 }
 
@@ -418,7 +460,8 @@ function addScore(n, x, y) {
     localStorage.setItem(BEST_KEY, String(state.best));
   }
   syncMutation();
-  if (n > 1) floatText(x, y, `+${n}`, "#f2c15a");
+  applyTheme(state.score, true);
+  if (n > 1) floatText(x, y, `+${n}`, cssVar("--gold", "#f2c15a"));
   updateMutTrack();
   if (state.combo >= 3) showCombo(`цепь ×${state.combo}`);
   if (state.coachStep < 3 && state.score >= 1) {
@@ -442,11 +485,15 @@ function startGame() {
   holdFillOver.style.width = "0%";
   screenStart.classList.add("hidden");
   screenOver.classList.add("hidden");
-  hud.classList.remove("hidden");
-  resetWorld();
-  state.running = true;
-  state.lastTs = performance.now();
-  showCoach("УДЕРЖИВАЙ палец", 2600);
+  statusEl.classList.remove("hidden");
+  // layout changes when status appears — resize playfield
+  requestAnimationFrame(() => {
+    resize();
+    resetWorld();
+    state.running = true;
+    state.lastTs = performance.now();
+    showCoach("УДЕРЖИВАЙ палец", 2600);
+  });
 }
 
 function nearestSpark(x, y) {
@@ -466,13 +513,14 @@ function onPointerDown(e) {
   state.touching = true;
   state.pointerId = e.pointerId;
   try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+  const p = pointerPos(e);
   const wasEmpty = !state.life;
-  beginLife(e.clientX, e.clientY);
+  beginLife(p.x, p.y);
   if (wasEmpty && state.relocateCool > 0) {
-    state.heat = Math.max(0, state.heat - 0.08);
+    state.heat = Math.max(0, state.heat - 0.04);
     state.safeUntil = Math.max(state.safeUntil, 0.45);
-    floatText(e.clientX, e.clientY - 24, "перенос", "#6dffc2");
-    burst(e.clientX, e.clientY, "#6dffc2", 12, 3);
+    floatText(p.x, p.y - 24, "перенос", cssVar("--life", "#6dffc2"));
+    burst(p.x, p.y, cssVar("--life", "#6dffc2"), 12, 3);
   }
   if (state.coachStep === 0) {
     state.coachStep = 1;
@@ -482,17 +530,18 @@ function onPointerDown(e) {
 
 function onPointerMove(e) {
   if (!state.running || !state.touching || e.pointerId !== state.pointerId || !state.life) return;
+  const p = pointerPos(e);
   const lx = state.life.x;
   const ly = state.life.y;
-  state.life.x = e.clientX;
-  state.life.y = e.clientY;
-  const moved = dist(lx, ly, e.clientX, e.clientY);
+  state.life.x = p.x;
+  state.life.y = p.y;
+  const moved = dist(lx, ly, p.x, p.y);
   if (moved > 4 && state.coachStep === 1) {
     state.coachStep = 2;
     showCoach("Не стой — следи за ЖАРОМ", 2400);
   }
   if ((hasMut("veins") || state.coachStep < 4) && moved > 4) {
-    state.veins.push({ x: e.clientX, y: e.clientY, life: hasMut("veins") ? 1 : 0.45, r: state.life.r * 0.5 });
+    state.veins.push({ x: p.x, y: p.y, life: hasMut("veins") ? 1 : 0.45, r: state.life.r * 0.5 });
     if (state.veins.length > 90) state.veins.shift();
   }
 }
@@ -613,15 +662,15 @@ function update(dt) {
 
   if (state.life) {
     const moved = dist(state.life.x, state.life.y, state.lastX, state.lastY);
-    // Standing still builds heat quickly; slow drift only cools gently
-    const coolFactor = hasMut("cool") ? 0.72 : 1;
-    if (moved < 3.2) {
+    // Heat fills very easily while nearly still; only fast movement cools
+    const coolFactor = hasMut("cool") ? 0.78 : 1;
+    if (moved < 6.5) {
       state.stillTimer += dt;
-      const heatRate = (0.55 + state.stillTimer * 0.55) * (0.95 + diff * 0.05) * coolFactor;
+      const heatRate = (1.35 + state.stillTimer * 1.1) * coolFactor;
       state.heat = Math.min(1, state.heat + heatRate * dt);
     } else {
       state.stillTimer = 0;
-      state.heat = Math.max(0, state.heat - (0.16 + (hasMut("cool") ? 0.08 : 0)) * dt);
+      state.heat = Math.max(0, state.heat - (0.08 + (hasMut("cool") ? 0.04 : 0)) * dt);
       if (Math.random() < 0.4) {
         state.burns.push({
           x: state.life.x,
@@ -658,7 +707,7 @@ function update(dt) {
       return;
     }
   } else {
-    state.heat = Math.max(0, state.heat - 0.12 * dt);
+    state.heat = Math.max(0, state.heat - 0.06 * dt);
   }
 
   heatFill.style.width = `${Math.round(state.heat * 100)}%`;
@@ -711,8 +760,8 @@ function update(dt) {
 
     if (state.life && dist(s.x, s.y, state.life.x, state.life.y) < state.life.r + s.r * 0.15) {
       state.sparks.splice(i, 1);
-      if (s.type === "cool") state.heat = Math.max(0, state.heat - 0.18);
-      else state.heat = Math.max(0, state.heat - 0.015);
+      if (s.type === "cool") state.heat = Math.max(0, state.heat - 0.1);
+      else state.heat = Math.max(0, state.heat - 0.005);
       if (s.type === "bait") {
         spawnHunter();
         showToast("приманка!");
@@ -827,11 +876,10 @@ function update(dt) {
 }
 
 function palette() {
-  if (hasMut("bloom")) return { a: "#2a1830", b: "#120d14", glow: "rgba(255,122,209,0.10)" };
-  if (hasMut("fang")) return { a: "#2a1418", b: "#120d14", glow: "rgba(255,61,102,0.10)" };
-  if (hasMut("magnet")) return { a: "#1a2030", b: "#100e16", glow: "rgba(126,182,255,0.10)" };
-  if (hasMut("cool")) return { a: "#152428", b: "#0e1216", glow: "rgba(109,255,194,0.10)" };
-  return { a: "#2a171d", b: "#120d14", glow: "rgba(255,104,64,0.08)" };
+  const a = cssVar("--bg1", "#24161c");
+  const b = cssVar("--bg0", "#120d14");
+  const ember = cssVar("--ember", "#ff6840");
+  return { a, b, glow: ember };
 }
 
 function drawBackground() {
@@ -845,14 +893,28 @@ function drawBackground() {
   const cx = state.life ? state.life.x : state.width * 0.5;
   const cy = state.life ? state.life.y : state.height * 0.48;
   const rg = ctx.createRadialGradient(cx, cy, 10, cx, cy, state.width * 0.7);
-  rg.addColorStop(0, p.glow);
-  rg.addColorStop(1, "transparent");
+  ctx.fillStyle = p.glow;
+  ctx.globalAlpha = 0.12;
+  ctx.beginPath();
+  ctx.arc(cx, cy, state.width * 0.55, 0, Math.PI * 2);
+  ctx.fill();
+  // soft falloff via second pass
+  ctx.globalAlpha = 1;
   ctx.fillStyle = rg;
+  // recreate with alpha stops
+  const soft = ctx.createRadialGradient(cx, cy, 10, cx, cy, state.width * 0.7);
+  soft.addColorStop(0, p.glow);
+  soft.addColorStop(1, "transparent");
+  ctx.globalAlpha = 0.16;
+  ctx.fillStyle = soft;
   ctx.fillRect(0, 0, state.width, state.height);
+  ctx.globalAlpha = 1;
 
   if (state.bloom > 0) {
-    ctx.fillStyle = `rgba(242,193,90,${state.bloom * 0.08})`;
+    ctx.fillStyle = cssVar("--gold", "#f2c15a");
+    ctx.globalAlpha = state.bloom * 0.08;
     ctx.fillRect(0, 0, state.width, state.height);
+    ctx.globalAlpha = 1;
   }
 
   for (const a of state.ash) {
@@ -889,9 +951,9 @@ function drawLifeBody(L, alpha = 1) {
   }
   ctx.closePath();
   const body = ctx.createRadialGradient(L.x - L.r * 0.2, L.y - L.r * 0.25, 2, L.x, L.y, L.r);
-  body.addColorStop(0, heatTint > 0.7 ? "#ffe1b0" : "#eafff2");
-  body.addColorStop(0.55, heatTint > 0.7 ? "#ff6840" : hasMut("magnet") ? "#9ec8ff" : "#6dffc2");
-  body.addColorStop(1, heatTint > 0.85 ? "#ff3d66" : "#1c5a48");
+  body.addColorStop(0, heatTint > 0.7 ? cssVar("--gold", "#ffe1b0") : "#eafff2");
+  body.addColorStop(0.55, heatTint > 0.7 ? cssVar("--ember", "#ff6840") : cssVar("--life", "#6dffc2"));
+  body.addColorStop(1, heatTint > 0.85 ? cssVar("--danger", "#ff3d66") : "#1c5a48");
   ctx.fillStyle = body;
   ctx.fill();
 
