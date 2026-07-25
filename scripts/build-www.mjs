@@ -37,7 +37,7 @@ if (existsSync(indexPath)) {
   let html = readFileSync(indexPath, "utf8");
   html = html.replace(
     /<script src="js\/game\.js\?v=[^"]+" type="module"><\/script>/,
-    `<script src="js/native.js" type="module"></script>\n  <script src="js/game.js?v=photos1" type="module"></script>`
+    `<script src="js/native.js" type="module"></script>\n  <script src="js/game.js?v=photos2" type="module"></script>`
   );
   writeFileSync(indexPath, html);
 }

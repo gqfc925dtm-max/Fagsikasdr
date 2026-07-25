@@ -37,9 +37,18 @@ const DEATH = {
   HUNGER: "свет иссяк — слишком долго без пищи",
 };
 
+const PHOTO_VER = "2";
 const PHOTOS = {
-  ocean: { src: "./assets/ocean.jpg", img: null, ready: false },
-  fish: { src: "./assets/fish-evil.jpg", img: null, ready: false },
+  ocean: {
+    src: new URL(`../assets/ocean.jpg?v=${PHOTO_VER}`, import.meta.url).href,
+    img: null,
+    ready: false,
+  },
+  fish: {
+    src: new URL(`../assets/fish-evil.jpg?v=${PHOTO_VER}`, import.meta.url).href,
+    img: null,
+    ready: false,
+  },
 };
 
 function loadImage(entry) {
@@ -2019,6 +2028,19 @@ function resetDemo() {
   applyThemeFromScore(false);
   for (let i = 0; i < 3; i += 1) spawnSpark();
   spawnSpark({ tutorial: true, type: "normal", near: { x: state.width * 0.48, y: state.height * 0.44 } });
+  state.hunters.push({
+    x: state.width * 0.12,
+    y: state.height * 0.28,
+    vx: 48,
+    vy: 8,
+    r: 22,
+    anger: 0.4,
+    slow: true,
+    warn: 0,
+    phase: 0,
+    nearMissed: true,
+    demo: true,
+  });
 }
 
 function startGame() {
@@ -2252,8 +2274,8 @@ function updateHunters(dt) {
   const maxHunters = Math.min(7, Math.max(1, Math.floor((2 + Math.floor(state.score / 18)) * soft)));
   state.hunterAcc += dt;
   let interval = Math.max(1.05, 3.4 - state.score * 0.026) / Math.max(0.55, soft);
-  if (!state.slowHunterSeen) interval = Math.max(interval, 4.8 + (1 - soft) * 1.6);
-  const firstHunterAt = soft < 0.7 ? OPENING_SEC + 4 : OPENING_SEC + 2;
+  if (!state.slowHunterSeen) interval = Math.max(interval, 2.4 + (1 - soft) * 1.2);
+  const firstHunterAt = soft < 0.7 ? OPENING_SEC + 0.4 : OPENING_SEC;
   while (state.hunters.length < maxHunters && state.hunterAcc >= interval) {
     state.hunterAcc -= interval;
     if (!state.slowHunterSeen && state.stats.sparkEats > 0) {
@@ -2467,6 +2489,15 @@ function updateDemo(dt) {
   state.demoClock += dt;
   if (state.sparks.length < 4 && Math.random() < 0.025) spawnSpark();
   for (const spark of state.sparks) updateSparkMotion(spark, dt * 0.7);
+  for (const hunter of state.hunters) {
+    hunter.phase += dt * 4;
+    hunter.x += (hunter.vx || 40) * dt;
+    hunter.y += Math.sin(hunter.phase) * 18 * dt;
+    if (hunter.x > state.width + 40) {
+      hunter.x = -40;
+      hunter.y = state.height * (0.22 + Math.random() * 0.35);
+    }
+  }
   if (state.life) {
     state.life.wobble += dt * 6;
     state.life.x = state.width * 0.5 + Math.sin(state.demoClock * 1.35) * state.width * 0.17;
@@ -3331,7 +3362,10 @@ function boot() {
   requestAnimationFrame(frame);
   const nativeShell = !!window.OttiskNative?.isNative;
   if ("serviceWorker" in navigator && !nativeShell) {
-    navigator.serviceWorker.register("./sw.js").catch(() => {});
+    navigator.serviceWorker
+      .register("./sw.js?v=28")
+      .then((reg) => reg.update())
+      .catch(() => {});
   }
 }
 
