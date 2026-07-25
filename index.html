@@ -18,11 +18,12 @@
   <title>ОТТИСК</title>
 </head>
 <body>
-  <div id="app" data-theme="0">
+  <div id="app" data-theme="0" data-skin="ink">
     <main id="stage" class="stage">
       <div class="aura" aria-hidden="true"></div>
       <canvas id="game" aria-label="Игровое поле ОТТИСК"></canvas>
       <div id="float-layer" class="float-layer">
+        <div id="goal-bar" class="goal-bar"></div>
         <div id="combo" class="combo"></div>
         <div id="toast" class="toast"></div>
         <div id="coach" class="coach"></div>
@@ -36,10 +37,10 @@
       </div>
       <div class="status-center">
         <div class="heat-head">
-          <span class="meta-label">жар</span>
-          <span id="heat-pct" class="heat-pct">0%</span>
+          <span class="meta-label">голод</span>
+          <span id="heat-pct" class="heat-pct">100%</span>
         </div>
-        <div id="heat" class="heat" aria-label="Жар">
+        <div id="heat" class="heat" aria-label="Голод">
           <i id="heat-fill"></i>
         </div>
         <div class="mut-track" aria-hidden="true">
@@ -49,7 +50,7 @@
       <div class="status-right">
         <span class="meta-label">форма</span>
         <span id="mut-badge" class="meta-value">искра</span>
-        <span id="theme-chip" class="meta-value dim">тон 1</span>
+        <span id="theme-chip" class="meta-value dim">уголь</span>
         <span id="next-mut" class="meta-next"></span>
       </div>
     </footer>
@@ -60,7 +61,18 @@
         <p class="eyebrow">удерживай · не кликай</p>
         <p class="brand">ОТТИСК</p>
         <h1 class="tagline">Живёт только под пальцем.</h1>
-        <p class="hint">Води по свету. Отпустил — исчезло. Красные охотники идут на след. Каждые 100 света мир меняет цвет.</p>
+        <p class="hint">Ешь свет, не дай охотникам коснуться тебя или твоего следа. Без света умираешь от голода.</p>
+        <div class="meta-panel">
+          <div class="meta-row">
+            <span class="meta-label">рекорд</span>
+            <span id="best-start" class="meta-strong">0</span>
+          </div>
+          <div class="meta-row">
+            <span class="meta-label">оттиск</span>
+            <span id="skin-name" class="meta-strong">чернь</span>
+          </div>
+          <div id="skin-unlocks" class="skin-unlocks"></div>
+        </div>
       </div>
       <div class="actions">
         <button id="btn-start" class="btn btn-primary" type="button">
@@ -68,7 +80,6 @@
           <span class="btn-sub">зажми и не отпускай</span>
         </button>
         <div class="hold-meter" aria-hidden="true"><i id="hold-fill"></i></div>
-        <p class="best">Рекорд <span id="best-start">0</span></p>
       </div>
       <p class="install-tip">iPhone · Поделиться · На экран «Домой»</p>
     </div>
@@ -82,6 +93,8 @@
         <p class="over-sub">света</p>
         <p id="death-reason" class="death-reason"></p>
         <p id="mut-summary" class="mut-summary"></p>
+        <div id="goals-result" class="goals-result"></div>
+        <p id="skin-result" class="skin-result"></p>
         <p class="best">Рекорд <span id="best-over">0</span></p>
         <button id="btn-retry" class="btn btn-primary" type="button">
           <span class="btn-main">Ещё раз</span>
@@ -91,6 +104,6 @@
       </div>
     </div>
   </div>
-  <script src="js/game.js?v=4d015b4" type="module"></script>
+  <script src="js/game.js?v=meta1" type="module"></script>
 </body>
 </html>
