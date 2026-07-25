@@ -12,7 +12,7 @@
   --glow: rgba(255, 104, 64, 0.28);
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
-  --status-h: 108px;
+  --status-h: 64px;
 }
 
 *,
@@ -75,24 +75,24 @@ body {
   position: relative;
   z-index: 6;
   flex: 0 0 auto;
-  min-height: calc(var(--status-h) + var(--safe-top));
-  padding:
-    calc(10px + var(--safe-top))
-    16px
-    12px;
+  order: 2;
+  min-height: calc(var(--status-h) + var(--safe-bottom));
+  padding: 8px 14px calc(8px + var(--safe-bottom));
   display: flex;
-  align-items: flex-end;
-  gap: 14px;
-  background: linear-gradient(180deg, var(--panel), color-mix(in srgb, var(--panel) 82%, #000));
-  border-bottom: 1px solid color-mix(in srgb, var(--foam) 10%, transparent);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+  align-items: center;
+  gap: 12px;
+  background: var(--panel);
+  border-top: 1px solid color-mix(in srgb, var(--foam) 12%, transparent);
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.25);
 }
 
 .status.hidden { display: none !important; }
 
+.stage { order: 1; }
+
 .status-score {
   flex: 0 0 auto;
-  min-width: 72px;
+  min-width: 54px;
 }
 
 .status-main {
@@ -100,47 +100,51 @@ body {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .status-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .hud-label,
 .heat-label {
   display: block;
-  font-size: 10px;
-  letter-spacing: 0.28em;
+  font-size: 9px;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--sand);
   font-weight: 700;
 }
 
+.heat-label {
+  margin-right: 2px;
+}
+
 #score {
   display: block;
   font-family: "Syne", sans-serif;
-  font-size: clamp(36px, 11vw, 52px);
+  font-size: 28px;
   font-weight: 800;
   letter-spacing: -0.045em;
   line-height: 0.92;
   color: var(--foam);
-  text-shadow: 0 0 28px var(--glow);
+  text-shadow: 0 0 18px var(--glow);
   transition: transform 0.12s ease, color 0.4s ease;
 }
 
-#score.pop { transform: scale(1.08); }
+#score.pop { transform: scale(1.06); }
 
 .mut-badge,
 .theme-chip {
   font-family: "Syne", sans-serif;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  padding: 5px 10px;
+  padding: 3px 8px;
   border-radius: 999px;
   flex-shrink: 0;
 }
@@ -148,7 +152,6 @@ body {
 .mut-badge {
   color: #1a1014;
   background: linear-gradient(120deg, var(--life), var(--gold));
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--life) 22%, transparent);
 }
 
 .theme-chip {
@@ -157,15 +160,9 @@ body {
   border: 1px solid color-mix(in srgb, var(--ember) 45%, transparent);
 }
 
-.heat-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
 .heat {
   width: 100%;
-  height: 8px;
+  height: 10px;
   border-radius: 999px;
   background: rgba(246, 239, 230, 0.1);
   overflow: hidden;

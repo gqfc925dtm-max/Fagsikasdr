@@ -71,6 +71,7 @@ const state = {
   death: "",
   time: 0,
   stillTimer: 0,
+  smoothSpeed: 0,
   lastX: 0,
   lastY: 0,
   mutation: MUTATIONS[0],
@@ -398,7 +399,8 @@ function beginLife(x, y) {
   state.lastX = x;
   state.lastY = y;
   state.stillTimer = 0;
-  state.heat = Math.max(0, state.heat - (hasMut("cool") ? 0.12 : 0.05));
+  state.heat = Math.max(0, state.heat - 0.01);
+  state.smoothSpeed = 0;
   burst(x, y, "#6dffc2", 14, 3.5);
   if (state.running) {
     tone(540, 0.06, "triangle", 0.032);
@@ -662,23 +664,22 @@ function update(dt) {
 
   if (state.life) {
     const moved = dist(state.life.x, state.life.y, state.lastX, state.lastY);
-    // Heat fills very easily while nearly still; only fast movement cools
-    const coolFactor = hasMut("cool") ? 0.78 : 1;
-    if (moved < 6.5) {
-      state.stillTimer += dt;
-      const heatRate = (1.35 + state.stillTimer * 1.1) * coolFactor;
-      state.heat = Math.min(1, state.heat + heatRate * dt);
-    } else {
-      state.stillTimer = 0;
-      state.heat = Math.max(0, state.heat - (0.08 + (hasMut("cool") ? 0.04 : 0)) * dt);
-      if (Math.random() < 0.4) {
-        state.burns.push({
-          x: state.life.x,
-          y: state.life.y,
-          r: state.life.r * 0.5,
-          life: 1,
-        });
-      }
+    // Smooth out iPhone finger jitter so "standing still" actually works
+    state.smoothSpeed = state.smoothSpeed * 0.82 + moved * 0.18;
+    const coolFactor = hasMut("cool") ? 0.75 : 1;
+    // Heat ALWAYS rises while holding. Still = fast, moving = slower, never negative.
+    const stillness = Math.max(0.4, 1 - state.smoothSpeed / 55);
+    const heatRate = (2.8 * stillness) * coolFactor;
+    state.heat = Math.min(1, state.heat + heatRate * dt);
+    if (state.smoothSpeed < 12) state.stillTimer += dt;
+    else state.stillTimer = 0;
+    if (state.smoothSpeed > 18 && Math.random() < 0.35) {
+      state.burns.push({
+        x: state.life.x,
+        y: state.life.y,
+        r: state.life.r * 0.5,
+        life: 1,
+      });
     }
     state.lastX = state.life.x;
     state.lastY = state.life.y;
@@ -707,7 +708,9 @@ function update(dt) {
       return;
     }
   } else {
-    state.heat = Math.max(0, state.heat - 0.06 * dt);
+    // Heat only drops when finger is UP
+    state.heat = Math.max(0, state.heat - 0.2 * dt);
+    state.smoothSpeed = 0;
   }
 
   heatFill.style.width = `${Math.round(state.heat * 100)}%`;
@@ -760,8 +763,8 @@ function update(dt) {
 
     if (state.life && dist(s.x, s.y, state.life.x, state.life.y) < state.life.r + s.r * 0.15) {
       state.sparks.splice(i, 1);
-      if (s.type === "cool") state.heat = Math.max(0, state.heat - 0.1);
-      else state.heat = Math.max(0, state.heat - 0.005);
+      if (s.type === "cool") state.heat = Math.max(0, state.heat - 0.05);
+      // normal sparks no longer erase heat
       if (s.type === "bait") {
         spawnHunter();
         showToast("приманка!");
@@ -892,20 +895,10 @@ function drawBackground() {
 
   const cx = state.life ? state.life.x : state.width * 0.5;
   const cy = state.life ? state.life.y : state.height * 0.48;
-  const rg = ctx.createRadialGradient(cx, cy, 10, cx, cy, state.width * 0.7);
-  ctx.fillStyle = p.glow;
-  ctx.globalAlpha = 0.12;
-  ctx.beginPath();
-  ctx.arc(cx, cy, state.width * 0.55, 0, Math.PI * 2);
-  ctx.fill();
-  // soft falloff via second pass
-  ctx.globalAlpha = 1;
-  ctx.fillStyle = rg;
-  // recreate with alpha stops
   const soft = ctx.createRadialGradient(cx, cy, 10, cx, cy, state.width * 0.7);
   soft.addColorStop(0, p.glow);
   soft.addColorStop(1, "transparent");
-  ctx.globalAlpha = 0.16;
+  ctx.globalAlpha = 0.18;
   ctx.fillStyle = soft;
   ctx.fillRect(0, 0, state.width, state.height);
   ctx.globalAlpha = 1;
@@ -1029,7 +1022,7 @@ function draw() {
     ctx.translate(h.x, h.y);
     ctx.rotate(Math.atan2(h.vy, h.vx || 0.01));
     const pulse = 1 + Math.sin(h.phase) * 0.06;
-    ctx.fillStyle = "#ff3d66";
+    ctx.fillStyle = cssVar("--danger", "#ff3d66");
     ctx.beginPath();
     ctx.moveTo(h.r * pulse, 0);
     ctx.lineTo(-h.r * 0.85, h.r * 0.72);

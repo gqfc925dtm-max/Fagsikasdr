@@ -19,27 +19,6 @@
 </head>
 <body>
   <div id="app" data-theme="0">
-    <header id="status" class="status hidden">
-      <div class="status-score">
-        <span class="hud-label">след</span>
-        <span id="score">0</span>
-      </div>
-      <div class="status-main">
-        <div class="status-row">
-          <div id="mut-badge" class="mut-badge">искра</div>
-          <div id="theme-chip" class="theme-chip">тон 1</div>
-          <div id="next-mut" class="next-mut"></div>
-        </div>
-        <div class="heat-wrap">
-          <span class="heat-label">жар</span>
-          <div id="heat" class="heat"><i id="heat-fill"></i></div>
-        </div>
-        <div class="mut-track">
-          <div id="mut-track-fill" class="mut-track-fill"></div>
-        </div>
-      </div>
-    </header>
-
     <main id="stage" class="stage">
       <div class="aura" aria-hidden="true"></div>
       <canvas id="game" aria-label="Игровое поле ОТТИСК"></canvas>
@@ -50,13 +29,32 @@
       </div>
     </main>
 
+    <footer id="status" class="status hidden">
+      <div class="status-score">
+        <span class="hud-label">след</span>
+        <span id="score">0</span>
+      </div>
+      <div class="status-main">
+        <div class="status-row">
+          <span class="heat-label">жар</span>
+          <div id="mut-badge" class="mut-badge">искра</div>
+          <div id="theme-chip" class="theme-chip">тон 1</div>
+          <div id="next-mut" class="next-mut"></div>
+        </div>
+        <div id="heat" class="heat"><i id="heat-fill"></i></div>
+        <div class="mut-track">
+          <div id="mut-track-fill" class="mut-track-fill"></div>
+        </div>
+      </div>
+    </footer>
+
     <div id="screen-start" class="screen">
       <div class="screen-bg" aria-hidden="true"></div>
       <div class="brand-block">
         <p class="eyebrow">не кликай — держи</p>
         <p class="brand">ОТТИСК</p>
         <h1 class="tagline">Живёт только под пальцем.</h1>
-        <p class="hint">Зажми и води по свету. Отпустил — исчезло. Стой на месте — сгорает. Каждые 100 света мир меняет цвет.</p>
+        <p class="hint">Зажми и води по свету. Постой на месте — жар вырастет сам. Каждые 100 света мир меняет цвет.</p>
       </div>
       <div class="actions">
         <button id="btn-start" class="btn btn-primary" type="button">
