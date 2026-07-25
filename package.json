@@ -4,8 +4,8 @@
   "private": true,
   "description": "ОТТИСК — существо живёт только под пальцем",
   "scripts": {
-    "start": "python3 -m http.server 8765",
-    "serve": "python3 -m http.server 8765",
+    "start": "npx --yes serve -l 8765 .",
+    "serve": "npx --yes serve -l 8765 .",
     "build:www": "node scripts/build-www.mjs",
     "cap:sync": "npm run build:www && npx cap sync",
     "cap:ios": "npm run build:www && npx cap open ios",

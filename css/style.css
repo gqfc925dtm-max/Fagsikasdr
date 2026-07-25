@@ -262,30 +262,25 @@ body {
   text-overflow: ellipsis;
 }
 
-.goal-bar {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 6px;
-  max-width: 100%;
-  margin-bottom: 4px;
-}
-
-.goal-chip {
-  font-size: 10px;
+.event-chip {
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--sand);
-  border: 1px solid var(--line);
-  background: color-mix(in srgb, var(--panel) 70%, transparent);
-  padding: 4px 8px;
-  border-radius: 2px;
+  color: var(--gold);
+  min-height: 16px;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
 }
 
-.goal-chip.done {
-  color: var(--life);
-  border-color: color-mix(in srgb, var(--life) 45%, transparent);
+.event-chip.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.combo.fever {
+  color: var(--ember);
 }
 
 .meta-panel {
@@ -337,7 +332,6 @@ body {
   opacity: 0.45;
 }
 
-.goals-result,
 .skin-result {
   width: 100%;
   font-size: 12px;

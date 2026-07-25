@@ -72,7 +72,6 @@ const heatFillEl = document.getElementById("heat-fill");
 const heatPctEl = document.getElementById("heat-pct");
 const mutTrackFillEl = document.getElementById("mut-track-fill");
 const nextMutEl = document.getElementById("next-mut");
-const goalBarEl = document.getElementById("goal-bar");
 const holdFillEl = document.getElementById("hold-fill");
 const holdFillOverEl = document.getElementById("hold-fill-over");
 const screenStartEl = document.getElementById("screen-start");
@@ -82,7 +81,6 @@ const bestOverEl = document.getElementById("best-over");
 const finalScoreEl = document.getElementById("final-score");
 const deathReasonEl = document.getElementById("death-reason");
 const mutSummaryEl = document.getElementById("mut-summary");
-const goalsResultEl = document.getElementById("goals-result");
 const skinResultEl = document.getElementById("skin-result");
 const skinNameEl = document.getElementById("skin-name");
 const skinUnlocksEl = document.getElementById("skin-unlocks");
@@ -90,6 +88,7 @@ const btnStart = document.getElementById("btn-start");
 const btnRetry = document.getElementById("btn-retry");
 const dailyChipEl = document.getElementById("daily-chip");
 const dailyCardEl = document.getElementById("daily-card");
+const eventChipEl = document.getElementById("event-chip");
 const streakStartEl = document.getElementById("streak-start");
 const marksStartEl = document.getElementById("marks-start");
 const screenContinueEl = document.getElementById("screen-continue");
@@ -115,55 +114,11 @@ const onboardLabelEl = document.getElementById("onboard-label");
 const onboardSubEl = document.getElementById("onboard-sub");
 const shareCanvasEl = document.getElementById("share-canvas");
 
-const GOAL_DEFS = [
-  {
-    id: "light12",
-    title: "12 света",
-    label: (s) => `свет ${Math.min(s.stats.sparkEats, 12)}/12`,
-    check: (s) => s.stats.sparkEats >= 12,
-  },
-  {
-    id: "rare3",
-    title: "3 редких",
-    label: (s) => `редкие ${Math.min(s.stats.rareEats, 3)}/3`,
-    check: (s) => s.stats.rareEats >= 3,
-  },
-  {
-    id: "theme2",
-    title: "тема 2",
-    label: (s) => (s.score >= 100 ? "тема 2" : `${Math.min(s.score, 100)}/100`),
-    check: (s) => s.score >= 100,
-  },
-  {
-    id: "fang",
-    title: "клык",
-    label: (s) => (hasMut("fang") ? "клык" : `${Math.min(s.score, 30)}/30`),
-    check: () => hasMut("fang"),
-  },
-  {
-    id: "combo6",
-    title: "цепь 6",
-    label: (s) => `цепь ${Math.min(s.stats.maxCombo, 6)}/6`,
-    check: (s) => s.stats.maxCombo >= 6,
-  },
-  {
-    id: "survive45",
-    title: "45 секунд",
-    label: (s) => `${Math.min(Math.floor(s.elapsed), 45)}/45с`,
-    check: (s) => s.elapsed >= 45,
-  },
-  {
-    id: "hunters2",
-    title: "2 охотника",
-    label: (s) => `охота ${Math.min(s.stats.hunterEats, 2)}/2`,
-    check: (s) => s.stats.hunterEats >= 2,
-  },
-  {
-    id: "dodge4",
-    title: "4 мимо",
-    label: (s) => `мимо ${Math.min(s.stats.nearMisses, 4)}/4`,
-    check: (s) => s.stats.nearMisses >= 4,
-  },
+const RUN_EVENTS = [
+  { id: "rain", title: "ливень света", dur: 4.2 },
+  { id: "raid", title: "облава", dur: 3.2 },
+  { id: "calm", title: "тишина", dur: 5.0 },
+  { id: "comet", title: "комета", dur: 0.8 },
 ];
 
 const DAILY_DEFS = [
@@ -243,8 +198,6 @@ const state = {
   flash: 0,
   shake: 0,
   deathReason: "",
-  goals: [],
-  evaluatingGoals: false,
   coachCount: 0,
   hold: null,
   meta: null,
@@ -260,6 +213,13 @@ const state = {
   timeScale: 1,
   slowmoUntil: 0,
   onboardStep: 0,
+  event: null,
+  eventAcc: 0,
+  eventNext: 11,
+  eventRainAcc: 0,
+  pulseCd: 0,
+  holdLifeTime: 0,
+  fever: false,
   tipFlags: {
     move: false,
     hunter: false,
@@ -443,16 +403,81 @@ function playSparkTone(type) {
   } else if (type === "bait") {
     tone(260, 0.08, "square", 0.028);
     tone(190, 0.1, "triangle", 0.022, 0.07);
+  } else if (type === "comet") {
+    tone(740, 0.08, "triangle", 0.034);
+    tone(1100, 0.12, "sine", 0.03, 0.07);
   } else {
     tone(620 + Math.min(12, state.combo) * 18, 0.055, "sine", 0.028);
   }
 }
 
-function showCombo(text) {
+function showCombo(text, fever = false) {
   comboEl.textContent = text;
-  comboEl.className = "combo show";
+  comboEl.className = `combo show${fever ? " fever" : ""}`;
   clearTimeout(showCombo.timer);
-  showCombo.timer = setTimeout(() => comboEl.classList.remove("show"), 750);
+  showCombo.timer = setTimeout(() => {
+    comboEl.classList.remove("show");
+    if (!state.fever) comboEl.classList.remove("fever");
+  }, 750);
+}
+
+function setEventChip(text) {
+  if (!eventChipEl) return;
+  if (!text) {
+    eventChipEl.textContent = "";
+    eventChipEl.classList.remove("show");
+    return;
+  }
+  eventChipEl.textContent = text;
+  eventChipEl.classList.add("show");
+}
+
+function activeEventId() {
+  return state.event?.id || "";
+}
+
+function startRunEvent(def) {
+  state.event = { id: def.id, title: def.title, t: def.dur };
+  setEventChip(def.title);
+  showToast(def.title);
+  tone(640, 0.07, "triangle", 0.028);
+  tone(880, 0.1, "sine", 0.022, 0.06);
+  buzz([8, 14, 8]);
+  state.flash = Math.max(state.flash, 0.1);
+  if (def.id === "raid") {
+    spawnHunter(false);
+    spawnHunter(false);
+  } else if (def.id === "comet") {
+    spawnComet();
+  } else if (def.id === "rain") {
+    state.eventRainAcc = 0;
+    for (let i = 0; i < 3; i += 1) spawnSpark({ edge: true });
+  }
+}
+
+function updateRunEvents(dt) {
+  if (state.event) {
+    state.event.t -= dt;
+    if (state.event.id === "rain") {
+      state.eventRainAcc += dt;
+      while (state.eventRainAcc >= 0.38) {
+        state.eventRainAcc -= 0.38;
+        spawnSpark({ edge: true, type: Math.random() < 0.18 ? "rare" : null });
+      }
+    }
+    if (state.event.t <= 0) {
+      state.event = null;
+      setEventChip("");
+      state.eventNext = rand(10, 16);
+      state.eventAcc = 0;
+    }
+    return;
+  }
+  if (state.elapsed < 8) return;
+  state.eventAcc += dt;
+  if (state.eventAcc < state.eventNext) return;
+  const pick = RUN_EVENTS[Math.floor(Math.random() * RUN_EVENTS.length)];
+  startRunEvent(pick);
 }
 
 function showToast(text, ms = 1450) {
@@ -590,8 +615,9 @@ function loadMeta() {
     premiumUnlocked,
     sound: raw?.sound !== false,
     haptics: raw?.haptics !== false,
-    onboarded: !!raw?.onboarded,
-    starterGift: !!raw?.starterGift,
+    // Returning players skip onboarding even if the flag was added later.
+    onboarded: !!raw?.onboarded || best > 0 || marks > 0 || Math.max(0, Number(raw?.runs || 0)) > 0,
+    starterGift: !!raw?.starterGift || best > 0 || marks > 0,
     ratePrompted: !!raw?.ratePrompted,
     runs: Math.max(0, Number(raw?.runs || 0)),
     weekId: currentWeek,
@@ -989,32 +1015,6 @@ function updateHungerUi() {
   if (pct < 28 && state.running && state.life) tipOnce("hunger", "ЕШЬ СВЕТ", 1500);
 }
 
-function renderGoals() {
-  goalBarEl.textContent = "";
-  for (const goal of state.goals) {
-    const chip = document.createElement("span");
-    chip.className = `goal-chip${goal.done ? " done" : ""}`;
-    chip.textContent = goal.label(state);
-    goalBarEl.appendChild(chip);
-  }
-}
-
-function renderGoalsResult() {
-  goalsResultEl.textContent = "";
-  const done = state.goals.filter((goal) => goal.done);
-  if (!done.length) {
-    goalsResultEl.textContent = "цели не завершены";
-    return;
-  }
-  done.forEach((goal, index) => {
-    const chip = document.createElement("span");
-    chip.className = "goal-chip done";
-    chip.textContent = goal.title;
-    goalsResultEl.appendChild(chip);
-    if (index < done.length - 1) goalsResultEl.appendChild(document.createTextNode(" "));
-  });
-}
-
 function renderSkinResult() {
   const current = activeSkin().name;
   if (!state.runUnlockedSkins.length) {
@@ -1038,46 +1038,6 @@ function renderDailyResult() {
       ? `за забег · +${state.runMarks} следов`
       : "за забег · следы не набраны";
   }
-}
-
-function pickRunGoals() {
-  state.goals = shuffle([...GOAL_DEFS]).slice(0, 3).map((goal) => ({
-    ...goal,
-    done: false,
-  }));
-  renderGoals();
-}
-
-function evaluateGoals() {
-  if (state.evaluatingGoals) return;
-  state.evaluatingGoals = true;
-  const newlyDone = [];
-  for (const goal of state.goals) {
-    if (!goal.done && goal.check(state)) {
-      goal.done = true;
-      newlyDone.push(goal);
-    }
-  }
-  renderGoals();
-  state.evaluatingGoals = false;
-  for (const goal of newlyDone) {
-    showToast(`цель: ${goal.title}`);
-    goalChime();
-    buzz([8, 18, 8]);
-    floatText(state.width * 0.5, state.height * 0.24, "+5", cssVar("--life", "#6fd9b0"), 18);
-    addScore(5, state.width * 0.5, state.height * 0.28, {
-      combo: false,
-      silentFloat: true,
-      color: cssVar("--life", "#6fd9b0"),
-    });
-    awardMarks(5, {
-      x: state.width * 0.5,
-      y: state.height * 0.18,
-      color: cssVar("--gold", "#f2c15a"),
-      size: 15,
-    });
-  }
-  evaluateDaily();
 }
 
 function syncMutation() {
@@ -1106,18 +1066,29 @@ function afterScoreChange(pop = false) {
   syncMutation();
   applyThemeFromScore(pop);
   checkScoreMilestones();
-  renderGoals();
-  evaluateGoals();
+  evaluateDaily();
 }
 
 function addScore(amount, x, y, opts = {}) {
   if (!amount) return;
-  state.score += amount;
+  let gained = amount;
+  if (opts.combo !== false && (state.fever || state.combo >= 4)) {
+    gained = Math.max(amount, Math.round(amount * 1.5));
+  }
+  state.score += gained;
   if (opts.combo !== false) {
     state.combo += 1;
     state.comboClock = 2.8;
     state.stats.maxCombo = Math.max(state.stats.maxCombo, state.combo);
-    if (state.combo >= 2) showCombo(`цепь ×${state.combo}`);
+    const feverNow = state.combo >= 5;
+    if (feverNow && !state.fever) {
+      showToast("жар цепи");
+      buzz([10, 16, 10]);
+      tone(700, 0.08, "triangle", 0.03);
+      state.bloomPulse = Math.max(state.bloomPulse, 0.55);
+    }
+    state.fever = feverNow;
+    if (state.combo >= 2) showCombo(feverNow ? `жар ×${state.combo}` : `цепь ×${state.combo}`, feverNow);
     if (state.combo === 8) {
       awardMarks(2, {
         x: state.width * 0.5,
@@ -1138,7 +1109,7 @@ function addScore(amount, x, y, opts = {}) {
     }
   }
   if (!opts.silentFloat && x != null && y != null) {
-    floatText(x, y, `+${amount}`, opts.color || cssVar("--gold", "#f2c15a"));
+    floatText(x, y, `+${gained}`, opts.color || cssVar("--gold", "#f2c15a"));
   }
   afterScoreChange(true);
 }
@@ -1317,7 +1288,6 @@ function finalizeGameOver(reason) {
     .filter((id) => id !== "spark")
     .map((id) => mutationForScore(MUTATIONS.find((m) => m.id === id)?.at || 0).name);
   mutSummaryEl.textContent = muts.length ? `формы: ${muts.join(" · ")}` : "форма осталась искрой";
-  renderGoalsResult();
   renderSkinResult();
   renderDailyResult();
   updateBestLabels();
@@ -1332,6 +1302,7 @@ function finalizeGameOver(reason) {
 
 function createLife(x, y, opts = {}) {
   state.echo = null;
+  state.holdLifeTime = 0;
   state.life = {
     x,
     y,
@@ -1351,16 +1322,46 @@ function createLife(x, y, opts = {}) {
   }
 }
 
+function releasePulse(x, y) {
+  if (state.pulseCd > 0 || state.holdLifeTime < 0.45) return false;
+  state.pulseCd = 2.6;
+  let pushed = 0;
+  for (const hunter of state.hunters) {
+    const d = dist(hunter.x, hunter.y, x, y);
+    if (d > 150) continue;
+    const force = (1 - d / 150) * 9.5;
+    hunter.vx += ((hunter.x - x) / (d || 1)) * force;
+    hunter.vy += ((hunter.y - y) / (d || 1)) * force;
+    hunter.warn = Math.max(hunter.warn, 0.7);
+    pushed += 1;
+  }
+  burst(x, y, cssVar("--foam", "#f3eee8"), 14, 4.2);
+  state.flash = Math.max(state.flash, 0.08);
+  tone(300, 0.07, "sine", 0.024);
+  tone(180, 0.1, "triangle", 0.02, 0.05);
+  if (pushed) {
+    showToast("импульс");
+    buzz(8);
+  }
+  return pushed > 0;
+}
+
 function releaseLife() {
   if (!state.life) return;
+  const x = state.life.x;
+  const y = state.life.y;
+  const wobble = state.life.wobble;
+  const r = state.life.r * 0.92;
+  releasePulse(x, y);
   state.echo = {
-    x: state.life.x,
-    y: state.life.y,
-    r: state.life.r * 0.92,
-    wobble: state.life.wobble,
+    x,
+    y,
+    r,
+    wobble,
     life: 1,
   };
   state.life = null;
+  state.holdLifeTime = 0;
   hum(false);
   if (state.running) tipOnce("echo", "СЛЕД УЯЗВИМ", 1400);
 }
@@ -1539,6 +1540,9 @@ function sparkProfile(type) {
   if (type === "bait") {
     return { type, worth: 1, restore: 12, color: "#ff7fd7", r: rand(6, 8.5) };
   }
+  if (type === "comet") {
+    return { type, worth: 5, restore: 28, color: "#ffe08a", r: rand(8, 10.5), comet: true };
+  }
   return { type: "normal", worth: 1, restore: 18, color: "#ffe2b0", r: rand(5.5, 7.6) };
 }
 
@@ -1548,6 +1552,24 @@ function rollSparkType() {
   if (r < 0.18) return "cool";
   if (r < 0.26) return "bait";
   return "normal";
+}
+
+function spawnComet() {
+  const fromLeft = Math.random() < 0.5;
+  const y = rand(state.height * 0.18, state.height * 0.78);
+  const x = fromLeft ? -20 : state.width + 20;
+  const speed = rand(3.2, 4.4);
+  const profile = sparkProfile("comet");
+  state.sparks.push({
+    x,
+    y,
+    vx: fromLeft ? speed : -speed,
+    vy: rand(-0.35, 0.35),
+    pulse: Math.random() * Math.PI * 2,
+    tutorial: false,
+    grace: 0.1,
+    ...profile,
+  });
 }
 
 function spawnSpark(opts = {}) {
@@ -1635,7 +1657,6 @@ function registerNearMiss(hunter, x, y) {
   if (state.stats.nearMisses === 1 || state.stats.nearMisses % 4 === 0) {
     showToast("мимо");
   }
-  evaluateGoals();
 }
 
 function resetStats() {
@@ -1685,6 +1706,13 @@ function resetRun() {
   state.hungerWarnClock = 0;
   state.coachCount = 0;
   state.tipFlags = { move: false, hunter: false, hunger: false, echo: false };
+  state.event = null;
+  state.eventAcc = 0;
+  state.eventNext = rand(9, 13);
+  state.eventRainAcc = 0;
+  state.pulseCd = 0;
+  state.holdLifeTime = 0;
+  state.fever = false;
   resetStats();
   clearHold();
   applyThemeFromScore(false);
@@ -1692,6 +1720,7 @@ function resetRun() {
   updateHungerUi();
   updateMutationUi();
   renderDaily();
+  setEventChip("");
   comboEl.className = "combo";
   toastEl.className = "toast";
   coachEl.className = "coach";
@@ -1702,8 +1731,6 @@ function resetRun() {
   dailyResultEl.textContent = "";
   if (marksResultEl) marksResultEl.textContent = "";
   screenContinueEl?.classList.add("hidden");
-  goalsResultEl.textContent = "";
-  pickRunGoals();
   for (let i = 0; i < 9; i += 1) spawnSpark();
   spawnSpark({ tutorial: true, type: "normal", near: { x: state.width * 0.5, y: state.height * 0.42 } });
 }
@@ -1844,6 +1871,11 @@ function updateAsh(dt) {
 
 function updateSparkMotion(spark, dt) {
   spark.pulse += dt * 5.2;
+  if (spark.comet) {
+    spark.x += spark.vx * dt * 60;
+    spark.y += spark.vy * dt * 60;
+    return;
+  }
   spark.vx += Math.sin(state.time * 1.3 + spark.y * 0.012) * 0.006;
   spark.vy += Math.cos(state.time * 1.1 + spark.x * 0.01) * 0.004;
   spark.vx *= 0.992;
@@ -1869,7 +1901,11 @@ function updateSparks(dt) {
   for (let i = state.sparks.length - 1; i >= 0; i -= 1) {
     const spark = state.sparks[i];
     spark.grace = Math.max(0, (spark.grace || 0) - dt);
-    if (state.life && magnetPull > 0) {
+    if (spark.comet && (spark.x < -80 || spark.x > state.width + 80)) {
+      state.sparks.splice(i, 1);
+      continue;
+    }
+    if (state.life && magnetPull > 0 && !spark.comet) {
       const d = dist(spark.x, spark.y, state.life.x, state.life.y);
       if (d < 200) {
         const force = (1 - d / 200) * magnetPull;
@@ -1961,6 +1997,8 @@ function updateHunters(dt) {
     const ang = Math.atan2(ty - hunter.y, tx - hunter.x);
     let speed = (0.95 + state.score * 0.012) * hunter.anger;
     if (hasMut("cool") && state.hunger < 50) speed *= 0.85;
+    if (activeEventId() === "calm") speed *= 0.62;
+    if (activeEventId() === "raid") speed *= 1.12;
     hunter.vx += Math.cos(ang) * speed * dt * 3.1;
     hunter.vy += Math.sin(ang) * speed * dt * 3.1;
     hunter.vx *= 0.955;
@@ -2053,8 +2091,13 @@ function updateRun(dt) {
   state.elapsed += dt;
   state.spawnAcc += dt;
   state.comboClock = Math.max(0, state.comboClock - dt);
-  if (state.comboClock <= 0 && state.combo !== 0) state.combo = 0;
+  if (state.comboClock <= 0 && state.combo !== 0) {
+    state.combo = 0;
+    state.fever = false;
+  }
+  state.pulseCd = Math.max(0, state.pulseCd - dt);
   if (state.life) {
+    state.holdLifeTime += dt;
     const prevX = state.life.px ?? state.life.x;
     const prevY = state.life.py ?? state.life.y;
     const moved = dist(state.life.x, state.life.y, prevX, prevY);
@@ -2063,6 +2106,7 @@ function updateRun(dt) {
     state.life.py = state.life.y;
     state.life.wobble += dt * 7.2;
     state.life.r = 22 + Math.min(9, state.combo * 0.75) + Math.sin(state.life.wobble) * 1.25;
+    if (state.fever) state.life.r += 2.2;
     state.life.teeth = hasMut("fang") && state.combo >= 4 ? Math.min(1, state.life.teeth + dt * 3) : Math.max(0, state.life.teeth - dt * 3);
     clampLife();
     updateHum();
@@ -2075,8 +2119,9 @@ function updateRun(dt) {
   state.guideSpark = state.life ? nearestSpark(state.life.x, state.life.y) : null;
   // Standing still drains hunger faster — no AFK farming
   const stillPenalty = state.life && (state.life.speed || 0) < 6 ? 1.55 : 1;
+  const calmMul = activeEventId() === "calm" ? 0.55 : 1;
   if (state.life) {
-    state.hunger -= HUNGER_DRAIN_PER_SEC * dt * (hasMut("cool") ? 0.7 : 1) * stillPenalty;
+    state.hunger -= HUNGER_DRAIN_PER_SEC * dt * (hasMut("cool") ? 0.7 : 1) * stillPenalty * calmMul;
     state.hunger = Math.max(0, state.hunger);
   }
   updateHungerUi();
@@ -2099,6 +2144,7 @@ function updateRun(dt) {
   updateSparks(dt);
   tryCompleteByHunger();
   if (!state.running) return;
+  updateRunEvents(dt);
   updateHunters(dt);
   if (!state.running) return;
   updateVeins(dt);
@@ -2106,8 +2152,6 @@ function updateRun(dt) {
   state.bloomPulse = Math.max(0, state.bloomPulse - dt * 0.85);
   state.flash = Math.max(0, state.flash - dt * 1.9);
   state.shake *= Math.pow(0.9, dt * 60);
-  renderGoals();
-  evaluateGoals();
 }
 
 function updateDemo(dt) {
