@@ -1,12 +1,16 @@
-const CACHE = "ottisk-v12";
+const CACHE = "ottisk-v13";
 const ASSETS = [
   "./",
   "./index.html",
+  "./privacy.html",
+  "./support.html",
   "./css/style.css",
   "./js/game.js",
+  "./js/native.js",
   "./manifest.json",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
+  "./icons/icon-1024.png",
   "./icons/apple-touch-icon.png",
 ];
 

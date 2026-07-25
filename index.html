@@ -92,6 +92,11 @@
         <div class="hold-meter" aria-hidden="true"><i id="hold-fill"></i></div>
       </div>
       <p class="install-tip">iPhone · Поделиться · На экран «Домой»</p>
+      <p class="legal-links">
+        <a href="./privacy.html">Конфиденциальность</a>
+        <span aria-hidden="true">·</span>
+        <a href="./support.html">Поддержка</a>
+      </p>
     </div>
 
     <div id="screen-continue" class="screen hidden">
@@ -100,11 +105,10 @@
         <p class="over-label">Ещё один след</p>
         <p class="brand over-brand">ВТОРОЙ ШАНС</p>
         <p id="continue-reason" class="death-reason"></p>
-        <p class="hint continue-hint">Посмотри короткую «рекламу» — и продолжи с этим счётом. Один раз за забег.</p>
-        <div id="ad-meter" class="ad-meter"><i id="ad-fill"></i></div>
+        <p id="continue-hint" class="hint continue-hint">Один бесплатный шанс за забег. Дальше — за следы.</p>
         <button id="btn-continue" class="btn btn-primary" type="button">
-          <span class="btn-main" id="continue-label">Смотреть 3 сек</span>
-          <span class="btn-sub">затем продолжить</span>
+          <span class="btn-main" id="continue-label">Продолжить</span>
+          <span class="btn-sub" id="continue-sub">бесплатно · 1 раз</span>
         </button>
         <button id="btn-skip-continue" class="btn btn-ghost" type="button">
           <span class="btn-main">Закончить</span>
@@ -142,6 +146,7 @@
 
     <canvas id="share-canvas" width="720" height="900" class="share-canvas" aria-hidden="true"></canvas>
   </div>
-  <script src="js/game.js?v=feel2" type="module"></script>
+  <script src="js/native.js" type="module"></script>
+  <script src="js/game.js?v=store1" type="module"></script>
 </body>
 </html>

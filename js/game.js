@@ -3,7 +3,12 @@ const META_KEY = "ottisk-meta-v1";
 const HOLD_SECONDS = 0.62;
 const HUNGER_DRAIN_PER_SEC = 100 / 12;
 const ECHO_FADE_SEC = 2.35;
+const FREE_CONTINUES_PER_RUN = 1;
+const MARKS_CONTINUE_COST = 12;
+const MAX_CONTINUES_PER_RUN = 2;
 const SHARE_URL = "https://gqfc925dtm-max.github.io/Fagsikasdr/";
+const PRIVACY_URL = `${SHARE_URL}privacy.html`;
+const SUPPORT_URL = `${SHARE_URL}support.html`;
 const THEME_NAMES = ["уголь", "глубина", "янтарь", "мох", "дымка", "пыльца"];
 const SCORE_MILESTONES = [
   { at: 10, marks: 2, text: "первый ритм" },
@@ -77,9 +82,10 @@ const streakStartEl = document.getElementById("streak-start");
 const marksStartEl = document.getElementById("marks-start");
 const screenContinueEl = document.getElementById("screen-continue");
 const continueReasonEl = document.getElementById("continue-reason");
+const continueHintEl = document.getElementById("continue-hint");
 const btnContinue = document.getElementById("btn-continue");
 const continueLabelEl = document.getElementById("continue-label");
-const adFillEl = document.getElementById("ad-fill");
+const continueSubEl = document.getElementById("continue-sub");
 const btnSkipContinue = document.getElementById("btn-skip-continue");
 const btnShare = document.getElementById("btn-share");
 const streakOverEl = document.getElementById("streak-over");
@@ -222,12 +228,9 @@ const state = {
   meta: null,
   runUnlockedSkins: [],
   pendingDeathReason: "",
-  continueUsed: false,
+  continuesUsed: 0,
   safeUntil: 0,
-  continueAdActive: false,
-  continueAdStartedAt: 0,
-  continueAdRaf: 0,
-  continueClickGuardUntil: 0,
+  continueBusy: false,
   paused: false,
   runMarks: 0,
   milestonesHit: [],
@@ -300,6 +303,11 @@ function mixColor(a, b, t) {
 
 function buzz(pattern = 8) {
   if (navigator.vibrate) navigator.vibrate(pattern);
+  const native = window.OttiskNative;
+  if (native?.isNative) {
+    const style = Array.isArray(pattern) || pattern >= 16 ? "medium" : "light";
+    native.haptic?.(style);
+  }
 }
 
 function ensureAudio() {
@@ -1045,52 +1053,48 @@ function bindHoldButton(button, target) {
   button.addEventListener("click", (e) => e.preventDefault());
 }
 
-function setContinueAdProgress(progress) {
-  const pct = `${Math.round(clamp(progress, 0, 1) * 100)}%`;
-  if (adFillEl) adFillEl.style.width = pct;
-  if (!continueLabelEl) return;
-  if (progress >= 1) {
-    continueLabelEl.textContent = "Продолжить";
-    return;
+function continueOffer() {
+  const used = state.continuesUsed || 0;
+  if (used >= MAX_CONTINUES_PER_RUN) {
+    return { ok: false, kind: "none", label: "Лимит", sub: "забег исчерпан", cost: 0 };
   }
-  const remain = Math.max(1, Math.ceil(3 - progress * 3));
-  continueLabelEl.textContent = progress > 0 ? `Смотрим ${remain} сек` : "Смотреть 3 сек";
-}
-
-function stopContinueAd(reset = true) {
-  state.continueAdActive = false;
-  state.continueAdStartedAt = 0;
-  if (state.continueAdRaf) cancelAnimationFrame(state.continueAdRaf);
-  state.continueAdRaf = 0;
-  if (reset) setContinueAdProgress(0);
-}
-
-function continueAdFrame(ts) {
-  if (!state.continueAdActive) return;
-  if (!state.continueAdStartedAt) state.continueAdStartedAt = ts;
-  const progress = clamp((ts - state.continueAdStartedAt) / 3000, 0, 1);
-  setContinueAdProgress(progress);
-  if (progress >= 1) {
-    stopContinueAd(false);
-    grantContinue();
-    return;
+  if (used < FREE_CONTINUES_PER_RUN) {
+    return { ok: true, kind: "free", label: "Продолжить", sub: "бесплатно · 1 раз", cost: 0 };
   }
-  state.continueAdRaf = requestAnimationFrame(continueAdFrame);
+  const marks = state.meta?.marks || 0;
+  const affordable = marks >= MARKS_CONTINUE_COST;
+  return {
+    ok: affordable,
+    kind: "marks",
+    label: affordable ? "Продолжить" : "Мало следов",
+    sub: `${MARKS_CONTINUE_COST} следов · есть ${marks}`,
+    cost: MARKS_CONTINUE_COST,
+  };
 }
 
-function startContinueAd() {
-  if (!state.pendingDeathReason || state.continueAdActive) return;
-  ensureAudio();
-  state.continueAdActive = true;
-  state.continueAdStartedAt = 0;
-  setContinueAdProgress(0.01);
-  state.continueAdRaf = requestAnimationFrame(continueAdFrame);
+function canOfferContinue() {
+  return continueOffer().kind !== "none";
+}
+
+function refreshContinueUi() {
+  const offer = continueOffer();
+  if (continueLabelEl) continueLabelEl.textContent = offer.label;
+  if (continueSubEl) continueSubEl.textContent = offer.sub;
+  if (continueHintEl) {
+    continueHintEl.textContent = offer.kind === "free"
+      ? "Один бесплатный шанс за забег. Счёт сохранится."
+      : offer.ok
+        ? `Дополнительный шанс за ${MARKS_CONTINUE_COST} следов.`
+        : `Нужно ${MARKS_CONTINUE_COST} следов. Сыграй ещё — копи следы.`;
+  }
+  if (btnContinue) btnContinue.disabled = !offer.ok;
 }
 
 function showContinueScreen(reason) {
   state.pendingDeathReason = reason;
-  stopContinueAd(true);
+  state.continueBusy = false;
   if (continueReasonEl) continueReasonEl.textContent = reason;
+  refreshContinueUi();
   statusEl.classList.add("hidden");
   screenOverEl.classList.add("hidden");
   screenContinueEl?.classList.remove("hidden");
@@ -1100,7 +1104,7 @@ function showContinueScreen(reason) {
 function finalizeGameOver(reason) {
   state.deathReason = reason;
   state.pendingDeathReason = "";
-  stopContinueAd(true);
+  state.continueBusy = false;
   evaluateDaily();
   finalScoreEl.textContent = String(state.score);
   deathReasonEl.textContent = reason;
@@ -1157,7 +1161,8 @@ function releaseLife() {
 
 function grantContinue() {
   state.pendingDeathReason = "";
-  state.continueUsed = true;
+  state.continuesUsed = (state.continuesUsed || 0) + 1;
+  state.continueBusy = false;
   state.paused = false;
   state.running = true;
   state.demo = false;
@@ -1181,6 +1186,33 @@ function grantContinue() {
   tone(780, 0.12, "sine", 0.026, 0.07);
   showToast("щит · 3 сек");
   buzz([8, 20, 8]);
+  window.OttiskNative?.haptic?.("medium");
+}
+
+function requestContinue() {
+  if (!state.pendingDeathReason || state.continueBusy) return;
+  const offer = continueOffer();
+  if (!offer.ok) {
+    showToast(offer.kind === "marks" ? `нужно ${MARKS_CONTINUE_COST} следов` : "лимит шансов");
+    refreshContinueUi();
+    return;
+  }
+  ensureAudio();
+  state.continueBusy = true;
+  if (offer.kind === "marks") {
+    if (!state.meta || (state.meta.marks || 0) < offer.cost) {
+      state.continueBusy = false;
+      showToast(`нужно ${offer.cost} следов`);
+      refreshContinueUi();
+      return;
+    }
+    state.meta.marks = Math.max(0, state.meta.marks - offer.cost);
+    saveMeta();
+    updateEconomyLabels();
+    renderSkinMeta();
+    showToast(`−${offer.cost} следов`);
+  }
+  grantContinue();
 }
 
 function shareText() {
@@ -1435,9 +1467,9 @@ function resetRun() {
   state.deathReason = "";
   state.pendingDeathReason = "";
   state.runUnlockedSkins = [];
-  state.continueUsed = false;
+  state.continuesUsed = 0;
   state.safeUntil = 0;
-  state.continueClickGuardUntil = 0;
+  state.continueBusy = false;
   state.paused = false;
   state.runMarks = 0;
   state.milestonesHit = [];
@@ -1446,7 +1478,6 @@ function resetRun() {
   state.tipFlags = { move: false, hunter: false, hunger: false, echo: false };
   resetStats();
   clearHold();
-  stopContinueAd(true);
   applyThemeFromScore(false);
   updateScoreUi(false);
   updateHungerUi();
@@ -1528,7 +1559,7 @@ function finishRun(reason) {
   state.echo = null;
   state.shake = 10;
   state.flash = 0.22;
-  if (!state.continueUsed && (reason === DEATH.HUNTER || reason === DEATH.ECHO || reason === DEATH.HUNGER)) {
+  if (canOfferContinue() && (reason === DEATH.HUNTER || reason === DEATH.ECHO || reason === DEATH.HUNGER)) {
     showContinueScreen(reason);
     return;
   }
@@ -2283,15 +2314,9 @@ function boot() {
   canvas.addEventListener("pointermove", onCanvasMove, { passive: false });
   canvas.addEventListener("pointerup", onCanvasUp, { passive: false });
   canvas.addEventListener("pointercancel", onCanvasUp, { passive: false });
-  btnContinue?.addEventListener("pointerdown", (e) => {
-    e.preventDefault();
-    state.continueClickGuardUntil = performance.now() + 450;
-    startContinueAd();
-  }, { passive: false });
   btnContinue?.addEventListener("click", (e) => {
     e.preventDefault();
-    if (performance.now() < state.continueClickGuardUntil) return;
-    startContinueAd();
+    requestContinue();
   });
   btnSkipContinue?.addEventListener("click", () => {
     if (!state.pendingDeathReason) return;
@@ -2301,33 +2326,40 @@ function boot() {
     shareRun().catch(() => showToast("не удалось поделиться"));
   });
   window.addEventListener("resize", resize);
-  document.addEventListener("visibilitychange", () => {
-    if (document.hidden) {
-      if (state.touchActive) {
-        state.touchActive = false;
-        state.pointerId = null;
-      }
-      if (state.running && !state.pendingDeathReason) {
-        state.life = null;
-        state.echo = null;
-        state.paused = true;
-        hum(false);
-      }
-      if (state.continueAdActive) stopContinueAd(true);
-      return;
+  const pauseForBackground = () => {
+    if (state.touchActive) {
+      state.touchActive = false;
+      state.pointerId = null;
     }
+    if (state.running && !state.pendingDeathReason) {
+      state.life = null;
+      state.echo = null;
+      state.paused = true;
+      hum(false);
+    }
+  };
+  const resumeFromBackground = () => {
     state.lastTs = performance.now();
     if (state.paused && state.running) {
       state.paused = false;
       state.safeUntil = performance.now() + 1200;
       showToast("удерживай снова");
     }
+  };
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) pauseForBackground();
+    else resumeFromBackground();
+  });
+  document.addEventListener("ottisk-app-state", (event) => {
+    if (event.detail?.isActive) resumeFromBackground();
+    else pauseForBackground();
   });
   if (state.meta?.streak > 1) {
     setTimeout(() => showToast(`серия · ${state.meta.streak} дн`), 650);
   }
   requestAnimationFrame(frame);
-  if ("serviceWorker" in navigator) {
+  const nativeShell = !!window.OttiskNative?.isNative;
+  if ("serviceWorker" in navigator && !nativeShell) {
     navigator.serviceWorker.register("./sw.js").catch(() => {});
   }
 }
