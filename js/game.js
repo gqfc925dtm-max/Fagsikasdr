@@ -697,14 +697,10 @@ function update(dt) {
 
     // Heat is a warning meter only — no death from standing still
 
-    const m = state.life.r * 0.32;
-    if (
-      state.life.x < m || state.life.y < m ||
-      state.life.x > state.width - m || state.life.y > state.height - m
-    ) {
-      kill("ушло за край");
-      return;
-    }
+    // Soft walls — stay on field, no edge death
+    const m = state.life.r * 0.45;
+    state.life.x = Math.min(state.width - m, Math.max(m, state.life.x));
+    state.life.y = Math.min(state.height - m, Math.max(m, state.life.y));
   } else {
     // Heat only drops when finger is UP
     state.heat = Math.max(0, state.heat - 0.2 * dt);
