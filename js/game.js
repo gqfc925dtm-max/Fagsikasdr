@@ -24,6 +24,8 @@ const SKINS = [
   { id: "ember", name: "жар", at: 60, color: "#ffc07d" },
   { id: "frost", name: "иней", at: 100, color: "#cfe1ff" },
   { id: "void", name: "пусто", at: 160, color: "#d7baff" },
+  { id: "solar", name: "солнце", at: 9999, cost: 40, color: "#ffd27a", premium: true },
+  { id: "noir", name: "нуар", at: 9999, cost: 70, color: "#9aa0ff", premium: true },
 ];
 
 const app = document.getElementById("app");
@@ -59,6 +61,20 @@ const skinNameEl = document.getElementById("skin-name");
 const skinUnlocksEl = document.getElementById("skin-unlocks");
 const btnStart = document.getElementById("btn-start");
 const btnRetry = document.getElementById("btn-retry");
+const dailyChipEl = document.getElementById("daily-chip");
+const dailyCardEl = document.getElementById("daily-card");
+const streakStartEl = document.getElementById("streak-start");
+const marksStartEl = document.getElementById("marks-start");
+const screenContinueEl = document.getElementById("screen-continue");
+const continueReasonEl = document.getElementById("continue-reason");
+const btnContinue = document.getElementById("btn-continue");
+const continueLabelEl = document.getElementById("continue-label");
+const adFillEl = document.getElementById("ad-fill");
+const btnSkipContinue = document.getElementById("btn-skip-continue");
+const btnShare = document.getElementById("btn-share");
+const streakOverEl = document.getElementById("streak-over");
+const dailyResultEl = document.getElementById("daily-result");
+const shareCanvasEl = document.getElementById("share-canvas");
 
 const GOAL_DEFS = [
   {
@@ -102,6 +118,33 @@ const GOAL_DEFS = [
     title: "2 охотника",
     label: (s) => `охота ${Math.min(s.stats.hunterEats, 2)}/2`,
     check: (s) => s.stats.hunterEats >= 2,
+  },
+];
+
+const DAILY_DEFS = [
+  {
+    id: "score30",
+    title: "30 света",
+    label: (s) => `${Math.min(s.score, 30)}/30`,
+    check: (s) => s.score >= 30,
+  },
+  {
+    id: "rare2",
+    title: "2 редких",
+    label: (s) => `редкие ${Math.min(s.stats.rareEats, 2)}/2`,
+    check: (s) => s.stats.rareEats >= 2,
+  },
+  {
+    id: "survive30",
+    title: "30 секунд",
+    label: (s) => `${Math.min(Math.floor(s.elapsed), 30)}/30с`,
+    check: (s) => s.elapsed >= 30,
+  },
+  {
+    id: "fang",
+    title: "клык за забег",
+    label: () => (hasMut("fang") ? "клык" : `${Math.min(state.score, 30)}/30`),
+    check: () => hasMut("fang"),
   },
 ];
 
@@ -149,6 +192,13 @@ const state = {
   hold: null,
   meta: null,
   runUnlockedSkins: [],
+  pendingDeathReason: "",
+  continueUsed: false,
+  safeUntil: 0,
+  continueAdActive: false,
+  continueAdStartedAt: 0,
+  continueAdRaf: 0,
+  continueClickGuardUntil: 0,
   stats: {
     sparkEats: 0,
     rareEats: 0,
@@ -353,6 +403,47 @@ function burst(x, y, color, count = 12, speed = 3.5) {
   }
 }
 
+function localDayKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function parseDayKey(dayKey) {
+  if (!dayKey || !/^\d{4}-\d{2}-\d{2}$/.test(dayKey)) return null;
+  const [year, month, day] = dayKey.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function dayDiff(fromKey, toKey) {
+  const from = parseDayKey(fromKey);
+  const to = parseDayKey(toKey);
+  if (!from || !to) return 0;
+  const diff = to.getTime() - from.getTime();
+  return Math.round(diff / 86400000);
+}
+
+function ownedSkinIds(meta = state.meta) {
+  if (!meta) return ["ink"];
+  const ids = new Set(["ink", ...(meta.unlockedSkins || []), ...(meta.premiumUnlocked || [])]);
+  return [...ids];
+}
+
+function isSkinOwned(id, meta = state.meta) {
+  return ownedSkinIds(meta).includes(id);
+}
+
+function currentDailyDef() {
+  return DAILY_DEFS.find((daily) => daily.id === state.meta?.dailyId) || DAILY_DEFS[0];
+}
+
+function pickDailyId(prevId = "") {
+  const pool = DAILY_DEFS.filter((daily) => daily.id !== prevId);
+  const choices = pool.length ? pool : DAILY_DEFS;
+  return choices[Math.floor(Math.random() * choices.length)].id;
+}
+
 function loadMeta() {
   let raw = null;
   try {
@@ -362,9 +453,27 @@ function loadMeta() {
   }
   const oldBest = Number(localStorage.getItem(BEST_KEY) || 0);
   const best = Math.max(0, Number(raw?.best || 0), oldBest);
-  const unlocked = SKINS.filter((skin) => best >= skin.at).map((skin) => skin.id);
-  const activeSkin = unlocked[unlocked.length - 1] || "ink";
-  return { best, unlockedSkins: unlocked, activeSkin };
+  const unlockedSkins = SKINS.filter((skin) => !skin.premium && best >= skin.at).map((skin) => skin.id);
+  const premiumUnlocked = SKINS.filter((skin) => skin.premium && Array.isArray(raw?.premiumUnlocked) && raw.premiumUnlocked.includes(skin.id))
+    .map((skin) => skin.id);
+  const streak = Math.max(0, Number(raw?.streak || 0));
+  const marks = Math.max(0, Number(raw?.marks || 0));
+  const activeId = typeof raw?.activeSkin === "string" ? raw.activeSkin : "";
+  const activeSkin = isSkinOwned(activeId, { unlockedSkins, premiumUnlocked })
+    ? activeId
+    : ownedSkinIds({ unlockedSkins, premiumUnlocked }).slice(-1)[0] || "ink";
+  return {
+    best,
+    unlockedSkins,
+    activeSkin,
+    marks,
+    streak,
+    lastPlayDay: typeof raw?.lastPlayDay === "string" ? raw.lastPlayDay : "",
+    dailyDay: typeof raw?.dailyDay === "string" ? raw.dailyDay : "",
+    dailyId: typeof raw?.dailyId === "string" ? raw.dailyId : "",
+    dailyDone: !!raw?.dailyDone,
+    premiumUnlocked,
+  };
 }
 
 function saveMeta() {
@@ -381,29 +490,153 @@ function activeSkin() {
   return skinById(state.meta?.activeSkin || "ink");
 }
 
+function touchPlayDay() {
+  if (!state.meta) return;
+  const today = localDayKey();
+  const diff = dayDiff(state.meta.lastPlayDay, today);
+  if (!state.meta.lastPlayDay) {
+    state.meta.streak = Math.max(1, state.meta.streak || 0);
+  } else if (diff === 1) {
+    state.meta.streak = Math.max(1, (state.meta.streak || 0) + 1);
+  } else if (diff > 1) {
+    state.meta.streak = 1;
+  }
+  state.meta.lastPlayDay = today;
+  saveMeta();
+}
+
+function refreshDaily() {
+  if (!state.meta) return;
+  const today = localDayKey();
+  let changed = false;
+  if (state.meta.dailyDay !== today) {
+    state.meta.dailyDay = today;
+    state.meta.dailyId = pickDailyId(state.meta.dailyId);
+    state.meta.dailyDone = false;
+    changed = true;
+  } else if (!DAILY_DEFS.some((daily) => daily.id === state.meta.dailyId)) {
+    state.meta.dailyId = pickDailyId();
+    changed = true;
+  }
+  if (changed) saveMeta();
+}
+
+function updateEconomyLabels() {
+  if (!state.meta) return;
+  if (marksStartEl) marksStartEl.textContent = String(state.meta.marks);
+  const streakText = `${Math.max(0, state.meta.streak || 0)} дн`;
+  if (streakStartEl) streakStartEl.textContent = streakText;
+  if (streakOverEl) streakOverEl.textContent = String(Math.max(0, state.meta.streak || 0));
+}
+
+function dailyProgressText(daily = currentDailyDef()) {
+  if (!daily) return "";
+  return state.meta?.dailyDone ? "выполнено · +15 следов" : daily.label(state);
+}
+
+function renderDaily() {
+  const daily = currentDailyDef();
+  if (!daily) return;
+  if (dailyCardEl) dailyCardEl.textContent = `ежедневка · ${daily.title} · ${dailyProgressText(daily)}`;
+  if (dailyChipEl) dailyChipEl.textContent = state.meta?.dailyDone ? "ежедневка · +15 взято" : `день · ${daily.title} · ${daily.label(state)}`;
+}
+
+function awardMarks(amount, opts = {}) {
+  if (!state.meta || !amount) return;
+  state.meta.marks = Math.max(0, Math.round((state.meta.marks || 0) + amount));
+  saveMeta();
+  updateEconomyLabels();
+  renderDaily();
+  renderSkinMeta();
+  if (opts.x != null && opts.y != null) {
+    floatText(opts.x, opts.y, `+${amount} следов`, opts.color || cssVar("--gold", "#f2c15a"), opts.size || 15);
+  }
+}
+
+function evaluateDaily() {
+  if (!state.meta || state.meta.dailyDone) return false;
+  const daily = currentDailyDef();
+  if (!daily || !daily.check(state)) {
+    renderDaily();
+    return false;
+  }
+  state.meta.dailyDone = true;
+  awardMarks(15, {
+    x: state.life?.x ?? state.width * 0.5,
+    y: state.life?.y ?? state.height * 0.22,
+    color: cssVar("--life", "#6fd9b0"),
+    size: 17,
+  });
+  showToast(`ежедневка: ${daily.title}`);
+  goalChime();
+  buzz([10, 18, 10]);
+  renderDaily();
+  return true;
+}
+
 function syncMetaFromBest() {
   if (!state.meta) return [];
   const prev = new Set(state.meta.unlockedSkins);
+  const hadPremiumSkin = !!skinById(state.meta.activeSkin).premium && state.meta.premiumUnlocked.includes(state.meta.activeSkin);
   state.meta.best = Math.max(state.meta.best, state.score);
   state.best = state.meta.best;
-  state.meta.unlockedSkins = SKINS.filter((skin) => state.meta.best >= skin.at).map((skin) => skin.id);
-  state.meta.activeSkin = state.meta.unlockedSkins[state.meta.unlockedSkins.length - 1] || "ink";
+  state.meta.unlockedSkins = SKINS.filter((skin) => !skin.premium && state.meta.best >= skin.at).map((skin) => skin.id);
+  const newlyUnlocked = state.meta.unlockedSkins.filter((id) => !prev.has(id));
+  if (!isSkinOwned(state.meta.activeSkin) || (!hadPremiumSkin && newlyUnlocked.length)) {
+    state.meta.activeSkin = newlyUnlocked[newlyUnlocked.length - 1]
+      || state.meta.unlockedSkins[state.meta.unlockedSkins.length - 1]
+      || "ink";
+  }
   saveMeta();
   updateBestLabels();
+  updateEconomyLabels();
+  renderDaily();
   renderSkinMeta();
-  return state.meta.unlockedSkins.filter((id) => !prev.has(id));
+  return newlyUnlocked;
 }
 
 function renderSkinMeta() {
   const skin = activeSkin();
   app.dataset.skin = skin.id;
-  skinNameEl.textContent = skin.name;
+  if (skinNameEl) skinNameEl.textContent = skin.name;
+  if (!skinUnlocksEl) return;
   skinUnlocksEl.textContent = "";
   for (const item of SKINS) {
-    const pill = document.createElement("span");
-    const owned = state.meta.unlockedSkins.includes(item.id);
-    pill.className = `skin-pill ${owned ? "on" : "locked"}`;
-    pill.textContent = item.name;
+    const pill = document.createElement("button");
+    const owned = isSkinOwned(item.id);
+    const premiumLocked = !!item.premium && !owned;
+    const scoreLocked = !item.premium && !owned;
+    pill.type = "button";
+    pill.className = `skin-pill${owned ? " on" : ""}${item.id === skin.id ? " active" : ""}${item.premium ? " premium" : ""}${!owned ? " locked" : ""}`;
+    pill.disabled = scoreLocked;
+    pill.setAttribute("aria-pressed", item.id === skin.id ? "true" : "false");
+    if (owned) {
+      pill.textContent = item.id === skin.id ? `${item.name} · выбран` : item.name;
+      pill.addEventListener("click", () => {
+        if (!state.meta || state.meta.activeSkin === item.id) return;
+        state.meta.activeSkin = item.id;
+        saveMeta();
+        renderSkinMeta();
+      });
+    } else if (premiumLocked) {
+      pill.textContent = `${item.name} · ${item.cost} следов`;
+      pill.addEventListener("click", () => {
+        if (!state.meta) return;
+        if ((state.meta.marks || 0) < item.cost) {
+          showToast(`нужно ${item.cost} следов`);
+          return;
+        }
+        state.meta.marks = Math.max(0, state.meta.marks - item.cost);
+        state.meta.premiumUnlocked = [...new Set([...(state.meta.premiumUnlocked || []), item.id])];
+        state.meta.activeSkin = item.id;
+        saveMeta();
+        updateEconomyLabels();
+        renderSkinMeta();
+        showToast(`куплен оттиск: ${item.name}`);
+      });
+    } else {
+      pill.textContent = `${item.name} · рекорд ${item.at}`;
+    }
     skinUnlocksEl.appendChild(pill);
   }
 }
@@ -501,12 +734,23 @@ function renderGoalsResult() {
 }
 
 function renderSkinResult() {
+  const current = activeSkin().name;
   if (!state.runUnlockedSkins.length) {
-    skinResultEl.textContent = "";
+    skinResultEl.textContent = `оттиск: ${current}`;
     return;
   }
   const names = state.runUnlockedSkins.map((id) => skinById(id).name).join(" · ");
-  skinResultEl.textContent = `новый оттиск: ${names}`;
+  skinResultEl.textContent = `оттиск: ${current} · новый: ${names}`;
+}
+
+function renderDailyResult() {
+  const daily = currentDailyDef();
+  if (!dailyResultEl || !daily) return;
+  if (state.meta?.dailyDone) {
+    dailyResultEl.textContent = `ежедневка: ${daily.title} · +15 следов`;
+    return;
+  }
+  dailyResultEl.textContent = `ежедневка: ${daily.title} · ${daily.label(state)}`;
 }
 
 function pickRunGoals() {
@@ -539,7 +783,14 @@ function evaluateGoals() {
       silentFloat: true,
       color: cssVar("--life", "#6fd9b0"),
     });
+    awardMarks(5, {
+      x: state.width * 0.5,
+      y: state.height * 0.18,
+      color: cssVar("--gold", "#f2c15a"),
+      size: 15,
+    });
   }
+  evaluateDaily();
 }
 
 function syncMutation() {
@@ -703,11 +954,89 @@ function bindHoldButton(button, target) {
   button.addEventListener("click", (e) => e.preventDefault());
 }
 
+function setContinueAdProgress(progress) {
+  const pct = `${Math.round(clamp(progress, 0, 1) * 100)}%`;
+  if (adFillEl) adFillEl.style.width = pct;
+  if (!continueLabelEl) return;
+  if (progress >= 1) {
+    continueLabelEl.textContent = "Продолжить";
+    return;
+  }
+  const remain = Math.max(1, Math.ceil(3 - progress * 3));
+  continueLabelEl.textContent = progress > 0 ? `Смотрим ${remain} сек` : "Смотреть 3 сек";
+}
+
+function stopContinueAd(reset = true) {
+  state.continueAdActive = false;
+  state.continueAdStartedAt = 0;
+  if (state.continueAdRaf) cancelAnimationFrame(state.continueAdRaf);
+  state.continueAdRaf = 0;
+  if (reset) setContinueAdProgress(0);
+}
+
+function continueAdFrame(ts) {
+  if (!state.continueAdActive) return;
+  if (!state.continueAdStartedAt) state.continueAdStartedAt = ts;
+  const progress = clamp((ts - state.continueAdStartedAt) / 3000, 0, 1);
+  setContinueAdProgress(progress);
+  if (progress >= 1) {
+    stopContinueAd(false);
+    grantContinue();
+    return;
+  }
+  state.continueAdRaf = requestAnimationFrame(continueAdFrame);
+}
+
+function startContinueAd() {
+  if (!state.pendingDeathReason || state.continueAdActive) return;
+  ensureAudio();
+  state.continueAdActive = true;
+  state.continueAdStartedAt = 0;
+  setContinueAdProgress(0.01);
+  state.continueAdRaf = requestAnimationFrame(continueAdFrame);
+}
+
+function showContinueScreen(reason) {
+  state.pendingDeathReason = reason;
+  stopContinueAd(true);
+  if (continueReasonEl) continueReasonEl.textContent = reason;
+  statusEl.classList.add("hidden");
+  screenOverEl.classList.add("hidden");
+  screenContinueEl?.classList.remove("hidden");
+  clearHold();
+}
+
+function finalizeGameOver(reason) {
+  state.deathReason = reason;
+  state.pendingDeathReason = "";
+  stopContinueAd(true);
+  evaluateDaily();
+  finalScoreEl.textContent = String(state.score);
+  deathReasonEl.textContent = reason;
+  const muts = state.unlockedMuts
+    .filter((id) => id !== "spark")
+    .map((id) => mutationForScore(MUTATIONS.find((m) => m.id === id)?.at || 0).name);
+  mutSummaryEl.textContent = muts.length ? `формы: ${muts.join(" · ")}` : "форма осталась искрой";
+  renderGoalsResult();
+  renderSkinResult();
+  renderDailyResult();
+  updateBestLabels();
+  updateEconomyLabels();
+  renderDaily();
+  statusEl.classList.add("hidden");
+  screenContinueEl?.classList.add("hidden");
+  screenOverEl.classList.remove("hidden");
+  clearHold();
+}
+
 function createLife(x, y, opts = {}) {
   state.echo = null;
   state.life = {
     x,
     y,
+    px: x,
+    py: y,
+    speed: 0,
     r: 24,
     wobble: Math.random() * Math.PI * 2,
     teeth: 0,
@@ -726,6 +1055,134 @@ function releaseLife() {
   state.echo = { x: state.life.x, y: state.life.y, r: state.life.r * 0.92, wobble: state.life.wobble };
   state.life = null;
   hum(false);
+}
+
+function grantContinue() {
+  state.pendingDeathReason = "";
+  state.continueUsed = true;
+  state.running = true;
+  state.demo = false;
+  state.touchActive = false;
+  state.pointerId = null;
+  state.hunger = 60;
+  state.hunters = [];
+  state.echo = null;
+  state.safeUntil = performance.now() + 2500;
+  if (!state.life) createLife(state.width * 0.5, state.height * 0.56);
+  else hum(true);
+  updateHungerUi();
+  renderDaily();
+  statusEl.classList.remove("hidden");
+  screenContinueEl?.classList.add("hidden");
+  screenOverEl.classList.add("hidden");
+  state.lastTs = performance.now();
+  state.flash = Math.max(state.flash, 0.1);
+  showToast("ещё шанс");
+}
+
+function shareText() {
+  return `Мой след в ОТТИСК: ${state.score} света. Рекорд ${state.best}.`;
+}
+
+function canvasToBlob(canvasEl) {
+  return new Promise((resolve) => {
+    if (!canvasEl?.toBlob) {
+      resolve(null);
+      return;
+    }
+    canvasEl.toBlob((blob) => resolve(blob), "image/png");
+  });
+}
+
+function buildShareCard() {
+  if (!shareCanvasEl) return null;
+  const shareCtx = shareCanvasEl.getContext("2d");
+  if (!shareCtx) return null;
+  const { width, height } = shareCanvasEl;
+  const skin = activeSkin();
+  const reason = state.deathReason || state.pendingDeathReason || "след ещё жив";
+  const gradient = shareCtx.createLinearGradient(0, 0, 0, height);
+  gradient.addColorStop(0, "#19151c");
+  gradient.addColorStop(1, "#0f0d12");
+  shareCtx.fillStyle = gradient;
+  shareCtx.fillRect(0, 0, width, height);
+
+  shareCtx.fillStyle = "rgba(255,255,255,0.06)";
+  shareCtx.beginPath();
+  shareCtx.arc(width * 0.82, height * 0.18, 130, 0, Math.PI * 2);
+  shareCtx.fill();
+  shareCtx.beginPath();
+  shareCtx.arc(width * 0.18, height * 0.78, 170, 0, Math.PI * 2);
+  shareCtx.fill();
+
+  shareCtx.strokeStyle = skin.color;
+  shareCtx.lineWidth = 4;
+  shareCtx.strokeRect(40, 40, width - 80, height - 80);
+
+  shareCtx.fillStyle = "#f3eee8";
+  shareCtx.textAlign = "left";
+  shareCtx.font = "700 32px Instrument Sans, sans-serif";
+  shareCtx.fillText("ОТТИСК", 90, 120);
+  shareCtx.font = "600 24px Instrument Sans, sans-serif";
+  shareCtx.fillStyle = "rgba(243,238,232,0.78)";
+  shareCtx.fillText("живёт только под пальцем", 90, 164);
+
+  shareCtx.fillStyle = skin.color;
+  shareCtx.font = "800 180px Syne, sans-serif";
+  shareCtx.fillText(String(state.score), 90, 400);
+
+  shareCtx.fillStyle = "#f3eee8";
+  shareCtx.font = "700 34px Instrument Sans, sans-serif";
+  shareCtx.fillText("света", 96, 448);
+  shareCtx.font = "600 28px Instrument Sans, sans-serif";
+  shareCtx.fillStyle = "rgba(243,238,232,0.82)";
+  shareCtx.fillText(`Рекорд · ${state.best}`, 90, 548);
+  shareCtx.fillText(`Причина · ${reason}`, 90, 602);
+  shareCtx.fillText(`Оттиск · ${skin.name}`, 90, 656);
+
+  shareCtx.fillStyle = "rgba(243,238,232,0.62)";
+  shareCtx.font = "600 22px Instrument Sans, sans-serif";
+  shareCtx.fillText(shareText(), 90, 770);
+
+  return shareCanvasEl;
+}
+
+async function shareRun() {
+  const text = shareText();
+  const card = buildShareCard();
+  try {
+    if (navigator.share) {
+      const blob = await canvasToBlob(card);
+      if (blob && typeof File !== "undefined") {
+        const file = new File([blob], "ottisk-share.png", { type: blob.type || "image/png" });
+        if (!navigator.canShare || navigator.canShare({ files: [file] })) {
+          await navigator.share({ title: "ОТТИСК", text, files: [file] });
+          showToast("след отправлен");
+          return;
+        }
+      }
+      await navigator.share({ title: "ОТТИСК", text });
+      showToast("след отправлен");
+      return;
+    }
+  } catch (err) {
+    if (err?.name === "AbortError") {
+      showToast("поделиться отменено");
+      return;
+    }
+  }
+
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      showToast("текст скопирован");
+      return;
+    }
+  } catch (_) {
+    // noop
+  }
+
+  showToast(text, 2200);
 }
 
 function sparkProfile(type) {
@@ -853,14 +1310,20 @@ function resetRun() {
   state.flash = 0;
   state.shake = 0;
   state.deathReason = "";
+  state.pendingDeathReason = "";
   state.runUnlockedSkins = [];
+  state.continueUsed = false;
+  state.safeUntil = 0;
+  state.continueClickGuardUntil = 0;
   state.coachCount = 0;
   resetStats();
   clearHold();
+  stopContinueAd(true);
   applyThemeFromScore(false);
   updateScoreUi(false);
   updateHungerUi();
   updateMutationUi();
+  renderDaily();
   comboEl.className = "combo";
   toastEl.className = "toast";
   coachEl.className = "coach";
@@ -868,6 +1331,8 @@ function resetRun() {
   deathReasonEl.textContent = "";
   mutSummaryEl.textContent = "";
   skinResultEl.textContent = "";
+  dailyResultEl.textContent = "";
+  screenContinueEl?.classList.add("hidden");
   goalsResultEl.textContent = "";
   pickRunGoals();
   for (let i = 0; i < 9; i += 1) spawnSpark();
@@ -897,8 +1362,13 @@ function resetDemo() {
 function startGame() {
   ensureAudio();
   hum(false);
+  touchPlayDay();
+  refreshDaily();
+  renderDaily();
+  updateEconomyLabels();
   screenStartEl.classList.add("hidden");
   screenOverEl.classList.add("hidden");
+  screenContinueEl?.classList.add("hidden");
   statusEl.classList.remove("hidden");
   requestAnimationFrame(() => {
     resize();
@@ -927,16 +1397,11 @@ function finishRun(reason) {
   state.echo = null;
   state.shake = 10;
   state.flash = 0.22;
-  finalScoreEl.textContent = String(state.score);
-  deathReasonEl.textContent = reason;
-  const muts = state.unlockedMuts.filter((id) => id !== "spark").map((id) => mutationForScore(MUTATIONS.find((m) => m.id === id)?.at || 0).name);
-  mutSummaryEl.textContent = muts.length ? `формы: ${muts.join(" · ")}` : "форма осталась искрой";
-  renderGoalsResult();
-  renderSkinResult();
-  updateBestLabels();
-  statusEl.classList.add("hidden");
-  screenOverEl.classList.remove("hidden");
-  clearHold();
+  if (!state.continueUsed && (reason === DEATH.HUNTER || reason === DEATH.ECHO || reason === DEATH.HUNGER)) {
+    showContinueScreen(reason);
+    return;
+  }
+  finalizeGameOver(reason);
 }
 
 function tryCompleteByHunger() {
@@ -1132,6 +1597,10 @@ function updateHunters(dt) {
     if (state.life) {
       const d = dist(hunter.x, hunter.y, state.life.x, state.life.y);
       if (d < hunter.r * 0.72 + state.life.r * 0.75) {
+        if (state.safeUntil > performance.now()) {
+          hunter.warn = 1;
+          continue;
+        }
         if (hasMut("fang") && state.combo >= 4) {
           state.hunters.splice(i, 1);
           state.stats.hunterEats += 1;
@@ -1572,9 +2041,13 @@ function frame(ts) {
 
 function boot() {
   state.meta = loadMeta();
+  touchPlayDay();
+  refreshDaily();
   state.best = state.meta.best;
   updateBestLabels();
+  renderDaily();
   renderSkinMeta();
+  updateEconomyLabels();
   resize();
   applyThemeFromScore(false);
   updateScoreUi(false);
@@ -1587,6 +2060,23 @@ function boot() {
   canvas.addEventListener("pointermove", onCanvasMove, { passive: false });
   canvas.addEventListener("pointerup", onCanvasUp, { passive: false });
   canvas.addEventListener("pointercancel", onCanvasUp, { passive: false });
+  btnContinue?.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    state.continueClickGuardUntil = performance.now() + 450;
+    startContinueAd();
+  }, { passive: false });
+  btnContinue?.addEventListener("click", (e) => {
+    e.preventDefault();
+    if (performance.now() < state.continueClickGuardUntil) return;
+    startContinueAd();
+  });
+  btnSkipContinue?.addEventListener("click", () => {
+    if (!state.pendingDeathReason) return;
+    finalizeGameOver(state.pendingDeathReason);
+  });
+  btnShare?.addEventListener("click", () => {
+    shareRun().catch(() => showToast("не удалось поделиться"));
+  });
   window.addEventListener("resize", resize);
   document.addEventListener("visibilitychange", () => {
     if (document.hidden && state.touchActive) {
@@ -1594,6 +2084,7 @@ function boot() {
       state.pointerId = null;
       if (state.running) releaseLife();
     }
+    if (document.hidden && state.continueAdActive) stopContinueAd(true);
   });
   requestAnimationFrame(frame);
   if ("serviceWorker" in navigator) {
