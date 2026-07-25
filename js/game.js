@@ -6,10 +6,20 @@ const ECHO_FADE_SEC = 2.35;
 const FREE_CONTINUES_PER_RUN = 1;
 const MARKS_CONTINUE_COST = 12;
 const MAX_CONTINUES_PER_RUN = 2;
+const MARKS_PACK_AMOUNT = 60;
+const MARKS_PACK_PRODUCT_ID = "ottisk_marks_60";
+const WEEKLY_TARGET = 50;
+const WEEKLY_REWARD = 20;
+const STARTER_MARKS = 15;
 const SHARE_URL = "https://gqfc925dtm-max.github.io/Fagsikasdr/";
 const PRIVACY_URL = `${SHARE_URL}privacy.html`;
 const SUPPORT_URL = `${SHARE_URL}support.html`;
 const THEME_NAMES = ["уголь", "глубина", "янтарь", "мох", "дымка", "пыльца"];
+const ONBOARD_STEPS = [
+  "Удерживай палец — существо живёт только в касании.",
+  "Ешь свет. Стойка жжёт голод быстрее.",
+  "Охотник ест тело и след. Один второй шанс — бесплатно.",
+];
 const SCORE_MILESTONES = [
   { at: 10, marks: 2, text: "первый ритм" },
   { at: 25, marks: 3, text: "след держится" },
@@ -17,6 +27,7 @@ const SCORE_MILESTONES = [
   { at: 100, marks: 8, text: "новая тема" },
   { at: 150, marks: 10, text: "глубокий след" },
   { at: 200, marks: 12, text: "легенда света" },
+  { at: 300, marks: 15, text: "без конца" },
 ];
 const DEATH = {
   HUNTER: "охотник поймал оттиск",
@@ -39,6 +50,7 @@ const SKINS = [
   { id: "ember", name: "жар", at: 60, color: "#ffc07d" },
   { id: "frost", name: "иней", at: 100, color: "#cfe1ff" },
   { id: "void", name: "пусто", at: 160, color: "#d7baff" },
+  { id: "pulse", name: "пульс", at: 220, color: "#ff9ab8" },
   { id: "solar", name: "солнце", at: 9999, cost: 40, color: "#ffd27a", premium: true },
   { id: "noir", name: "нуар", at: 9999, cost: 70, color: "#9aa0ff", premium: true },
 ];
@@ -91,6 +103,16 @@ const btnShare = document.getElementById("btn-share");
 const streakOverEl = document.getElementById("streak-over");
 const dailyResultEl = document.getElementById("daily-result");
 const marksResultEl = document.getElementById("marks-result");
+const weeklyCardEl = document.getElementById("weekly-card");
+const btnSound = document.getElementById("btn-sound");
+const btnHaptics = document.getElementById("btn-haptics");
+const btnMarksPack = document.getElementById("btn-marks-pack");
+const btnRate = document.getElementById("btn-rate");
+const screenOnboardEl = document.getElementById("screen-onboard");
+const onboardTextEl = document.getElementById("onboard-text");
+const btnOnboard = document.getElementById("btn-onboard");
+const onboardLabelEl = document.getElementById("onboard-label");
+const onboardSubEl = document.getElementById("onboard-sub");
 const shareCanvasEl = document.getElementById("share-canvas");
 
 const GOAL_DEFS = [
@@ -235,6 +257,9 @@ const state = {
   runMarks: 0,
   milestonesHit: [],
   hungerWarnClock: 0,
+  timeScale: 1,
+  slowmoUntil: 0,
+  onboardStep: 0,
   tipFlags: {
     move: false,
     hunter: false,
@@ -301,7 +326,16 @@ function mixColor(a, b, t) {
   return `rgb(${m[0]}, ${m[1]}, ${m[2]})`;
 }
 
+function soundEnabled() {
+  return state.meta?.sound !== false;
+}
+
+function hapticsEnabled() {
+  return state.meta?.haptics !== false;
+}
+
 function buzz(pattern = 8) {
+  if (!hapticsEnabled()) return;
   if (navigator.vibrate) navigator.vibrate(pattern);
   const native = window.OttiskNative;
   if (native?.isNative) {
@@ -311,6 +345,7 @@ function buzz(pattern = 8) {
 }
 
 function ensureAudio() {
+  if (!soundEnabled()) return null;
   if (state.audio) return state.audio;
   const AudioCtx = window.AudioContext || window.webkitAudioContext;
   if (!AudioCtx) return null;
@@ -319,6 +354,7 @@ function ensureAudio() {
 }
 
 function tone(freq, dur = 0.08, type = "sine", gain = 0.04, delay = 0) {
+  if (!soundEnabled()) return;
   const ac = ensureAudio();
   if (!ac) return;
   if (ac.state === "suspended") ac.resume().catch(() => {});
@@ -337,11 +373,12 @@ function tone(freq, dur = 0.08, type = "sine", gain = 0.04, delay = 0) {
 }
 
 function hum(on) {
-  const ac = ensureAudio();
-  if (!ac) return;
-  if (ac.state === "suspended") ac.resume().catch(() => {});
   if (!on) {
-    if (!state.humNode) return;
+    if (!state.humNode || !state.audio) {
+      state.humNode = null;
+      return;
+    }
+    const ac = state.audio;
     const { g, o1, o2 } = state.humNode;
     const t = ac.currentTime;
     g.gain.cancelScheduledValues(t);
@@ -351,6 +388,10 @@ function hum(on) {
     state.humNode = null;
     return;
   }
+  if (!soundEnabled()) return;
+  const ac = ensureAudio();
+  if (!ac) return;
+  if (ac.state === "suspended") ac.resume().catch(() => {});
   if (state.humNode) return;
   const o1 = ac.createOscillator();
   const o2 = ac.createOscillator();
@@ -507,6 +548,14 @@ function pickDailyId(prevId = "") {
   return choices[Math.floor(Math.random() * choices.length)].id;
 }
 
+function weekKey(date = new Date()) {
+  const tmp = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  tmp.setDate(tmp.getDate() + 3 - ((tmp.getDay() + 6) % 7));
+  const week1 = new Date(tmp.getFullYear(), 0, 4);
+  const week = 1 + Math.round(((tmp - week1) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7);
+  return `${tmp.getFullYear()}-W${String(week).padStart(2, "0")}`;
+}
+
 function loadMeta() {
   let raw = null;
   try {
@@ -525,6 +574,9 @@ function loadMeta() {
   const activeSkin = isSkinOwned(activeId, { unlockedSkins, premiumUnlocked })
     ? activeId
     : ownedSkinIds({ unlockedSkins, premiumUnlocked }).slice(-1)[0] || "ink";
+  const currentWeek = weekKey();
+  const savedWeek = typeof raw?.weekId === "string" ? raw.weekId : "";
+  const weekFresh = savedWeek !== currentWeek;
   return {
     best,
     unlockedSkins,
@@ -536,6 +588,16 @@ function loadMeta() {
     dailyId: typeof raw?.dailyId === "string" ? raw.dailyId : "",
     dailyDone: !!raw?.dailyDone,
     premiumUnlocked,
+    sound: raw?.sound !== false,
+    haptics: raw?.haptics !== false,
+    onboarded: !!raw?.onboarded,
+    starterGift: !!raw?.starterGift,
+    ratePrompted: !!raw?.ratePrompted,
+    runs: Math.max(0, Number(raw?.runs || 0)),
+    weekId: currentWeek,
+    weekBest: weekFresh ? 0 : Math.max(0, Number(raw?.weekBest || 0)),
+    weekRewardTaken: weekFresh ? false : !!raw?.weekRewardTaken,
+    iapMarksBought: Math.max(0, Number(raw?.iapMarksBought || 0)),
   };
 }
 
@@ -602,6 +664,143 @@ function renderDaily() {
   if (!daily) return;
   if (dailyCardEl) dailyCardEl.textContent = `ежедневка · ${daily.title} · ${dailyProgressText(daily)}`;
   if (dailyChipEl) dailyChipEl.textContent = state.meta?.dailyDone ? "ежедневка · +15 взято" : `день · ${daily.title} · ${daily.label(state)}`;
+  renderWeekly();
+  renderSettings();
+}
+
+function renderWeekly() {
+  if (!weeklyCardEl || !state.meta) return;
+  const best = Math.min(WEEKLY_TARGET, state.meta.weekBest || 0);
+  if (state.meta.weekRewardTaken) {
+    weeklyCardEl.textContent = `неделя · ${WEEKLY_TARGET} света · +${WEEKLY_REWARD} взято`;
+    return;
+  }
+  weeklyCardEl.textContent = `неделя · ${best}/${WEEKLY_TARGET} света · +${WEEKLY_REWARD} следов`;
+}
+
+function renderSettings() {
+  if (!state.meta) return;
+  if (btnSound) {
+    btnSound.classList.toggle("on", state.meta.sound !== false);
+    btnSound.setAttribute("aria-pressed", state.meta.sound !== false ? "true" : "false");
+    btnSound.textContent = state.meta.sound !== false ? "звук" : "звук off";
+  }
+  if (btnHaptics) {
+    btnHaptics.classList.toggle("on", state.meta.haptics !== false);
+    btnHaptics.setAttribute("aria-pressed", state.meta.haptics !== false ? "true" : "false");
+    btnHaptics.textContent = state.meta.haptics !== false ? "вибро" : "вибро off";
+  }
+}
+
+function evaluateWeekly(score) {
+  if (!state.meta) return false;
+  const currentWeek = weekKey();
+  if (state.meta.weekId !== currentWeek) {
+    state.meta.weekId = currentWeek;
+    state.meta.weekBest = 0;
+    state.meta.weekRewardTaken = false;
+  }
+  state.meta.weekBest = Math.max(state.meta.weekBest || 0, score);
+  saveMeta();
+  renderWeekly();
+  if (state.meta.weekRewardTaken || state.meta.weekBest < WEEKLY_TARGET) return false;
+  state.meta.weekRewardTaken = true;
+  awardMarks(WEEKLY_REWARD, {
+    x: state.width * 0.5,
+    y: state.height * 0.2,
+    color: cssVar("--life", "#6fd9b0"),
+    size: 16,
+  });
+  showToast(`неделя: +${WEEKLY_REWARD} следов`);
+  goalChime();
+  return true;
+}
+
+function grantStarterGift() {
+  if (!state.meta || state.meta.starterGift) return;
+  state.meta.starterGift = true;
+  awardMarks(STARTER_MARKS, { metaOnly: true });
+  showToast(`подарок · +${STARTER_MARKS} следов`);
+}
+
+function showOnboard() {
+  if (!screenOnboardEl) return;
+  state.onboardStep = 0;
+  refreshOnboardUi();
+  screenStartEl.classList.add("hidden");
+  screenOnboardEl.classList.remove("hidden");
+}
+
+function refreshOnboardUi() {
+  const step = state.onboardStep;
+  if (onboardTextEl) onboardTextEl.textContent = ONBOARD_STEPS[step] || ONBOARD_STEPS[0];
+  const last = step >= ONBOARD_STEPS.length - 1;
+  if (onboardLabelEl) onboardLabelEl.textContent = last ? "Играть" : "Дальше";
+  if (onboardSubEl) onboardSubEl.textContent = last ? "держи кнопку на старте" : `шаг ${step + 1} из ${ONBOARD_STEPS.length}`;
+}
+
+function advanceOnboard() {
+  if (state.onboardStep < ONBOARD_STEPS.length - 1) {
+    state.onboardStep += 1;
+    refreshOnboardUi();
+    tone(520 + state.onboardStep * 80, 0.06, "triangle", 0.024);
+    return;
+  }
+  if (state.meta) {
+    state.meta.onboarded = true;
+    saveMeta();
+  }
+  grantStarterGift();
+  screenOnboardEl?.classList.add("hidden");
+  screenStartEl.classList.remove("hidden");
+  updateEconomyLabels();
+  renderDaily();
+}
+
+async function purchaseMarksPack() {
+  if (!state.meta) return;
+  const native = window.OttiskNative;
+  if (native?.isNative && typeof native.purchase === "function") {
+    showToast("открываем покупку…");
+    const result = await native.purchase(MARKS_PACK_PRODUCT_ID).catch(() => null);
+    if (result?.ok) {
+      state.meta.iapMarksBought = (state.meta.iapMarksBought || 0) + 1;
+      awardMarks(MARKS_PACK_AMOUNT, { metaOnly: true });
+      showToast(`+${MARKS_PACK_AMOUNT} следов`);
+      return;
+    }
+    showToast(result?.message || "покупка отменена");
+    return;
+  }
+  showToast("покупка · в версии App Store");
+}
+
+async function maybeAskRate() {
+  if (!state.meta || state.meta.ratePrompted) {
+    btnRate?.classList.add("hidden");
+    return;
+  }
+  const strong = state.score >= 40 || state.score >= state.best;
+  const enoughRuns = (state.meta.runs || 0) >= 3;
+  if (!strong || !enoughRuns) {
+    btnRate?.classList.add("hidden");
+    return;
+  }
+  btnRate?.classList.remove("hidden");
+}
+
+async function requestReview() {
+  if (!state.meta) return;
+  state.meta.ratePrompted = true;
+  saveMeta();
+  btnRate?.classList.add("hidden");
+  const native = window.OttiskNative;
+  if (native?.isNative && typeof native.requestReview === "function") {
+    await native.requestReview().catch(() => {});
+    showToast("спасибо");
+    return;
+  }
+  showToast("спасибо — оценка будет в App Store");
 }
 
 function awardMarks(amount, opts = {}) {
@@ -1105,7 +1304,13 @@ function finalizeGameOver(reason) {
   state.deathReason = reason;
   state.pendingDeathReason = "";
   state.continueBusy = false;
+  state.timeScale = 1;
+  if (state.meta) {
+    state.meta.runs = Math.max(0, (state.meta.runs || 0) + 1);
+    saveMeta();
+  }
   evaluateDaily();
+  evaluateWeekly(state.score);
   finalScoreEl.textContent = String(state.score);
   deathReasonEl.textContent = reason;
   const muts = state.unlockedMuts
@@ -1118,6 +1323,7 @@ function finalizeGameOver(reason) {
   updateBestLabels();
   updateEconomyLabels();
   renderDaily();
+  maybeAskRate();
   statusEl.classList.add("hidden");
   screenContinueEl?.classList.add("hidden");
   screenOverEl.classList.remove("hidden");
@@ -1423,6 +1629,9 @@ function registerNearMiss(hunter, x, y) {
   floatText(x, y - 18, "мимо", cssVar("--foam", "#f3eee8"), 14);
   tone(880, 0.045, "triangle", 0.02);
   buzz(4);
+  state.timeScale = 0.42;
+  state.slowmoUntil = performance.now() + 160;
+  state.flash = Math.max(state.flash, 0.06);
   if (state.stats.nearMisses === 1 || state.stats.nearMisses % 4 === 0) {
     showToast("мимо");
   }
@@ -2271,10 +2480,15 @@ function draw() {
 }
 
 function frame(ts) {
-  const dt = Math.min(0.033, (ts - (state.lastTs || ts)) / 1000 || 0.016);
+  const rawDt = Math.min(0.033, (ts - (state.lastTs || ts)) / 1000 || 0.016);
   state.lastTs = ts;
+  if (state.slowmoUntil && ts >= state.slowmoUntil) {
+    state.timeScale = 1;
+    state.slowmoUntil = 0;
+  }
+  const dt = rawDt * (state.running ? state.timeScale || 1 : 1);
   if (state.hold && !state.running) {
-    state.hold.progress = clamp(state.hold.progress + dt / HOLD_SECONDS, 0, 1);
+    state.hold.progress = clamp(state.hold.progress + rawDt / HOLD_SECONDS, 0, 1);
     const width = `${Math.round(state.hold.progress * 100)}%`;
     setHoldVisual(width, state.hold.target);
     if (state.hold.progress >= 1) {
@@ -2284,7 +2498,7 @@ function frame(ts) {
   }
   if (state.running) {
     updateRun(dt);
-  } else if (!screenStartEl.classList.contains("hidden")) {
+  } else if (!screenStartEl.classList.contains("hidden") && screenOnboardEl?.classList.contains("hidden")) {
     updateDemo(dt);
   } else {
     updateOver(dt);
@@ -2295,6 +2509,7 @@ function frame(ts) {
 
 function boot() {
   state.meta = loadMeta();
+  saveMeta();
   touchPlayDay();
   refreshDaily();
   state.best = state.meta.best;
@@ -2325,6 +2540,29 @@ function boot() {
   btnShare?.addEventListener("click", () => {
     shareRun().catch(() => showToast("не удалось поделиться"));
   });
+  btnRate?.addEventListener("click", () => {
+    requestReview().catch(() => {});
+  });
+  btnOnboard?.addEventListener("click", () => advanceOnboard());
+  btnSound?.addEventListener("click", () => {
+    if (!state.meta) return;
+    state.meta.sound = !(state.meta.sound !== false);
+    if (!state.meta.sound) hum(false);
+    saveMeta();
+    renderSettings();
+    showToast(state.meta.sound ? "звук вкл" : "звук выкл");
+  });
+  btnHaptics?.addEventListener("click", () => {
+    if (!state.meta) return;
+    state.meta.haptics = !(state.meta.haptics !== false);
+    saveMeta();
+    renderSettings();
+    if (state.meta.haptics) buzz(8);
+    showToast(state.meta.haptics ? "вибро вкл" : "вибро выкл");
+  });
+  btnMarksPack?.addEventListener("click", () => {
+    purchaseMarksPack().catch(() => showToast("покупка недоступна"));
+  });
   window.addEventListener("resize", resize);
   const pauseForBackground = () => {
     if (state.touchActive) {
@@ -2354,7 +2592,9 @@ function boot() {
     if (event.detail?.isActive) resumeFromBackground();
     else pauseForBackground();
   });
-  if (state.meta?.streak > 1) {
+  if (!state.meta.onboarded) {
+    showOnboard();
+  } else if (state.meta?.streak > 1) {
     setTimeout(() => showToast(`серия · ${state.meta.streak} дн`), 650);
   }
   requestAnimationFrame(frame);

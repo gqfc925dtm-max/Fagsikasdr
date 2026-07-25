@@ -7,6 +7,12 @@ const Native = {
   platform: "web",
   ready: false,
   async haptic() {},
+  async purchase() {
+    return { ok: false, message: "покупка · только в App Store" };
+  },
+  async requestReview() {
+    return false;
+  },
 };
 
 function plugins() {
@@ -47,6 +53,36 @@ async function bootNative() {
     } catch (_) {
       // noop
     }
+  };
+
+  // Wire a StoreKit plugin here later (e.g. RevenueCat / Native Purchases).
+  Native.purchase = async (productId) => {
+    if (typeof p.OttiskIAP?.purchase === "function") {
+      return p.OttiskIAP.purchase({ productId });
+    }
+    return {
+      ok: false,
+      message: "StoreKit ещё не подключён в Xcode",
+      productId,
+    };
+  };
+
+  Native.requestReview = async () => {
+    try {
+      if (typeof p.OttiskIAP?.requestReview === "function") {
+        await p.OttiskIAP.requestReview();
+        return true;
+      }
+      // Fallback: open App Store write-review URL when configured.
+      const appId = window.OTTISK_APP_STORE_ID;
+      if (appId && p.App?.openUrl) {
+        await p.App.openUrl({ url: `itms-apps://itunes.apple.com/app/id${appId}?action=write-review` });
+        return true;
+      }
+    } catch (_) {
+      // noop
+    }
+    return false;
   };
 
   Native.ready = true;

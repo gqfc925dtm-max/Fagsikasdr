@@ -54,8 +54,17 @@ npx cap open ios
 - 1 бесплатный continue за забег
 - Дополнительный continue за следы (внутриигровая валюта)
 - Косметика за следы / рекорд
+- Кнопка `+60 следов` уже зовёт `OttiskNative.purchase('ottisk_marks_60')`
 
-Позже можно добавить StoreKit IAP (`ottisk_marks_60`) — код игры уже разделён так, чтобы покупки подключить без переписывания ядра.
+### Подключить StoreKit
+
+1. App Store Connect → In-App Purchase → Consumable  
+   Product ID: `ottisk_marks_60`
+2. В Xcode добавь StoreKit / RevenueCat / `@capgo/native-purchases`
+3. Проброс в `window.Capacitor.Plugins.OttiskIAP.purchase({ productId })`
+4. После успешной оплаты игра сама начислит 60 следов
+
+Оценка: кнопка «Оценить» после сильных забегов → `requestReview()`.
 
 ## TestFlight
 

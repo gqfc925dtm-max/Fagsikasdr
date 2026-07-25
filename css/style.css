@@ -478,6 +478,58 @@ body {
   max-width: 28ch;
 }
 
+.weekly-card,
+.settings-row {
+  width: 100%;
+}
+
+.weekly-card {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--life);
+  border: 1px solid color-mix(in srgb, var(--life) 35%, transparent);
+  background: color-mix(in srgb, var(--panel) 75%, transparent);
+  padding: 6px 8px;
+}
+
+.weekly-card:empty { display: none; }
+
+.settings-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.set-pill {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--mute);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 5px 8px;
+  font-family: "Instrument Sans", sans-serif;
+}
+
+.set-pill.on {
+  color: var(--foam);
+  border-color: color-mix(in srgb, var(--ember) 45%, transparent);
+}
+
+.set-pill.premium {
+  color: var(--gold);
+  border-color: color-mix(in srgb, var(--gold) 40%, transparent);
+}
+
+.onboard-card {
+  max-width: 320px;
+}
+
 .legal-links {
   margin-top: 10px;
   display: flex;
