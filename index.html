@@ -6,8 +6,8 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="ОТТИСК" />
-  <meta name="theme-color" content="#140c08" />
-  <meta name="description" content="ОТТИСК — существо живёт только под твоим пальцем. Отпустил — его нет." />
+  <meta name="theme-color" content="#120d14" />
+  <meta name="description" content="ОТТИСК — существо живёт только под пальцем. Мутирует, пока ты не отпускаешь." />
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
@@ -19,23 +19,32 @@
 </head>
 <body>
   <div id="app">
+    <div class="aura" aria-hidden="true"></div>
     <canvas id="game" aria-label="Игровое поле ОТТИСК"></canvas>
 
     <div id="hud" class="hud hidden">
-      <div class="hud-score">
-        <span class="hud-label">след</span>
-        <span id="score">0</span>
+      <div class="hud-top">
+        <div class="hud-score">
+          <span class="hud-label">след</span>
+          <span id="score">0</span>
+        </div>
+        <div id="mut-badge" class="mut-badge">искра</div>
       </div>
-      <div id="heat" class="heat"><i id="heat-fill"></i></div>
+      <div class="heat-wrap">
+        <span class="heat-label">жар</span>
+        <div id="heat" class="heat"><i id="heat-fill"></i></div>
+      </div>
       <div id="combo" class="combo"></div>
+      <div id="toast" class="toast"></div>
     </div>
 
     <div id="screen-start" class="screen">
       <div class="screen-bg" aria-hidden="true"></div>
       <div class="brand-block">
+        <p class="eyebrow">новая форма жизни</p>
         <p class="brand">ОТТИСК</p>
         <h1 class="tagline">Живёт только под пальцем.</h1>
-        <p class="hint">Удерживай — оно ест свет. Слишком долго на одном месте — сгорает. Отпустил — его нет. Перенеси касанием.</p>
+        <p class="hint">Удерживай — ест свет и мутирует. Стой на месте — сгорает. Отпустил — его нет. След притягивает охотников.</p>
       </div>
       <div class="actions">
         <button id="btn-start" class="btn btn-primary" type="button">Коснуться</button>
@@ -47,11 +56,12 @@
     <div id="screen-over" class="screen hidden">
       <div class="screen-bg dim" aria-hidden="true"></div>
       <div class="over-card">
-        <p class="over-label">Исчезло после</p>
+        <p class="over-label">След оборвался</p>
         <p class="brand over-brand">ОТТИСК</p>
         <p id="final-score" class="final-score">0</p>
-        <p class="over-sub">следа</p>
+        <p class="over-sub">собрано света</p>
         <p id="death-reason" class="death-reason"></p>
+        <p id="mut-summary" class="mut-summary"></p>
         <p class="best">Рекорд: <span id="best-over">0</span></p>
         <button id="btn-retry" class="btn btn-primary" type="button">Ещё раз</button>
       </div>
