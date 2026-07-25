@@ -1,4 +1,4 @@
-const CACHE = "ottisk-v32";
+const CACHE = "ottisk-v33";
 const ASSETS = [
   "./",
   "./index.html",
@@ -32,6 +32,33 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET") return;
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
+
+  const path = url.pathname;
+  const isAppShell =
+    request.mode === "navigate" ||
+    path.endsWith(".html") ||
+    path.endsWith(".js") ||
+    path.endsWith(".css") ||
+    path.endsWith("/sw.js") ||
+    /\/Fagsikasdr\/?$/.test(path);
+
+  if (isAppShell) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response && response.status === 200 && response.type === "basic") {
+            const copy = response.clone();
+            caches.open(CACHE).then((cache) => cache.put(request, copy));
+          }
+          return response;
+        })
+        .catch(() => caches.match(request))
+    );
+    return;
+  }
+
   event.respondWith(
     caches.match(request).then((cached) => {
       const fetched = fetch(request)
