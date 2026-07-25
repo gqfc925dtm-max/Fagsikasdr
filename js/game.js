@@ -1529,7 +1529,7 @@ function createLife(x, y, opts = {}) {
     px: x,
     py: y,
     speed: 0,
-    r: 24,
+    r: 20,
     wobble: Math.random() * Math.PI * 2,
     teeth: 0,
   };
@@ -1768,22 +1768,22 @@ async function shareRun() {
 
 function sparkProfile(type) {
   if (type === "rare") {
-    return { type, worth: 3, restore: 35, color: "#ffd45c", r: rand(7, 9.5) };
+    return { type, worth: 3, restore: 35, color: "#ffd45c", r: rand(4.2, 5.8) };
   }
   if (type === "cool") {
-    return { type, worth: 1, restore: 25, color: "#6ec8ff", r: rand(6, 8.5) };
+    return { type, worth: 1, restore: 25, color: "#6ec8ff", r: rand(3.8, 5.2) };
   }
   if (type === "bait") {
-    return { type, worth: 1, restore: 12, color: "#ff6ad8", r: rand(6, 8.5) };
+    return { type, worth: 1, restore: 12, color: "#ff6ad8", r: rand(3.8, 5.2) };
   }
   if (type === "comet") {
-    return { type, worth: 5, restore: 28, color: "#ffe66e", r: rand(8, 10.5), comet: true };
+    return { type, worth: 5, restore: 28, color: "#ffe66e", r: rand(5, 6.5), comet: true };
   }
   if (type === "deep") {
-    return { type, worth: 4, restore: 32, color: "#8ae0ff", r: rand(7, 9.2), deep: true };
+    return { type, worth: 4, restore: 32, color: "#8ae0ff", r: rand(4.2, 5.6), deep: true };
   }
   if (type === "seed") {
-    return { type, worth: 2, restore: 16, color: "#6affc4", r: rand(6.5, 8.2), seed: true };
+    return { type, worth: 2, restore: 16, color: "#6affc4", r: rand(4, 5.4), seed: true };
   }
   const normals = ["#ffe2a8", "#ffc48a", "#fff0c8", cssVar("--accent-b", "#5fe8b8")];
   return {
@@ -1791,7 +1791,7 @@ function sparkProfile(type) {
     worth: 1,
     restore: 18,
     color: normals[Math.floor(Math.random() * normals.length)],
-    r: rand(5.5, 7.6),
+    r: rand(3.4, 4.8),
   };
 }
 
@@ -2410,8 +2410,8 @@ function updateRun(dt) {
     state.life.px = state.life.x;
     state.life.py = state.life.y;
     state.life.wobble += dt * 7.2;
-    state.life.r = 22 + Math.min(9, state.combo * 0.75) + Math.sin(state.life.wobble) * 1.25;
-    if (state.fever) state.life.r += 2.2;
+    state.life.r = 18 + Math.min(6, state.combo * 0.65) + Math.sin(state.life.wobble) * 0.9;
+    if (state.fever) state.life.r += 1.6;
     state.life.teeth = hasMut("fang") && state.combo >= 4 ? Math.min(1, state.life.teeth + dt * 3) : Math.max(0, state.life.teeth - dt * 3);
     clampLife();
     updateHum();
@@ -2485,7 +2485,7 @@ function updateDemo(dt) {
     state.life.wobble += dt * 6;
     state.life.x = state.width * 0.5 + Math.sin(state.demoClock * 1.35) * state.width * 0.17;
     state.life.y = state.height * 0.58 + Math.cos(state.demoClock * 0.92) * state.height * 0.07;
-    state.life.r = 23 + Math.sin(state.demoClock * 2.8) * 1.3;
+    state.life.r = 19 + Math.sin(state.demoClock * 2.8) * 0.9;
     for (let i = state.sparks.length - 1; i >= 0; i -= 1) {
       const spark = state.sparks[i];
       if (dist(spark.x, spark.y, state.life.x, state.life.y) < state.life.r * 0.72 + spark.r) {
@@ -2680,57 +2680,65 @@ function drawVeins() {
 }
 
 function drawSpark(spark) {
-  const pulse = 1 + Math.sin(spark.pulse) * 0.18;
+  const pulse = 1 + Math.sin(spark.pulse) * 0.06;
   const r = spark.r * pulse;
   if (spark.comet) {
     const ang = Math.atan2(spark.vy, spark.vx || 0.001);
     ctx.save();
     ctx.translate(spark.x, spark.y);
     ctx.rotate(ang);
-    const trail = ctx.createLinearGradient(-34, 0, 12, 0);
+    const trail = ctx.createLinearGradient(-24, 0, 8, 0);
     trail.addColorStop(0, "transparent");
-    trail.addColorStop(0.55, spark.color);
-    trail.addColorStop(1, "#fff8e8");
+    trail.addColorStop(0.6, spark.color);
+    trail.addColorStop(1, mixColor(spark.color, "#fff8e8", 0.35));
     ctx.fillStyle = trail;
-    ctx.globalAlpha = 0.85;
+    ctx.globalAlpha = 0.9;
     ctx.beginPath();
-    ctx.moveTo(-34, 0);
-    ctx.lineTo(6, -5.5);
-    ctx.lineTo(6, 5.5);
+    ctx.moveTo(-24, 0);
+    ctx.lineTo(5, -4);
+    ctx.lineTo(5, 4);
     ctx.closePath();
     ctx.fill();
     ctx.restore();
   }
-  const glow = ctx.createRadialGradient(spark.x, spark.y, 0, spark.x, spark.y, r * 5);
-  glow.addColorStop(0, "#ffffff");
-  glow.addColorStop(0.18, spark.color);
-  glow.addColorStop(0.55, spark.color);
+  const glowR = r * 2.15;
+  const glow = ctx.createRadialGradient(spark.x, spark.y, r * 0.55, spark.x, spark.y, glowR);
+  glow.addColorStop(0, spark.color);
   glow.addColorStop(1, "transparent");
-  ctx.globalAlpha = 1;
+  ctx.globalAlpha = 0.48;
   ctx.fillStyle = glow;
   ctx.beginPath();
-  ctx.arc(spark.x, spark.y, r * 5, 0, Math.PI * 2);
+  ctx.arc(spark.x, spark.y, glowR, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = "#ffffff";
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = spark.color;
   ctx.beginPath();
-  ctx.arc(spark.x, spark.y, Math.max(2.1, r * 0.55), 0, Math.PI * 2);
+  ctx.arc(spark.x, spark.y, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = mixColor(spark.color, "#fff8ec", 0.42);
+  ctx.beginPath();
+  ctx.arc(spark.x, spark.y, r * 0.45, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,0.8)";
+  ctx.beginPath();
+  ctx.arc(spark.x - r * 0.24, spark.y - r * 0.24, Math.max(0.8, r * 0.16), 0, Math.PI * 2);
   ctx.fill();
   if (spark.type === "rare" || spark.comet || spark.deep) {
-    ctx.strokeStyle = spark.deep ? "rgba(138,224,255,0.75)" : "rgba(255,212,92,0.8)";
-    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = spark.deep ? "rgba(138,224,255,0.7)" : "rgba(255,212,92,0.75)";
+    ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.arc(spark.x, spark.y, r * 1.75, 0, Math.PI * 2);
+    ctx.arc(spark.x, spark.y, r * 1.35, 0, Math.PI * 2);
     ctx.stroke();
   }
   if (spark.tutorial) {
     const t = (state.time * 1.4) % 1;
     for (let i = 0; i < 2; i += 1) {
       const phase = (t + i * 0.5) % 1;
-      ctx.globalAlpha = (1 - phase) * 0.42;
+      ctx.globalAlpha = (1 - phase) * 0.32;
       ctx.strokeStyle = spark.color;
-      ctx.lineWidth = 1.2;
+      ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.arc(spark.x, spark.y, r * (1.4 + phase * 3.2), 0, Math.PI * 2);
+      ctx.arc(spark.x, spark.y, r * (1.2 + phase * 1.8), 0, Math.PI * 2);
       ctx.stroke();
     }
     ctx.globalAlpha = 1;
@@ -2801,14 +2809,14 @@ function drawLifeBody(body, alpha = 1) {
   const accent = cssVar("--accent-a", "#ff7a45");
   ctx.save();
   ctx.globalAlpha = alpha;
-  const bloom = ctx.createRadialGradient(body.x, body.y, 2, body.x, body.y, body.r * 2.3);
-  bloom.addColorStop(0, mixColor(ink, "#ffffff", 0.35));
-  bloom.addColorStop(0.35, ink);
+  const bloom = ctx.createRadialGradient(body.x, body.y, 1, body.x, body.y, body.r * 1.55);
+  bloom.addColorStop(0, mixColor(ink, "#ffffff", 0.22));
+  bloom.addColorStop(0.5, ink);
   bloom.addColorStop(1, "transparent");
-  ctx.globalAlpha = alpha * (state.fever ? 0.5 : 0.36);
+  ctx.globalAlpha = alpha * (state.fever ? 0.28 : 0.18);
   ctx.fillStyle = bloom;
   ctx.beginPath();
-  ctx.arc(body.x, body.y, body.r * 2.6, 0, Math.PI * 2);
+  ctx.arc(body.x, body.y, body.r * 1.65, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.strokeStyle = ink;
@@ -2952,7 +2960,7 @@ function drawGuide() {
   ctx.lineTo(state.guideSpark.x, state.guideSpark.y);
   ctx.stroke();
   ctx.beginPath();
-  ctx.arc(state.guideSpark.x, state.guideSpark.y, state.guideSpark.r * 2.2, 0, Math.PI * 2);
+  ctx.arc(state.guideSpark.x, state.guideSpark.y, state.guideSpark.r * 1.5, 0, Math.PI * 2);
   ctx.stroke();
   ctx.setLineDash([]);
   ctx.restore();
@@ -3023,14 +3031,14 @@ function drawOpeningPulse() {
   const pulse = (state.time * 2.4) % 1;
   const cx = state.life.x;
   const cy = state.life.y;
-  const baseR = state.life.r + 28 + (1 - t) * 18;
+  const baseR = state.life.r + 18 + (1 - t) * 12;
   for (let i = 0; i < 2; i += 1) {
     const phase = (pulse + i * 0.5) % 1;
     ctx.globalAlpha = (1 - phase) * 0.28 * t;
     ctx.strokeStyle = i === 0 ? cssVar("--gold", "#ffe898") : cssVar("--life", "#7affd4");
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(cx, cy, baseR + phase * 42, 0, Math.PI * 2);
+    ctx.arc(cx, cy, baseR + phase * 28, 0, Math.PI * 2);
     ctx.stroke();
   }
   ctx.globalAlpha = 1;
