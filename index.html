@@ -23,6 +23,7 @@
       <div class="aura" aria-hidden="true"></div>
       <canvas id="game" aria-label="Игровое поле ОТТИСК"></canvas>
       <div id="float-layer" class="float-layer">
+        <div id="daily-chip" class="daily-chip"></div>
         <div id="goal-bar" class="goal-bar"></div>
         <div id="combo" class="combo"></div>
         <div id="toast" class="toast"></div>
@@ -61,14 +62,23 @@
         <p class="eyebrow">удерживай · не кликай</p>
         <p class="brand">ОТТИСК</p>
         <h1 class="tagline">Живёт только под пальцем.</h1>
-        <p class="hint">Ешь свет, не дай охотникам коснуться тебя или твоего следа. Без света умираешь от голода.</p>
+        <p class="hint">Ешь свет. Не дай охотнику коснуться тебя или следа. Без света — голод.</p>
         <div class="meta-panel">
           <div class="meta-row">
             <span class="meta-label">рекорд</span>
             <span id="best-start" class="meta-strong">0</span>
           </div>
           <div class="meta-row">
-            <span class="meta-label">оттиск</span>
+            <span class="meta-label">серия</span>
+            <span id="streak-start" class="meta-strong">0 дн</span>
+          </div>
+          <div class="meta-row">
+            <span class="meta-label">следы</span>
+            <span id="marks-start" class="meta-strong">0</span>
+          </div>
+          <div id="daily-card" class="daily-card"></div>
+          <div class="shop-head">
+            <span class="meta-label">оттиски</span>
             <span id="skin-name" class="meta-strong">чернь</span>
           </div>
           <div id="skin-unlocks" class="skin-unlocks"></div>
@@ -84,6 +94,24 @@
       <p class="install-tip">iPhone · Поделиться · На экран «Домой»</p>
     </div>
 
+    <div id="screen-continue" class="screen hidden">
+      <div class="screen-bg dim" aria-hidden="true"></div>
+      <div class="over-card continue-card">
+        <p class="over-label">Ещё один след</p>
+        <p class="brand over-brand">ВТОРОЙ ШАНС</p>
+        <p id="continue-reason" class="death-reason"></p>
+        <p class="hint continue-hint">Посмотри короткую «рекламу» — и продолжи с этим счётом. Один раз за забег.</p>
+        <div id="ad-meter" class="ad-meter"><i id="ad-fill"></i></div>
+        <button id="btn-continue" class="btn btn-primary" type="button">
+          <span class="btn-main" id="continue-label">Смотреть 3 сек</span>
+          <span class="btn-sub">затем продолжить</span>
+        </button>
+        <button id="btn-skip-continue" class="btn btn-ghost" type="button">
+          <span class="btn-main">Закончить</span>
+        </button>
+      </div>
+    </div>
+
     <div id="screen-over" class="screen hidden">
       <div class="screen-bg dim" aria-hidden="true"></div>
       <div class="over-card">
@@ -95,15 +123,24 @@
         <p id="mut-summary" class="mut-summary"></p>
         <div id="goals-result" class="goals-result"></div>
         <p id="skin-result" class="skin-result"></p>
-        <p class="best">Рекорд <span id="best-over">0</span></p>
-        <button id="btn-retry" class="btn btn-primary" type="button">
-          <span class="btn-main">Ещё раз</span>
-          <span class="btn-sub">удерживай кнопку</span>
-        </button>
-        <div class="hold-meter over"><i id="hold-fill-over"></i></div>
+        <p id="daily-result" class="daily-result"></p>
+        <p class="best">Рекорд <span id="best-over">0</span> · серия <span id="streak-over">0</span></p>
+        <div class="over-actions">
+          <button id="btn-share" class="btn btn-secondary" type="button">
+            <span class="btn-main">Поделиться</span>
+            <span class="btn-sub">отправь свой след</span>
+          </button>
+          <button id="btn-retry" class="btn btn-primary" type="button">
+            <span class="btn-main">Ещё раз</span>
+            <span class="btn-sub">удерживай кнопку</span>
+          </button>
+          <div class="hold-meter over"><i id="hold-fill-over"></i></div>
+        </div>
       </div>
     </div>
+
+    <canvas id="share-canvas" width="720" height="900" class="share-canvas" aria-hidden="true"></canvas>
   </div>
-  <script src="js/game.js?v=fix2k" type="module"></script>
+  <script src="js/game.js?v=grow1" type="module"></script>
 </body>
 </html>
