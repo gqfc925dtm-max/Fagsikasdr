@@ -37,7 +37,7 @@ const DEATH = {
   HUNGER: "свет иссяк — слишком долго без пищи",
 };
 
-const PHOTO_VER = "2";
+const PHOTO_VER = "3";
 const PHOTOS = {
   ocean: {
     src: new URL(`../assets/ocean.jpg?v=${PHOTO_VER}`, import.meta.url).href,
@@ -2008,6 +2008,20 @@ function resetRun() {
   screenContinueEl?.classList.add("hidden");
   for (let i = 0; i < 2; i += 1) spawnSpark();
   spawnSpark({ tutorial: true, type: "normal", near: { x: state.width * 0.5, y: state.height * 0.42 } });
+  state.hunters.push({
+    x: -36,
+    y: state.height * 0.22,
+    vx: 70,
+    vy: 10,
+    r: 26,
+    anger: 0.55,
+    slow: true,
+    warn: 1,
+    phase: Math.random() * Math.PI * 2,
+    nearMissed: false,
+    parade: true,
+  });
+  state.slowHunterSeen = true;
 }
 
 function resetDemo() {
@@ -2269,21 +2283,22 @@ function eatSpark(index, spark) {
 }
 
 function updateHunters(dt) {
-  if (inOpening()) return;
   const soft = difficultyScale();
-  const maxHunters = Math.min(7, Math.max(1, Math.floor((2 + Math.floor(state.score / 18)) * soft)));
-  state.hunterAcc += dt;
-  let interval = Math.max(1.05, 3.4 - state.score * 0.026) / Math.max(0.55, soft);
-  if (!state.slowHunterSeen) interval = Math.max(interval, 2.4 + (1 - soft) * 1.2);
-  const firstHunterAt = soft < 0.7 ? OPENING_SEC + 0.4 : OPENING_SEC;
-  while (state.hunters.length < maxHunters && state.hunterAcc >= interval) {
-    state.hunterAcc -= interval;
-    if (!state.slowHunterSeen && state.stats.sparkEats > 0) {
-      spawnHunter(true);
-      state.slowHunterSeen = true;
-    } else if (state.elapsed > firstHunterAt) {
-      spawnHunter(false);
-      if (state.score > 45 && Math.random() < 0.22 * soft && state.hunters.length < maxHunters) spawnHunter(false);
+  if (!inOpening()) {
+    const maxHunters = Math.min(7, Math.max(1, Math.floor((2 + Math.floor(state.score / 18)) * soft)));
+    state.hunterAcc += dt;
+    let interval = Math.max(1.05, 3.4 - state.score * 0.026) / Math.max(0.55, soft);
+    if (!state.slowHunterSeen) interval = Math.max(interval, 2.4 + (1 - soft) * 1.2);
+    const firstHunterAt = soft < 0.7 ? OPENING_SEC + 0.4 : OPENING_SEC;
+    while (state.hunters.length < maxHunters && state.hunterAcc >= interval) {
+      state.hunterAcc -= interval;
+      if (!state.slowHunterSeen && state.stats.sparkEats > 0) {
+        spawnHunter(true);
+        state.slowHunterSeen = true;
+      } else if (state.elapsed > firstHunterAt) {
+        spawnHunter(false);
+        if (state.score > 45 && Math.random() < 0.22 * soft && state.hunters.length < maxHunters) spawnHunter(false);
+      }
     }
   }
 
@@ -2292,6 +2307,21 @@ function updateHunters(dt) {
     hunter.phase += dt * 5;
     if (hunter.shadow) hunter.wobble = (hunter.wobble || 0) + dt * 5.5;
     hunter.warn = Math.max(0, hunter.warn - dt * 1.45);
+    if (hunter.parade) {
+      if (!inOpening()) {
+        hunter.parade = false;
+        hunter.slow = false;
+        hunter.warn = 1;
+      } else {
+        hunter.x += (hunter.vx || 55) * dt;
+        hunter.y += Math.sin(hunter.phase) * 22 * dt;
+        if (hunter.x > state.width + 50) {
+          hunter.x = -50;
+          hunter.y = state.height * (0.18 + Math.random() * 0.28);
+        }
+        continue;
+      }
+    }
     let tx = state.width * 0.5;
     let ty = state.height * 0.5;
     if (state.life) {
@@ -2902,8 +2932,8 @@ function drawEvilFish(hunter, alpha = 1, ghost = false) {
   const wobble = Math.sin(hunter.phase || 0) * 0.1;
   if (PHOTOS.fish.ready) {
     const img = PHOTOS.fish.img;
-    const fishW = r * 4.6;
-    const fishH = r * 2.85;
+    const fishW = r * 5.8;
+    const fishH = r * 3.5;
     ctx.save();
     ctx.translate(hunter.x, hunter.y);
     ctx.rotate(angle + wobble);
@@ -3363,7 +3393,7 @@ function boot() {
   const nativeShell = !!window.OttiskNative?.isNative;
   if ("serviceWorker" in navigator && !nativeShell) {
     navigator.serviceWorker
-      .register("./sw.js?v=28")
+      .register("./sw.js?v=29")
       .then((reg) => reg.update())
       .catch(() => {});
   }

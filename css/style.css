@@ -49,7 +49,7 @@ body {
   flex-direction: column;
   background:
     linear-gradient(180deg, rgba(30, 120, 170, 0.28) 0%, rgba(6, 40, 64, 0.55) 100%),
-    url("../assets/ocean.jpg?v=2") center / cover no-repeat;
+    url("../assets/ocean.jpg?v=3") center / cover no-repeat;
   transition: background 0.7s ease, color 0.55s ease;
 }
 
