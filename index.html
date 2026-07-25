@@ -23,8 +23,6 @@
       <div class="aura" aria-hidden="true"></div>
       <canvas id="game" aria-label="Игровое поле ОТТИСК"></canvas>
       <div id="float-layer" class="float-layer">
-        <div id="daily-chip" class="daily-chip"></div>
-        <div id="event-chip" class="event-chip"></div>
         <div id="combo" class="combo"></div>
         <div id="toast" class="toast"></div>
         <div id="coach" class="coach"></div>
@@ -33,27 +31,19 @@
 
     <footer id="status" class="status hidden">
       <div class="status-left">
-        <span class="meta-label">след</span>
         <span id="score">0</span>
       </div>
       <div class="status-center">
         <div class="heat-head">
-          <span class="meta-label">голод</span>
           <span id="heat-pct" class="heat-pct">100%</span>
         </div>
-        <div id="heat" class="heat" aria-label="Голод">
+        <div id="heat" class="heat" aria-label="Сытость">
           <i id="heat-fill"></i>
         </div>
         <div class="mut-track" aria-hidden="true">
           <div id="mut-track-fill" class="mut-track-fill"></div>
         </div>
         <div id="dive-meter" class="dive-meter" aria-hidden="true"><i id="dive-fill"></i></div>
-      </div>
-      <div class="status-right">
-        <span class="meta-label">форма</span>
-        <span id="mut-badge" class="meta-value">искра</span>
-        <span id="theme-chip" class="meta-value dim">уголь</span>
-        <span id="next-mut" class="meta-next"></span>
       </div>
     </footer>
 
@@ -170,6 +160,6 @@
     <canvas id="share-canvas" width="720" height="900" class="share-canvas" aria-hidden="true"></canvas>
   </div>
   <script src="js/native.js" type="module"></script>
-  <script src="js/game.js?v=bright3" type="module"></script>
+  <script src="js/game.js?v=hook1" type="module"></script>
 </body>
 </html>

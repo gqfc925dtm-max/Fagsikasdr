@@ -1,19 +1,19 @@
 :root {
-  --bg0: #1c1420;
-  --bg1: #3a2438;
-  --bg2: #4a2e22;
-  --foam: #fffaf2;
-  --sand: #d4b8a0;
-  --ember: #ff8a52;
-  --gold: #ffe08a;
-  --life: #6ff0c4;
-  --danger: #ff6a86;
-  --mute: #9a8894;
-  --panel: #241828;
-  --line: rgba(255, 250, 242, 0.18);
-  --glow: rgba(255, 138, 82, 0.38);
-  --accent-a: #ff8a52;
-  --accent-b: #6ff0c4;
+  --bg0: #241828;
+  --bg1: #442840;
+  --bg2: #5a3428;
+  --foam: #fffdf8;
+  --sand: #e8d0b8;
+  --ember: #ff9a62;
+  --gold: #ffe898;
+  --life: #7affd4;
+  --danger: #ff7898;
+  --mute: #b0a0ac;
+  --panel: #2e2034;
+  --line: rgba(255, 253, 248, 0.22);
+  --glow: rgba(255, 154, 98, 0.48);
+  --accent-a: #ff9a62;
+  --accent-b: #7affd4;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -48,9 +48,9 @@ body {
   display: flex;
   flex-direction: column;
   background:
-    radial-gradient(120% 80% at 10% 0%, color-mix(in srgb, var(--accent-a) 38%, transparent), transparent 58%),
-    radial-gradient(100% 70% at 90% 8%, color-mix(in srgb, var(--accent-b) 32%, transparent), transparent 52%),
-    radial-gradient(90% 60% at 50% 100%, color-mix(in srgb, var(--gold) 18%, transparent), transparent 60%),
+    radial-gradient(120% 80% at 10% 0%, color-mix(in srgb, var(--accent-a) 48%, transparent), transparent 58%),
+    radial-gradient(100% 70% at 90% 8%, color-mix(in srgb, var(--accent-b) 42%, transparent), transparent 52%),
+    radial-gradient(90% 60% at 50% 100%, color-mix(in srgb, var(--gold) 28%, transparent), transparent 60%),
     linear-gradient(165deg, var(--bg1) 0%, var(--bg0) 52%, var(--bg2) 100%);
   transition: background 0.7s ease, color 0.55s ease;
 }
@@ -82,34 +82,34 @@ body {
 }
 
 #app[data-theme="0"] {
-  --bg0: #1c1420; --bg1: #3a2438; --bg2: #4a2e22;
-  --ember: #ff8a52; --gold: #ffe08a; --life: #6ff0c4; --danger: #ff6a86;
-  --panel: #241828; --accent-a: #ff8a52; --accent-b: #6ff0c4;
+  --bg0: #241828; --bg1: #442840; --bg2: #5a3428;
+  --ember: #ff9a62; --gold: #ffe898; --life: #7affd4; --danger: #ff7898;
+  --panel: #2e2034; --accent-a: #ff9a62; --accent-b: #7affd4;
 }
 #app[data-theme="1"] {
-  --bg0: #0a2030; --bg1: #184860; --bg2: #105048;
-  --ember: #4ad4ff; --gold: #b4f4ff; --life: #6ff0d4; --danger: #ff7ab4;
-  --panel: #123040; --accent-a: #4ad4ff; --accent-b: #ff7ab4;
+  --bg0: #102838; --bg1: #205870; --bg2: #186058;
+  --ember: #62e4ff; --gold: #c8fcff; --life: #7affdc; --danger: #ff8ac4;
+  --panel: #183848; --accent-a: #62e4ff; --accent-b: #ff8ac4;
 }
 #app[data-theme="2"] {
-  --bg0: #28180c; --bg1: #4a2c14; --bg2: #5a2010;
-  --ember: #ffaa48; --gold: #ffe89a; --life: #ffd07a; --danger: #ff6a48;
-  --panel: #301c10; --accent-a: #ffaa48; --accent-b: #ffe89a;
+  --bg0: #341c10; --bg1: #5a3818; --bg2: #6a2818;
+  --ember: #ffb858; --gold: #fff0aa; --life: #ffdc88; --danger: #ff7858;
+  --panel: #3a2418; --accent-a: #ffb858; --accent-b: #fff0aa;
 }
 #app[data-theme="3"] {
-  --bg0: #0e2418; --bg1: #1a5040; --bg2: #284028;
-  --ember: #52ffaa; --gold: #d4ff7a; --life: #7affcc; --danger: #ff9a66;
-  --panel: #163428; --accent-a: #52ffaa; --accent-b: #d4ff7a;
+  --bg0: #143020; --bg1: #226050; --bg2: #345030;
+  --ember: #62ffb8; --gold: #e0ff8a; --life: #88ffdc; --danger: #ffaa72;
+  --panel: #1e4034; --accent-a: #62ffb8; --accent-b: #e0ff8a;
 }
 #app[data-theme="4"] {
-  --bg0: #221428; --bg1: #402060; --bg2: #502038;
-  --ember: #ff7adc; --gold: #ffd0f0; --life: #a0d4ff; --danger: #ff6a9a;
-  --panel: #281830; --accent-a: #ff7adc; --accent-b: #a0d4ff;
+  --bg0: #2a1834; --bg1: #502878; --bg2: #602848;
+  --ember: #ff8aec; --gold: #ffe0f8; --life: #b0e0ff; --danger: #ff7aaa;
+  --panel: #321c3c; --accent-a: #ff8aec; --accent-b: #b0e0ff;
 }
 #app[data-theme="5"] {
-  --bg0: #242014; --bg1: #443828; --bg2: #504818;
-  --ember: #ffe04a; --gold: #fff5b0; --life: #e4ff86; --danger: #ff9a52;
-  --panel: #302818; --accent-a: #ffe04a; --accent-b: #ff9a52;
+  --bg0: #2c2418; --bg1: #544030; --bg2: #645820;
+  --ember: #ffe858; --gold: #fff8c8; --life: #ecff98; --danger: #ffaa62;
+  --panel: #383020; --accent-a: #ffe858; --accent-b: #ffaa62;
 }
 
 .stage {
@@ -127,17 +127,17 @@ body {
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(70% 50% at 20% 15%, color-mix(in srgb, var(--accent-a) 42%, transparent), transparent 60%),
-    radial-gradient(65% 45% at 85% 25%, color-mix(in srgb, var(--accent-b) 36%, transparent), transparent 58%),
-    radial-gradient(90% 60% at 50% 100%, color-mix(in srgb, var(--ember) 28%, transparent), transparent 64%),
+    radial-gradient(70% 50% at 20% 15%, color-mix(in srgb, var(--accent-a) 52%, transparent), transparent 60%),
+    radial-gradient(65% 45% at 85% 25%, color-mix(in srgb, var(--accent-b) 46%, transparent), transparent 58%),
+    radial-gradient(90% 60% at 50% 100%, color-mix(in srgb, var(--ember) 38%, transparent), transparent 64%),
     linear-gradient(180deg, transparent 58%, color-mix(in srgb, var(--panel) 50%, transparent));
   z-index: 0;
   animation: aura-shift 7s ease-in-out infinite alternate;
 }
 
 @keyframes aura-shift {
-  from { opacity: 0.92; transform: scale(1); filter: saturate(1.05); }
-  to { opacity: 1; transform: scale(1.06); filter: saturate(1.25); }
+  from { opacity: 0.94; transform: scale(1); filter: saturate(1.15) brightness(1.04); }
+  to { opacity: 1; transform: scale(1.07); filter: saturate(1.38) brightness(1.1); }
 }
 
 #game {
@@ -169,13 +169,13 @@ body {
   z-index: 6;
   flex: 0 0 auto;
   display: grid;
-  grid-template-columns: 64px 1fr 96px;
-  gap: 14px;
+  grid-template-columns: 72px 1fr;
+  gap: 16px;
   align-items: center;
   padding: 10px 16px calc(10px + var(--safe-bottom));
   background:
-    linear-gradient(90deg, color-mix(in srgb, var(--accent-a) 16%, transparent), transparent 40%),
-    linear-gradient(270deg, color-mix(in srgb, var(--accent-b) 14%, transparent), transparent 40%),
+    linear-gradient(90deg, color-mix(in srgb, var(--accent-a) 22%, transparent), transparent 40%),
+    linear-gradient(270deg, color-mix(in srgb, var(--accent-b) 20%, transparent), transparent 40%),
     var(--panel);
   border-top: 1px solid var(--line);
 }
@@ -195,11 +195,12 @@ body {
 .status-left #score {
   display: block;
   font-family: "Syne", sans-serif;
-  font-size: 30px;
+  font-size: 34px;
   font-weight: 800;
   letter-spacing: -0.04em;
   line-height: 1;
-  color: var(--foam);
+  color: var(--gold);
+  text-shadow: 0 0 18px color-mix(in srgb, var(--gold) 45%, transparent);
   transition: transform 0.12s ease;
 }
 
@@ -254,7 +255,7 @@ body {
   height: 100%;
   background: linear-gradient(90deg, var(--life), var(--accent-b) 40%, var(--gold) 70%, var(--ember));
   transition: width 0.06s linear;
-  box-shadow: 0 0 12px color-mix(in srgb, var(--life) 35%, transparent);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--life) 50%, transparent);
 }
 
 .heat.low i {
@@ -282,7 +283,13 @@ body {
 .mut-track-fill {
   width: 0%;
   height: 100%;
-  background: var(--life);
+  background: linear-gradient(90deg, var(--life), var(--gold));
+  box-shadow: 0 0 8px color-mix(in srgb, var(--life) 40%, transparent);
+}
+
+#app.in-run .float-layer .daily-chip,
+#app.in-run .float-layer .event-chip {
+  display: none !important;
 }
 
 .status-right {
