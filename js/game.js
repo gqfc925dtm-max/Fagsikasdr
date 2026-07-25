@@ -541,7 +541,7 @@ function onPointerMove(e) {
   const moved = dist(lx, ly, p.x, p.y);
   if (moved > 4 && state.coachStep === 1) {
     state.coachStep = 2;
-    showCoach("Не стой — следи за ЖАРОМ", 2400);
+    showCoach("Собирай свет, избегай красных", 2400);
   }
   if ((hasMut("veins") || state.coachStep < 4) && moved > 4) {
     state.veins.push({ x: p.x, y: p.y, life: hasMut("veins") ? 1 : 0.45, r: state.life.r * 0.5 });
@@ -695,10 +695,7 @@ function update(dt) {
       state.nodes.g.gain.setTargetAtTime(0.01 + state.heat * 0.02, ac.currentTime, 0.05);
     }
 
-    if (state.heat >= 1) {
-      kill("сгорело на месте");
-      return;
-    }
+    // Heat is a warning meter only — no death from standing still
 
     const m = state.life.r * 0.32;
     if (
@@ -896,19 +893,9 @@ function drawBackground() {
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, state.width, state.height);
 
-  const cx = state.life ? state.life.x : state.width * 0.5;
-  const cy = state.life ? state.life.y : state.height * 0.48;
-  const soft = ctx.createRadialGradient(cx, cy, 10, cx, cy, state.width * 0.7);
-  soft.addColorStop(0, p.glow);
-  soft.addColorStop(1, "transparent");
-  ctx.globalAlpha = 0.18;
-  ctx.fillStyle = soft;
-  ctx.fillRect(0, 0, state.width, state.height);
-  ctx.globalAlpha = 1;
-
   if (state.bloom > 0) {
     ctx.fillStyle = cssVar("--gold", "#f2c15a");
-    ctx.globalAlpha = state.bloom * 0.08;
+    ctx.globalAlpha = state.bloom * 0.06;
     ctx.fillRect(0, 0, state.width, state.height);
     ctx.globalAlpha = 1;
   }
@@ -930,17 +917,8 @@ function drawLifeBody(L, alpha = 1) {
     : heatTint > 0.45
       ? cssVar("--ember", "#e86a3a")
       : cssVar("--life", "#6fd9b0");
-  const soft = ctx.createRadialGradient(L.x, L.y, L.r * 0.2, L.x, L.y, L.r * 2.2);
-  soft.addColorStop(0, ink);
-  soft.addColorStop(1, "transparent");
-  ctx.globalAlpha = alpha * (0.18 + heatTint * 0.2);
-  ctx.fillStyle = soft;
-  ctx.beginPath();
-  ctx.arc(L.x, L.y, L.r * 2.2, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.globalAlpha = alpha;
 
-  // Ink stamp / fingerprint rings — no cute eye-circle
+  // Ink stamp rings only — no big transparent halo
   ctx.strokeStyle = ink;
   ctx.lineCap = "round";
   const rings = hasMut("fang") ? 5 : 4;
@@ -948,7 +926,7 @@ function drawLifeBody(L, alpha = 1) {
     const t = (i + 1) / rings;
     const wob = Math.sin(L.wobble * 1.2 + i * 0.9) * (1.2 + i * 0.35);
     ctx.lineWidth = Math.max(1.2, 2.6 - i * 0.25);
-    ctx.globalAlpha = alpha * (0.35 + t * 0.5);
+    ctx.globalAlpha = alpha * (0.4 + t * 0.5);
     ctx.beginPath();
     ctx.ellipse(
       L.x + Math.sin(L.wobble * 0.4 + i) * 0.8,
@@ -962,7 +940,6 @@ function drawLifeBody(L, alpha = 1) {
     ctx.stroke();
   }
 
-  // Sharp fang ticks when empowered
   if (hasMut("fang") && state.combo >= 5) {
     ctx.globalAlpha = alpha * 0.85;
     ctx.strokeStyle = cssVar("--danger", "#e2556d");
