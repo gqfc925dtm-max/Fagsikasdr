@@ -1732,7 +1732,7 @@ function createLife(x, y, opts = {}) {
     px: x,
     py: y,
     speed: 0,
-    r: 32,
+    r: 17,
     wobble: Math.random() * Math.PI * 2,
     aim: -Math.PI / 2,
     teeth: 0,
