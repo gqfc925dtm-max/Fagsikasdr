@@ -48,9 +48,9 @@ body {
   display: flex;
   flex-direction: column;
   background:
-    radial-gradient(120% 80% at 10% 0%, color-mix(in srgb, var(--accent-a) 48%, transparent), transparent 58%),
-    radial-gradient(100% 70% at 90% 8%, color-mix(in srgb, var(--accent-b) 42%, transparent), transparent 52%),
-    radial-gradient(90% 60% at 50% 100%, color-mix(in srgb, var(--gold) 28%, transparent), transparent 60%),
+    radial-gradient(120% 80% at 10% 0%, color-mix(in srgb, var(--accent-a) 32%, transparent), transparent 58%),
+    radial-gradient(100% 70% at 90% 8%, color-mix(in srgb, var(--accent-b) 28%, transparent), transparent 52%),
+    radial-gradient(90% 60% at 50% 100%, color-mix(in srgb, var(--gold) 16%, transparent), transparent 60%),
     linear-gradient(165deg, var(--bg1) 0%, var(--bg0) 52%, var(--bg2) 100%);
   transition: background 0.7s ease, color 0.55s ease;
 }
@@ -127,9 +127,9 @@ body {
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(70% 50% at 20% 15%, color-mix(in srgb, var(--accent-a) 52%, transparent), transparent 60%),
-    radial-gradient(65% 45% at 85% 25%, color-mix(in srgb, var(--accent-b) 46%, transparent), transparent 58%),
-    radial-gradient(90% 60% at 50% 100%, color-mix(in srgb, var(--ember) 38%, transparent), transparent 64%),
+    radial-gradient(70% 50% at 20% 15%, color-mix(in srgb, var(--accent-a) 34%, transparent), transparent 60%),
+    radial-gradient(65% 45% at 85% 25%, color-mix(in srgb, var(--accent-b) 30%, transparent), transparent 58%),
+    radial-gradient(90% 60% at 50% 100%, color-mix(in srgb, var(--ember) 22%, transparent), transparent 64%),
     linear-gradient(180deg, transparent 58%, color-mix(in srgb, var(--panel) 50%, transparent));
   z-index: 0;
   animation: aura-shift 7s ease-in-out infinite alternate;
