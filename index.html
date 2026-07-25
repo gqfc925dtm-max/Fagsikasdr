@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="ОТТИСК" />
   <meta name="theme-color" content="#120d14" />
-  <meta name="description" content="ОТТИСК — существо живёт только под пальцем. Мутирует, пока ты не отпускаешь." />
+  <meta name="description" content="ОТТИСК — удерживай палец: существо живёт только в касании." />
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
@@ -34,20 +34,29 @@
         <span class="heat-label">жар</span>
         <div id="heat" class="heat"><i id="heat-fill"></i></div>
       </div>
+      <div class="mut-track">
+        <div id="mut-track-fill" class="mut-track-fill"></div>
+      </div>
+      <div id="next-mut" class="next-mut"></div>
       <div id="combo" class="combo"></div>
       <div id="toast" class="toast"></div>
+      <div id="coach" class="coach"></div>
     </div>
 
     <div id="screen-start" class="screen">
       <div class="screen-bg" aria-hidden="true"></div>
       <div class="brand-block">
-        <p class="eyebrow">новая форма жизни</p>
+        <p class="eyebrow">не кликай — держи</p>
         <p class="brand">ОТТИСК</p>
         <h1 class="tagline">Живёт только под пальцем.</h1>
-        <p class="hint">Удерживай — ест свет и мутирует. Стой на месте — сгорает. Отпустил — его нет. След притягивает охотников.</p>
+        <p class="hint">Зажми и води по свету. Отпустил — исчезло. Стой на месте — сгорает. Красные охотники идут на тепло.</p>
       </div>
       <div class="actions">
-        <button id="btn-start" class="btn btn-primary" type="button">Коснуться</button>
+        <button id="btn-start" class="btn btn-primary" type="button">
+          <span class="btn-main">Удерживай здесь</span>
+          <span class="btn-sub">не нажимай коротко — именно держи</span>
+        </button>
+        <div class="hold-meter" aria-hidden="true"><i id="hold-fill"></i></div>
         <p class="best">Рекорд: <span id="best-start">0</span></p>
       </div>
       <p class="install-tip">На iPhone: Поделиться → На экран «Домой»</p>
@@ -63,7 +72,11 @@
         <p id="death-reason" class="death-reason"></p>
         <p id="mut-summary" class="mut-summary"></p>
         <p class="best">Рекорд: <span id="best-over">0</span></p>
-        <button id="btn-retry" class="btn btn-primary" type="button">Ещё раз</button>
+        <button id="btn-retry" class="btn btn-primary" type="button">
+          <span class="btn-main">Удерживай снова</span>
+          <span class="btn-sub">зажми кнопку, чтобы начать</span>
+        </button>
+        <div class="hold-meter over"><i id="hold-fill-over"></i></div>
       </div>
     </div>
   </div>

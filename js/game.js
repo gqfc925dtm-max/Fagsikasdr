@@ -9,6 +9,11 @@ const comboEl = document.getElementById("combo");
 const toastEl = document.getElementById("toast");
 const mutBadge = document.getElementById("mut-badge");
 const heatFill = document.getElementById("heat-fill");
+const mutTrackFill = document.getElementById("mut-track-fill");
+const nextMutEl = document.getElementById("next-mut");
+const coachEl = document.getElementById("coach");
+const holdFill = document.getElementById("hold-fill");
+const holdFillOver = document.getElementById("hold-fill-over");
 const screenStart = document.getElementById("screen-start");
 const screenOver = document.getElementById("screen-over");
 const bestStart = document.getElementById("best-start");
@@ -67,6 +72,14 @@ const state = {
   demo: true,
   demoPhase: 0,
   demoTimer: 0,
+  coachStep: 0,
+  coachTimer: 0,
+  grace: 0,
+  holdProgress: 0,
+  holdingStart: false,
+  guideSpark: null,
+  safeUntil: 0,
+  relocateCool: 0,
 };
 
 function resize() {
@@ -159,6 +172,34 @@ function showToast(text) {
   showToast._t = setTimeout(() => toastEl.classList.remove("show"), 1400);
 }
 
+function showCoach(text, ms = 2200) {
+  coachEl.textContent = text;
+  coachEl.className = "coach show";
+  clearTimeout(showCoach._t);
+  showCoach._t = setTimeout(() => coachEl.classList.remove("show"), ms);
+}
+
+function updateMutTrack() {
+  let prev = MUTATIONS[0];
+  let next = null;
+  for (let i = 0; i < MUTATIONS.length; i++) {
+    if (state.score >= MUTATIONS[i].at) prev = MUTATIONS[i];
+    if (state.score < MUTATIONS[i].at) {
+      next = MUTATIONS[i];
+      break;
+    }
+  }
+  if (!next) {
+    mutTrackFill.style.width = "100%";
+    nextMutEl.textContent = "форма завершена";
+    return;
+  }
+  const span = Math.max(1, next.at - prev.at);
+  const prog = Math.min(1, (state.score - prev.at) / span);
+  mutTrackFill.style.width = `${Math.round(prog * 100)}%`;
+  nextMutEl.textContent = `до «${next.name}»: ${next.at - state.score}`;
+}
+
 function floatText(x, y, text, color = "#f2c15a") {
   state.floatTexts.push({ x, y, text, color, life: 1, vy: -0.6 });
 }
@@ -213,6 +254,7 @@ function syncMutation() {
     }
   }
   mutBadge.textContent = state.mutation.name;
+  updateMutTrack();
 }
 
 function resetWorld() {
@@ -245,7 +287,22 @@ function resetWorld() {
   comboEl.className = "combo";
   toastEl.className = "toast";
   mutBadge.textContent = "искра";
+  state.coachStep = 0;
+  state.coachTimer = 0;
+  state.grace = 4.5;
+  state.safeUntil = 0;
+  state.relocateCool = 0;
+  state.guideSpark = null;
+  updateMutTrack();
   for (let i = 0; i < 8; i++) spawnSpark(true);
+  // First sparks near center so tutorial is obvious
+  state.sparks[0].x = state.width * 0.5;
+  state.sparks[0].y = state.height * 0.42;
+  state.sparks[0].vx = 0.1;
+  state.sparks[0].vy = 0.05;
+  state.sparks[0].type = "normal";
+  state.sparks[0].color = "#ffe3b0";
+  state.sparks[0].worth = 1;
 }
 
 function sparkTypeRoll() {
@@ -362,7 +419,12 @@ function addScore(n, x, y) {
   }
   syncMutation();
   if (n > 1) floatText(x, y, `+${n}`, "#f2c15a");
+  updateMutTrack();
   if (state.combo >= 3) showCombo(`цепь ×${state.combo}`);
+  if (state.coachStep < 3 && state.score >= 1) {
+    state.coachStep = 3;
+    showCoach("Есть! Собирай цепь", 2000);
+  }
   if (hasMut("bloom") && state.combo > 0 && state.combo % 8 === 0) {
     state.bloom = 1;
     showToast("цветение");
@@ -374,12 +436,27 @@ function addScore(n, x, y) {
 function startGame() {
   ensureAudio();
   state.demo = false;
+  state.holdingStart = false;
+  state.holdProgress = 0;
+  holdFill.style.width = "0%";
+  holdFillOver.style.width = "0%";
   screenStart.classList.add("hidden");
   screenOver.classList.add("hidden");
   hud.classList.remove("hidden");
   resetWorld();
   state.running = true;
   state.lastTs = performance.now();
+  showCoach("УДЕРЖИВАЙ палец", 2600);
+}
+
+function nearestSpark(x, y) {
+  let best = null;
+  let bestD = Infinity;
+  for (const s of state.sparks) {
+    const d = dist(x, y, s.x, s.y);
+    if (d < bestD) { bestD = d; best = s; }
+  }
+  return best;
 }
 
 function onPointerDown(e) {
@@ -389,7 +466,18 @@ function onPointerDown(e) {
   state.touching = true;
   state.pointerId = e.pointerId;
   try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+  const wasEmpty = !state.life;
   beginLife(e.clientX, e.clientY);
+  if (wasEmpty && state.relocateCool > 0) {
+    state.heat = Math.max(0, state.heat - 0.2);
+    state.safeUntil = Math.max(state.safeUntil, 0.45);
+    floatText(e.clientX, e.clientY - 24, "перенос", "#6dffc2");
+    burst(e.clientX, e.clientY, "#6dffc2", 12, 3);
+  }
+  if (state.coachStep === 0) {
+    state.coachStep = 1;
+    showCoach("ВОДИ по светлым точкам", 2500);
+  }
 }
 
 function onPointerMove(e) {
@@ -398,9 +486,14 @@ function onPointerMove(e) {
   const ly = state.life.y;
   state.life.x = e.clientX;
   state.life.y = e.clientY;
-  if (hasMut("veins") && dist(lx, ly, e.clientX, e.clientY) > 4) {
-    state.veins.push({ x: e.clientX, y: e.clientY, life: 1, r: state.life.r * 0.55 });
-    if (state.veins.length > 80) state.veins.shift();
+  const moved = dist(lx, ly, e.clientX, e.clientY);
+  if (moved > 4 && state.coachStep === 1) {
+    state.coachStep = 2;
+    showCoach("Не стой — следи за ЖАРОМ", 2400);
+  }
+  if ((hasMut("veins") || state.coachStep < 4) && moved > 4) {
+    state.veins.push({ x: e.clientX, y: e.clientY, life: hasMut("veins") ? 1 : 0.45, r: state.life.r * 0.5 });
+    if (state.veins.length > 90) state.veins.shift();
   }
 }
 
@@ -421,7 +514,46 @@ function onPointerUp(e) {
     endLife(true);
     tone(220, 0.05, "sine", 0.028);
     state.combo = Math.max(0, state.combo - 1);
+    state.relocateCool = 0.8;
+    if (state.coachStep === 2 || state.coachStep === 3) {
+      state.coachStep = 4;
+      showCoach("Отпустил — его нет. Жми снова", 2600);
+    }
   }
+}
+
+function bindHoldToStart(btn, fillEl) {
+  let pid = null;
+  let armed = false;
+  const clear = () => {
+    pid = null;
+    armed = false;
+    state.holdingStart = false;
+    state.holdProgress = 0;
+    fillEl.style.width = "0%";
+  };
+  btn.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    if (state.running) return;
+    pid = e.pointerId;
+    armed = true;
+    state.holdingStart = true;
+    state.holdProgress = 0;
+    try { btn.setPointerCapture(e.pointerId); } catch (_) {}
+    ensureAudio();
+    tone(320, 0.05, "sine", 0.025);
+  });
+  btn.addEventListener("pointerup", (e) => {
+    if (pid != null && e.pointerId !== pid) return;
+    if (armed && !state.running && state.holdProgress < 1) {
+      showToast("держи дольше — не кликай");
+    }
+    clear();
+  });
+  btn.addEventListener("pointercancel", clear);
+  btn.addEventListener("lostpointercapture", clear);
+  // Block click-to-start habit
+  btn.addEventListener("click", (e) => e.preventDefault());
 }
 
 function difficulty() {
@@ -460,6 +592,15 @@ function updateDemo(dt) {
 function update(dt) {
   state.time += dt;
   const diff = difficulty();
+  state.grace = Math.max(0, state.grace - dt);
+  state.safeUntil = Math.max(0, state.safeUntil - dt);
+  state.relocateCool = Math.max(0, state.relocateCool - dt);
+
+  if (state.life) {
+    state.guideSpark = nearestSpark(state.life.x, state.life.y);
+  } else {
+    state.guideSpark = null;
+  }
 
   for (const a of state.ash) {
     a.x += a.vx * dt * 60;
@@ -585,10 +726,14 @@ function update(dt) {
 
   state.hunterAcc += dt;
   const hunterEvery = Math.max(0.75, 2.3 - diff * 0.12);
-  if (state.hunterAcc >= hunterEvery) {
+  if (state.grace <= 0 && state.hunterAcc >= hunterEvery) {
     state.hunterAcc = 0;
     spawnHunter();
     if (diff > 2 && Math.random() < 0.45) spawnHunter();
+    if (state.coachStep < 5) {
+      state.coachStep = 5;
+      showCoach("Красные охотники — убегай", 2500);
+    }
   }
 
   for (let i = state.hunters.length - 1; i >= 0; i--) {
@@ -603,7 +748,7 @@ function update(dt) {
       tx = b.x; ty = b.y;
     }
     const ang = Math.atan2(ty - h.y, tx - h.x);
-    const spd = (1.05 + diff * 0.16) * h.anger;
+    const spd = (1.05 + diff * 0.16) * h.anger * (state.safeUntil > 0 ? 0.35 : 1);
     h.vx += Math.cos(ang) * spd * dt * 3.2;
     h.vy += Math.sin(ang) * spd * dt * 3.2;
     h.vx *= 0.955;
@@ -611,7 +756,7 @@ function update(dt) {
     h.x += h.vx * dt * 60;
     h.y += h.vy * dt * 60;
 
-    if (state.life) {
+    if (state.life && state.safeUntil <= 0) {
       const d = dist(h.x, h.y, state.life.x, state.life.y);
       const biteRange = state.life.r * 0.72 + h.r * 0.5;
       if (d < biteRange) {
@@ -850,10 +995,37 @@ function draw() {
     ctx.fill();
   }
 
-  if (state.life) drawLifeBody(state.life, 1);
-  else if (state.running) {
+  // Guide thread to nearest spark while learning
+  if (state.running && state.life && state.guideSpark && (state.score < 8 || state.coachStep < 5)) {
+    const s = state.guideSpark;
     ctx.save();
-    ctx.globalAlpha = 0.28 + Math.sin(state.time * 3) * 0.1;
+    ctx.globalAlpha = 0.35 + Math.sin(state.time * 4) * 0.1;
+    ctx.strokeStyle = "#f2c15a";
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 8]);
+    ctx.beginPath();
+    ctx.moveTo(state.life.x, state.life.y);
+    ctx.lineTo(s.x, s.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r * 2.2, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  if (state.life) {
+    drawLifeBody(state.life, 1);
+    if (state.safeUntil > 0) {
+      ctx.beginPath();
+      ctx.strokeStyle = `rgba(109,255,194,${0.45 * Math.min(1, state.safeUntil * 2)})`;
+      ctx.lineWidth = 2;
+      ctx.arc(state.life.x, state.life.y, state.life.r * 1.35, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  } else if (state.running) {
+    ctx.save();
+    ctx.globalAlpha = 0.32 + Math.sin(state.time * 3) * 0.12;
     ctx.strokeStyle = "#cbb7a3";
     ctx.lineWidth = 2;
     ctx.setLineDash([4, 8]);
@@ -864,10 +1036,20 @@ function draw() {
     ctx.fillStyle = "#cbb7a3";
     ctx.font = "700 13px Sora, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("коснись — оно родится", state.width / 2, state.height * 0.55 + 50);
+    ctx.fillText("зажми палец — не кликай", state.width / 2, state.height * 0.55 + 50);
     ctx.restore();
   } else if (state.demo && state.life) {
     drawLifeBody(state.life, 0.85);
+  }
+
+  if (state.running && state.grace > 0) {
+    ctx.save();
+    ctx.globalAlpha = 0.55;
+    ctx.fillStyle = "#cbb7a3";
+    ctx.font = "700 12px Sora, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(`тихо ещё ${state.grace.toFixed(1)}с`, state.width / 2, state.height - 28);
+    ctx.restore();
   }
 
   for (const p of state.particles) {
@@ -899,6 +1081,18 @@ function draw() {
 function frame(ts) {
   const dt = Math.min(0.033, (ts - state.lastTs) / 1000 || 0.016);
   state.lastTs = ts;
+
+  if (state.holdingStart && !state.running) {
+    state.holdProgress = Math.min(1, state.holdProgress + dt * 1.7);
+    const w = `${Math.round(state.holdProgress * 100)}%`;
+    holdFill.style.width = w;
+    holdFillOver.style.width = w;
+    if (state.holdProgress >= 1) {
+      state.holdingStart = false;
+      startGame();
+    }
+  }
+
   if (state.running) update(dt);
   else if (!screenStart.classList.contains("hidden")) {
     state.demo = true;
@@ -926,8 +1120,8 @@ function updateBestLabels() {
   bestOver.textContent = String(state.best);
 }
 
-btnStart.addEventListener("click", startGame);
-btnRetry.addEventListener("click", startGame);
+bindHoldToStart(btnStart, holdFill);
+bindHoldToStart(btnRetry, holdFillOver);
 canvas.addEventListener("pointerdown", onPointerDown, { passive: false });
 canvas.addEventListener("pointermove", onPointerMove, { passive: false });
 canvas.addEventListener("pointerup", onPointerUp, { passive: false });
