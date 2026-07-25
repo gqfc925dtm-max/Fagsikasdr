@@ -13,7 +13,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
   <title>ОТТИСК</title>
 </head>
@@ -30,41 +30,47 @@
     </main>
 
     <footer id="status" class="status hidden">
-      <div class="status-score">
-        <span class="hud-label">след</span>
+      <div class="status-left">
+        <span class="meta-label">след</span>
         <span id="score">0</span>
       </div>
-      <div class="status-main">
-        <div class="status-row">
-          <span class="heat-label">жар</span>
-          <div id="mut-badge" class="mut-badge">искра</div>
-          <div id="theme-chip" class="theme-chip">тон 1</div>
-          <div id="next-mut" class="next-mut"></div>
+      <div class="status-center">
+        <div class="heat-head">
+          <span class="meta-label">жар</span>
+          <span id="heat-pct" class="heat-pct">0%</span>
         </div>
-        <div id="heat" class="heat"><i id="heat-fill"></i></div>
-        <div class="mut-track">
+        <div id="heat" class="heat" aria-label="Жар">
+          <i id="heat-fill"></i>
+        </div>
+        <div class="mut-track" aria-hidden="true">
           <div id="mut-track-fill" class="mut-track-fill"></div>
         </div>
+      </div>
+      <div class="status-right">
+        <span class="meta-label">форма</span>
+        <span id="mut-badge" class="meta-value">искра</span>
+        <span id="theme-chip" class="meta-value dim">тон 1</span>
+        <span id="next-mut" class="meta-next"></span>
       </div>
     </footer>
 
     <div id="screen-start" class="screen">
       <div class="screen-bg" aria-hidden="true"></div>
       <div class="brand-block">
-        <p class="eyebrow">не кликай — держи</p>
+        <p class="eyebrow">удерживай · не кликай</p>
         <p class="brand">ОТТИСК</p>
         <h1 class="tagline">Живёт только под пальцем.</h1>
-        <p class="hint">Зажми и води по свету. Постой на месте — жар вырастет сам. Каждые 100 света мир меняет цвет.</p>
+        <p class="hint">Води по свету. Постой — растёт жар. Отпустил — исчезло. Каждые 100 света мир меняет цвет.</p>
       </div>
       <div class="actions">
         <button id="btn-start" class="btn btn-primary" type="button">
-          <span class="btn-main">Удерживай здесь</span>
-          <span class="btn-sub">не нажимай коротко — именно держи</span>
+          <span class="btn-main">Удерживай</span>
+          <span class="btn-sub">зажми и не отпускай</span>
         </button>
         <div class="hold-meter" aria-hidden="true"><i id="hold-fill"></i></div>
-        <p class="best">Рекорд: <span id="best-start">0</span></p>
+        <p class="best">Рекорд <span id="best-start">0</span></p>
       </div>
-      <p class="install-tip">На iPhone: Поделиться → На экран «Домой»</p>
+      <p class="install-tip">iPhone · Поделиться · На экран «Домой»</p>
     </div>
 
     <div id="screen-over" class="screen hidden">
@@ -73,13 +79,13 @@
         <p class="over-label">След оборвался</p>
         <p class="brand over-brand">ОТТИСК</p>
         <p id="final-score" class="final-score">0</p>
-        <p class="over-sub">собрано света</p>
+        <p class="over-sub">света</p>
         <p id="death-reason" class="death-reason"></p>
         <p id="mut-summary" class="mut-summary"></p>
-        <p class="best">Рекорд: <span id="best-over">0</span></p>
+        <p class="best">Рекорд <span id="best-over">0</span></p>
         <button id="btn-retry" class="btn btn-primary" type="button">
-          <span class="btn-main">Удерживай снова</span>
-          <span class="btn-sub">зажми кнопку, чтобы начать</span>
+          <span class="btn-main">Ещё раз</span>
+          <span class="btn-sub">удерживай кнопку</span>
         </button>
         <div class="hold-meter over"><i id="hold-fill-over"></i></div>
       </div>

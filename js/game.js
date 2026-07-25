@@ -12,6 +12,7 @@ const toastEl = document.getElementById("toast");
 const mutBadge = document.getElementById("mut-badge");
 const themeChip = document.getElementById("theme-chip");
 const heatFill = document.getElementById("heat-fill");
+const heatPct = document.getElementById("heat-pct");
 const mutTrackFill = document.getElementById("mut-track-fill");
 const nextMutEl = document.getElementById("next-mut");
 const coachEl = document.getElementById("coach");
@@ -125,7 +126,7 @@ function applyTheme(score, announce = false) {
   if (!changed && !announce) return;
   state.theme = theme;
   app.dataset.theme = String(theme);
-  themeChip.textContent = `тон ${theme + 1} · ${THEME_NAMES[theme]}`;
+  themeChip.textContent = `${THEME_NAMES[theme]}`;
   document.querySelector('meta[name="theme-color"]')?.setAttribute("content", cssVar("--bg0", "#120d14"));
   if (changed && announce && score >= 100) {
     showToast(`новый цвет: ${THEME_NAMES[theme]}`);
@@ -666,10 +667,10 @@ function update(dt) {
     const moved = dist(state.life.x, state.life.y, state.lastX, state.lastY);
     // Smooth out iPhone finger jitter so "standing still" actually works
     state.smoothSpeed = state.smoothSpeed * 0.82 + moved * 0.18;
-    const coolFactor = hasMut("cool") ? 0.75 : 1;
-    // Heat ALWAYS rises while holding. Still = fast, moving = slower, never negative.
-    const stillness = Math.max(0.4, 1 - state.smoothSpeed / 55);
-    const heatRate = (2.8 * stillness) * coolFactor;
+    const coolFactor = hasMut("cool") ? 0.7 : 1;
+    // Balanced heat: ~2s still to max, slower while moving, never drains while held
+    const stillness = Math.max(0.22, 1 - state.smoothSpeed / 48);
+    const heatRate = (0.35 + 0.55 * stillness) * coolFactor;
     state.heat = Math.min(1, state.heat + heatRate * dt);
     if (state.smoothSpeed < 12) state.stillTimer += dt;
     else state.stillTimer = 0;
@@ -713,7 +714,9 @@ function update(dt) {
     state.smoothSpeed = 0;
   }
 
-  heatFill.style.width = `${Math.round(state.heat * 100)}%`;
+  const heatRounded = Math.round(state.heat * 100);
+  heatFill.style.width = `${heatRounded}%`;
+  if (heatPct) heatPct.textContent = `${heatRounded}%`;
   state.bloom = Math.max(0, state.bloom - dt * 0.85);
 
   state.spawnAcc += dt;
@@ -922,45 +925,90 @@ function drawLifeBody(L, alpha = 1) {
   ctx.save();
   ctx.globalAlpha = alpha;
   const heatTint = state.heat;
-  const glow = ctx.createRadialGradient(L.x, L.y, L.r * 0.1, L.x, L.y, L.r * 2.6);
-  glow.addColorStop(0, `rgba(109,255,194,${0.5 - heatTint * 0.2})`);
-  glow.addColorStop(0.4, `rgba(255,104,64,${0.18 + heatTint * 0.35})`);
-  glow.addColorStop(1, "transparent");
-  ctx.fillStyle = glow;
+  const ink = heatTint > 0.75
+    ? cssVar("--danger", "#e2556d")
+    : heatTint > 0.45
+      ? cssVar("--ember", "#e86a3a")
+      : cssVar("--life", "#6fd9b0");
+  const soft = ctx.createRadialGradient(L.x, L.y, L.r * 0.2, L.x, L.y, L.r * 2.2);
+  soft.addColorStop(0, ink);
+  soft.addColorStop(1, "transparent");
+  ctx.globalAlpha = alpha * (0.18 + heatTint * 0.2);
+  ctx.fillStyle = soft;
   ctx.beginPath();
-  ctx.arc(L.x, L.y, L.r * 2.6, 0, Math.PI * 2);
+  ctx.arc(L.x, L.y, L.r * 2.2, 0, Math.PI * 2);
   ctx.fill();
+  ctx.globalAlpha = alpha;
 
-  ctx.beginPath();
-  const lobes = hasMut("fang") ? 9 : 7;
-  for (let i = 0; i < lobes; i++) {
-    const a = (i / lobes) * Math.PI * 2 + L.wobble * 0.14;
-    const spike = hasMut("fang") && state.combo >= 5 && i % 2 === 0 ? 1.18 : 1;
-    const rr = L.r * (0.84 + Math.sin(L.wobble * 1.5 + i * 1.3) * 0.11) * spike;
-    const px = L.x + Math.cos(a) * rr;
-    const py = L.y + Math.sin(a) * rr;
-    if (i === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
+  // Ink stamp / fingerprint rings — no cute eye-circle
+  ctx.strokeStyle = ink;
+  ctx.lineCap = "round";
+  const rings = hasMut("fang") ? 5 : 4;
+  for (let i = 0; i < rings; i++) {
+    const t = (i + 1) / rings;
+    const wob = Math.sin(L.wobble * 1.2 + i * 0.9) * (1.2 + i * 0.35);
+    ctx.lineWidth = Math.max(1.2, 2.6 - i * 0.25);
+    ctx.globalAlpha = alpha * (0.35 + t * 0.5);
+    ctx.beginPath();
+    ctx.ellipse(
+      L.x + Math.sin(L.wobble * 0.4 + i) * 0.8,
+      L.y + Math.cos(L.wobble * 0.35 + i) * 0.6,
+      L.r * (0.28 + t * 0.72) + wob * 0.15,
+      L.r * (0.34 + t * 0.66) + wob * 0.1,
+      Math.sin(L.wobble * 0.2) * 0.15,
+      0.15 + i * 0.08,
+      Math.PI * 1.85 - i * 0.05
+    );
+    ctx.stroke();
   }
-  ctx.closePath();
-  const body = ctx.createRadialGradient(L.x - L.r * 0.2, L.y - L.r * 0.25, 2, L.x, L.y, L.r);
-  body.addColorStop(0, heatTint > 0.7 ? cssVar("--gold", "#ffe1b0") : "#eafff2");
-  body.addColorStop(0.55, heatTint > 0.7 ? cssVar("--ember", "#ff6840") : cssVar("--life", "#6dffc2"));
-  body.addColorStop(1, heatTint > 0.85 ? cssVar("--danger", "#ff3d66") : "#1c5a48");
-  ctx.fillStyle = body;
-  ctx.fill();
 
-  // inner core
-  ctx.fillStyle = "#120d14";
-  ctx.beginPath();
-  ctx.arc(L.x, L.y, Math.max(3, L.r * 0.17), 0, Math.PI * 2);
-  ctx.fill();
+  // Sharp fang ticks when empowered
+  if (hasMut("fang") && state.combo >= 5) {
+    ctx.globalAlpha = alpha * 0.85;
+    ctx.strokeStyle = cssVar("--danger", "#e2556d");
+    ctx.lineWidth = 1.6;
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2 + L.wobble * 0.1;
+      const r0 = L.r * 0.92;
+      const r1 = L.r * 1.18;
+      ctx.beginPath();
+      ctx.moveTo(L.x + Math.cos(a) * r0, L.y + Math.sin(a) * r0);
+      ctx.lineTo(L.x + Math.cos(a) * r1, L.y + Math.sin(a) * r1);
+      ctx.stroke();
+    }
+  }
 
-  // tiny highlight
-  ctx.fillStyle = "rgba(246,239,230,0.55)";
-  ctx.beginPath();
-  ctx.arc(L.x - L.r * 0.22, L.y - L.r * 0.22, Math.max(2, L.r * 0.1), 0, Math.PI * 2);
-  ctx.fill();
+  ctx.restore();
+}
+
+function drawHoldHint() {
+  const cx = state.width / 2;
+  const cy = state.height * 0.52;
+  const s = 34;
+  const pulse = 0.35 + Math.sin(state.time * 2.8) * 0.12;
+  ctx.save();
+  ctx.globalAlpha = pulse;
+  ctx.strokeStyle = cssVar("--foam", "#f3eee8");
+  ctx.lineWidth = 1.5;
+  // corner brackets instead of a circle
+  const corners = [
+    [cx - s, cy - s, 1, 1],
+    [cx + s, cy - s, -1, 1],
+    [cx - s, cy + s, 1, -1],
+    [cx + s, cy + s, -1, -1],
+  ];
+  for (const [x, y, dx, dy] of corners) {
+    ctx.beginPath();
+    ctx.moveTo(x, y + dy * 14);
+    ctx.lineTo(x, y);
+    ctx.lineTo(x + dx * 14, y);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 0.55 + Math.sin(state.time * 2.8) * 0.1;
+  ctx.fillStyle = cssVar("--sand", "#a89b90");
+  ctx.font = "600 12px Instrument Sans, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("удерживай здесь", cx, cy + s + 28);
   ctx.restore();
 }
 
