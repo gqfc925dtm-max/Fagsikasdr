@@ -240,7 +240,7 @@ function updateMutTrack() {
   const span = Math.max(1, next.at - prev.at);
   const prog = Math.min(1, (state.score - prev.at) / span);
   mutTrackFill.style.width = `${Math.round(prog * 100)}%`;
-  nextMutEl.textContent = `до «${next.name}»: ${next.at - state.score}`;
+  nextMutEl.textContent = `→ ${next.name} ${next.at - state.score}`;
 }
 
 function floatText(x, y, text, color = "#f2c15a") {
@@ -1128,20 +1128,7 @@ function draw() {
       ctx.stroke();
     }
   } else if (state.running) {
-    ctx.save();
-    ctx.globalAlpha = 0.32 + Math.sin(state.time * 3) * 0.12;
-    ctx.strokeStyle = "#cbb7a3";
-    ctx.lineWidth = 2;
-    ctx.setLineDash([4, 8]);
-    ctx.beginPath();
-    ctx.arc(state.width / 2, state.height * 0.55, 28, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = "#cbb7a3";
-    ctx.font = "700 13px Sora, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("зажми палец — не кликай", state.width / 2, state.height * 0.55 + 50);
-    ctx.restore();
+    drawHoldHint();
   } else if (state.demo && state.life) {
     drawLifeBody(state.life, 0.85);
   }
