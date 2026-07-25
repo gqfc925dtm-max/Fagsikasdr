@@ -1,12 +1,12 @@
 {
-  "name": "ВЫСОТА",
-  "short_name": "ВЫСОТА",
-  "description": "Залипательная башня на один палец",
+  "name": "ОТТИСК",
+  "short_name": "ОТТИСК",
+  "description": "Существо живёт только под твоим пальцем",
   "start_url": "./index.html",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#071018",
-  "theme_color": "#071018",
+  "background_color": "#140c08",
+  "theme_color": "#140c08",
   "lang": "ru",
   "icons": [
     {
