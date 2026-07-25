@@ -2538,7 +2538,7 @@ function drawBackground() {
       state.height * 0.2,
       state.width * 0.55
     );
-    orbA.addColorStop(0, `rgba(${a[0]},${a[1]},${a[2]},0.22)`);
+    orbA.addColorStop(0, `rgba(${a[0]},${a[1]},${a[2]},0.38)`);
     orbA.addColorStop(1, "transparent");
     ctx.fillStyle = orbA;
     ctx.fillRect(0, 0, state.width, state.height);
@@ -2551,35 +2551,49 @@ function drawBackground() {
       state.height * 0.72,
       state.width * 0.5
     );
-    orbB.addColorStop(0, `rgba(${b[0]},${b[1]},${b[2]},0.18)`);
+    orbB.addColorStop(0, `rgba(${b[0]},${b[1]},${b[2]},0.34)`);
     orbB.addColorStop(1, "transparent");
     ctx.fillStyle = orbB;
     ctx.fillRect(0, 0, state.width, state.height);
+
+    const gold = hexToRgb(cssVar("--gold", "#ffe08a"));
+    const orbC = ctx.createRadialGradient(
+      state.width * 0.5,
+      state.height * 0.08,
+      4,
+      state.width * 0.5,
+      state.height * 0.05,
+      state.width * 0.42
+    );
+    orbC.addColorStop(0, `rgba(${gold[0]},${gold[1]},${gold[2]},0.2)`);
+    orbC.addColorStop(1, "transparent");
+    ctx.fillStyle = orbC;
+    ctx.fillRect(0, 0, state.width, state.height);
   }
   if (state.bloomPulse > 0) {
-    ctx.fillStyle = cssVar("--gold", "#ffd27a");
-    ctx.globalAlpha = state.bloomPulse * 0.09;
+    ctx.fillStyle = cssVar("--gold", "#ffe08a");
+    ctx.globalAlpha = state.bloomPulse * 0.14;
     ctx.fillRect(0, 0, state.width, state.height);
     ctx.globalAlpha = 1;
   }
   if (state.fever) {
-    ctx.fillStyle = cssVar("--ember", "#ff7a45");
-    ctx.globalAlpha = 0.05 + Math.sin(state.time * 7) * 0.02;
+    ctx.fillStyle = cssVar("--ember", "#ff8a52");
+    ctx.globalAlpha = 0.08 + Math.sin(state.time * 7) * 0.03;
     ctx.fillRect(0, 0, state.width, state.height);
     ctx.globalAlpha = 1;
   }
   for (const stain of state.stains) {
-    ctx.globalAlpha = 0.12 * stain.life;
+    ctx.globalAlpha = 0.2 * stain.life;
     ctx.fillStyle = inInkDive() ? "#8ae0ff" : activeSkin().color;
     ctx.beginPath();
-    ctx.ellipse(stain.x, stain.y, stain.r * 1.15, stain.r * 0.8, 0.2, 0, Math.PI * 2);
+    ctx.ellipse(stain.x, stain.y, stain.r * 1.25, stain.r * 0.86, 0.2, 0, Math.PI * 2);
     ctx.fill();
   }
   for (const a of state.ash) {
-    ctx.globalAlpha = inInkDive() ? a.a * 1.5 : a.a;
-    ctx.fillStyle = inInkDive() ? "#9ad8ff" : (a.color || "#fff6ec");
+    ctx.globalAlpha = inInkDive() ? Math.min(1, a.a * 1.8) : Math.min(1, a.a * 1.35);
+    ctx.fillStyle = inInkDive() ? "#b0e8ff" : (a.color || "#fffaf2");
     ctx.beginPath();
-    ctx.arc(a.x, a.y, a.r, 0, Math.PI * 2);
+    ctx.arc(a.x, a.y, a.r * 1.15, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.globalAlpha = 1;
