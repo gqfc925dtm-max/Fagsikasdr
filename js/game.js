@@ -37,7 +37,7 @@ const DEATH = {
   HUNGER: "свет иссяк — слишком долго без пищи",
 };
 
-const PHOTO_VER = "3";
+const PHOTO_VER = "4";
 const PHOTOS = {
   ocean: {
     src: new URL(`../assets/ocean.jpg?v=${PHOTO_VER}`, import.meta.url).href,
@@ -45,7 +45,7 @@ const PHOTOS = {
     ready: false,
   },
   fish: {
-    src: new URL(`../assets/fish-evil.jpg?v=${PHOTO_VER}`, import.meta.url).href,
+    src: new URL(`../assets/fish-evil.png?v=${PHOTO_VER}`, import.meta.url).href,
     img: null,
     ready: false,
   },
@@ -1895,7 +1895,7 @@ function spawnHunter(slow = false) {
     y,
     vx: 0,
     vy: 0,
-    r: rand(18, 24),
+    r: rand(9, 13),
     anger,
     slow,
     warn: slow ? 1 : 0,
@@ -2013,7 +2013,7 @@ function resetRun() {
     y: state.height * 0.22,
     vx: 70,
     vy: 10,
-    r: 26,
+    r: 12,
     anger: 0.55,
     slow: true,
     warn: 1,
@@ -2047,7 +2047,7 @@ function resetDemo() {
     y: state.height * 0.28,
     vx: 48,
     vy: 8,
-    r: 22,
+    r: 11,
     anger: 0.4,
     slow: true,
     warn: 0,
@@ -2451,7 +2451,7 @@ function updateRun(dt) {
     state.life.px = state.life.x;
     state.life.py = state.life.y;
     state.life.wobble += dt * 7.2;
-    state.life.r = 28 + Math.min(8, state.combo * 0.75) + Math.sin(state.life.wobble) * 1.1;
+    state.life.r = 32 + Math.min(8, state.combo * 0.75) + Math.sin(state.life.wobble) * 1.1;
     if (state.fever) state.life.r += 2.2;
     state.life.teeth = hasMut("fang") && state.combo >= 4 ? Math.min(1, state.life.teeth + dt * 3) : Math.max(0, state.life.teeth - dt * 3);
     clampLife();
@@ -2600,13 +2600,13 @@ function drawOceanBackground() {
   if (PHOTOS.ocean.ready) {
     drawImageCover(PHOTOS.ocean.img, 0, 0, w, h);
     const shade = ctx.createLinearGradient(0, 0, 0, h);
-    shade.addColorStop(0, "rgba(8, 40, 64, 0.08)");
-    shade.addColorStop(0.45, "rgba(4, 28, 48, 0.18)");
-    shade.addColorStop(1, "rgba(2, 16, 32, 0.42)");
+    shade.addColorStop(0, "rgba(10, 60, 110, 0.22)");
+    shade.addColorStop(0.4, "rgba(6, 40, 70, 0.12)");
+    shade.addColorStop(1, "rgba(2, 18, 36, 0.38)");
     ctx.fillStyle = shade;
     ctx.fillRect(0, 0, w, h);
-    const caustic = ctx.createRadialGradient(w * 0.5, h * 0.08, 10, w * 0.5, h * 0.35, w * 0.75);
-    caustic.addColorStop(0, `rgba(255,255,255,${0.07 + Math.sin(t * 0.35) * 0.02})`);
+    const caustic = ctx.createRadialGradient(w * 0.45, h * 0.12, 8, w * 0.5, h * 0.55, Math.max(w, h) * 0.7);
+    caustic.addColorStop(0, `rgba(180,230,255,${0.06 + Math.sin(t * 0.35) * 0.02})`);
     caustic.addColorStop(1, "transparent");
     ctx.fillStyle = caustic;
     ctx.fillRect(0, 0, w, h);
@@ -2770,11 +2770,48 @@ function drawLightShard(x, y, r, color, rot, alpha = 1) {
 
 function inkPolypBodyPath(s) {
   ctx.beginPath();
-  ctx.moveTo(s * 1.05, 0);
-  ctx.bezierCurveTo(s * 0.55, -s * 0.72, -s * 0.35, -s * 0.68, -s * 0.55, -s * 0.15);
-  ctx.bezierCurveTo(-s * 0.62, s * 0.35, -s * 0.2, s * 0.78, s * 0.15, s * 0.62);
-  ctx.bezierCurveTo(s * 0.65, s * 0.45, s * 1.0, s * 0.25, s * 1.05, 0);
-  ctx.closePath();
+  ctx.ellipse(s * 0.08, 0, s * 0.92, s * 0.78, 0, 0, Math.PI * 2);
+}
+
+function drawOctopusTentacle(s, wob, i, ink, accent, alpha) {
+  const side = i < 4 ? -1 : 1;
+  const rank = i % 4;
+  const baseY = side * s * (0.18 + rank * 0.2);
+  const curl = Math.sin(wob * 1.35 + i * 0.9) * s * 0.42;
+  const wave = Math.cos(wob * 1.1 + i * 0.7) * s * 0.28;
+  const len = s * (1.55 + rank * 0.12 + Math.sin(wob + i) * 0.12);
+  const midX = -s * (0.55 + rank * 0.08) + wave * 0.35;
+  const midY = baseY * 1.45 + curl * 0.55;
+  const tipX = -len;
+  const tipY = baseY * 1.1 + curl + Math.sin(wob * 1.6 + i) * s * 0.2;
+  const width = Math.max(2.4, s * (0.22 - rank * 0.02));
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.globalAlpha = alpha * (0.78 + rank * 0.04);
+  ctx.strokeStyle = mixColor(ink, accent, 0.12 + rank * 0.05);
+  ctx.lineWidth = width;
+  ctx.beginPath();
+  ctx.moveTo(-s * 0.05, baseY * 0.55);
+  ctx.bezierCurveTo(midX, midY, tipX + s * 0.35, tipY - curl * 0.2, tipX, tipY);
+  ctx.stroke();
+  ctx.globalAlpha = alpha * 0.55;
+  ctx.strokeStyle = mixColor(ink, "#2a1830", 0.35);
+  ctx.lineWidth = Math.max(1.2, width * 0.42);
+  ctx.beginPath();
+  ctx.moveTo(-s * 0.02, baseY * 0.55 + width * 0.18);
+  ctx.bezierCurveTo(midX, midY + width * 0.15, tipX + s * 0.32, tipY - curl * 0.15, tipX + s * 0.04, tipY);
+  ctx.stroke();
+  ctx.fillStyle = mixColor(ink, "#fff0e0", 0.35);
+  for (let k = 0; k < 5; k += 1) {
+    const t = 0.22 + k * 0.14;
+    const sx = -s * 0.05 * (1 - t) + midX * (1 - t) * 0.55 + tipX * t;
+    const sy = baseY * 0.55 * (1 - t) + midY * (1 - t) * 0.45 + tipY * t;
+    const sr = Math.max(1.1, width * (0.28 - k * 0.03));
+    ctx.globalAlpha = alpha * (0.55 - k * 0.06);
+    ctx.beginPath();
+    ctx.ellipse(sx, sy + width * 0.12, sr, sr * 0.72, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
 }
 
 function drawInkPolyp(body, alpha = 1) {
@@ -2787,57 +2824,75 @@ function drawInkPolyp(body, alpha = 1) {
   ctx.save();
   ctx.translate(body.x, body.y);
   ctx.rotate(aim);
-  const tentacles = 5;
-  ctx.lineCap = "round";
-  for (let i = 0; i < tentacles; i += 1) {
-    const spread = (i - (tentacles - 1) / 2) * 0.38;
-    const len = s * (1.05 + Math.sin(wob * 1.3 + i) * 0.18);
-    ctx.globalAlpha = alpha * (0.5 + i * 0.07);
-    ctx.strokeStyle = mixColor(ink, accentB, 0.22 + i * 0.06);
-    ctx.lineWidth = Math.max(2.2, s * 0.12 - i * 0.012);
-    ctx.beginPath();
-    ctx.moveTo(-s * 0.12, spread * s * 0.5);
-    ctx.quadraticCurveTo(
-      -s * 0.85 - Math.sin(wob + i) * s * 0.14,
-      spread * s * 1.05 + Math.cos(wob * 0.8 + i) * s * 0.22,
-      -len,
-      spread * s * 0.8 + Math.sin(wob * 1.1 + i * 0.7) * s * 0.38
-    );
-    ctx.stroke();
+  for (let i = 0; i < 8; i += 1) {
+    drawOctopusTentacle(s, wob, i, ink, accentB, alpha);
   }
   if ((body.speed || 0) > 5) {
-    ctx.globalAlpha = alpha * 0.32;
-    ctx.fillStyle = mixColor(ink, accentB, 0.38);
+    ctx.globalAlpha = alpha * 0.28;
+    ctx.fillStyle = mixColor(ink, accentB, 0.4);
     ctx.beginPath();
-    ctx.ellipse(-s * 1.05, 0, s * 0.5, s * 0.32, 0, 0, Math.PI * 2);
+    ctx.ellipse(-s * 1.15, 0, s * 0.55, s * 0.28, 0, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.globalAlpha = alpha;
-  ctx.fillStyle = mixColor(ink, "#140818", 0.12);
-  ctx.strokeStyle = ink;
-  ctx.lineWidth = 2.8;
+  const mantle = ctx.createRadialGradient(s * 0.12, -s * 0.18, s * 0.1, s * 0.05, 0, s * 0.95);
+  mantle.addColorStop(0, mixColor(ink, "#fff4e8", 0.28));
+  mantle.addColorStop(0.45, mixColor(ink, accent, 0.12));
+  mantle.addColorStop(1, mixColor(ink, "#1a1020", 0.28));
+  ctx.fillStyle = mantle;
+  ctx.strokeStyle = mixColor(ink, "#140818", 0.25);
+  ctx.lineWidth = 2.4;
   inkPolypBodyPath(s);
   ctx.fill();
   ctx.stroke();
-  ctx.fillStyle = mixColor(accent, accentB, 0.42 + Math.sin(wob * 2.1) * 0.12);
-  ctx.globalAlpha = alpha * 0.78;
-  ctx.beginPath();
-  ctx.ellipse(s * 0.12, s * 0.06, s * 0.36, s * 0.26, 0.12, 0, Math.PI * 2);
-  ctx.fill();
-  const eyeX = s * 0.4;
-  const blink = Math.sin(wob * 0.35) > 0.94 ? 0.22 : 1;
+  ctx.fillStyle = mixColor(ink, accentB, 0.18);
+  ctx.globalAlpha = alpha * 0.55;
+  for (let i = 0; i < 10; i += 1) {
+    const a = i * 0.62 + wob * 0.2;
+    const pr = s * (0.18 + (i % 3) * 0.08);
+    const px = Math.cos(a) * s * (0.22 + (i % 4) * 0.1);
+    const py = Math.sin(a * 1.1) * s * (0.18 + (i % 3) * 0.08);
+    ctx.beginPath();
+    ctx.ellipse(px, py, pr * 0.35, pr * 0.28, a, 0, Math.PI * 2);
+    ctx.fill();
+  }
   ctx.globalAlpha = alpha;
-  ctx.fillStyle = "#fffdf8";
+  ctx.fillStyle = mixColor(ink, "#2a1428", 0.35);
   ctx.beginPath();
-  ctx.ellipse(eyeX, -s * 0.06, s * 0.21, s * 0.26 * blink, -0.12, 0, Math.PI * 2);
+  ctx.ellipse(-s * 0.55, s * 0.08, s * 0.18, s * 0.12, 0.2, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = "#1a1020";
+  const blink = Math.sin(wob * 0.32) > 0.93 ? 0.2 : 1;
+  for (const side of [-1, 1]) {
+    const ex = s * 0.38;
+    const ey = side * s * 0.28;
+    ctx.fillStyle = "#fffdf8";
+    ctx.beginPath();
+    ctx.ellipse(ex, ey, s * 0.2, s * 0.24 * blink, side * 0.15, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = mixColor(accentB, "#1a2840", 0.35);
+    ctx.beginPath();
+    ctx.ellipse(ex + s * 0.04, ey, s * 0.11, s * 0.13 * blink, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#120818";
+    ctx.beginPath();
+    ctx.arc(ex + s * 0.06, ey, s * 0.07 * blink, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(ex + s * 0.09, ey - s * 0.05, s * 0.035, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = mixColor(ink, "#1a1020", 0.4);
+    ctx.lineWidth = Math.max(1.4, s * 0.05);
+    ctx.beginPath();
+    ctx.arc(ex - s * 0.02, ey - s * 0.2, s * 0.16, Math.PI * 1.1, Math.PI * 1.85);
+    ctx.stroke();
+  }
+  ctx.fillStyle = mixColor(ink, accent, 0.35);
+  ctx.globalAlpha = alpha * 0.9;
   ctx.beginPath();
-  ctx.arc(eyeX + s * 0.05, -s * 0.04, s * 0.1 * blink, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#ffffff";
-  ctx.beginPath();
-  ctx.arc(eyeX + s * 0.09, -s * 0.09, s * 0.038, 0, Math.PI * 2);
+  ctx.moveTo(s * 0.75, -s * 0.08);
+  ctx.quadraticCurveTo(s * 1.15, 0, s * 0.75, s * 0.1);
+  ctx.quadraticCurveTo(s * 0.62, 0, s * 0.75, -s * 0.08);
   ctx.fill();
   if (state.fever) {
     ctx.strokeStyle = cssVar("--ember", "#ff9a62");
@@ -2852,10 +2907,10 @@ function drawInkPolyp(body, alpha = 1) {
     ctx.lineCap = "round";
     ctx.globalAlpha = alpha * 0.95;
     ctx.beginPath();
-    ctx.moveTo(s * 1.05, 0);
-    ctx.lineTo(s * 1.42, -s * 0.14);
-    ctx.moveTo(s * 1.05, 0);
-    ctx.lineTo(s * 1.42, s * 0.14);
+    ctx.moveTo(s * 0.95, -s * 0.08);
+    ctx.lineTo(s * 1.35, -s * 0.18);
+    ctx.moveTo(s * 0.95, s * 0.08);
+    ctx.lineTo(s * 1.35, s * 0.18);
     ctx.stroke();
   }
   ctx.restore();
@@ -2932,8 +2987,8 @@ function drawEvilFish(hunter, alpha = 1, ghost = false) {
   const wobble = Math.sin(hunter.phase || 0) * 0.1;
   if (PHOTOS.fish.ready) {
     const img = PHOTOS.fish.img;
-    const fishW = r * 5.8;
-    const fishH = r * 3.5;
+    const fishW = r * 3.6;
+    const fishH = r * 1.9;
     ctx.save();
     ctx.translate(hunter.x, hunter.y);
     ctx.rotate(angle + wobble);
@@ -3393,7 +3448,7 @@ function boot() {
   const nativeShell = !!window.OttiskNative?.isNative;
   if ("serviceWorker" in navigator && !nativeShell) {
     navigator.serviceWorker
-      .register("./sw.js?v=29")
+      .register("./sw.js?v=30")
       .then((reg) => reg.update())
       .catch(() => {});
   }
