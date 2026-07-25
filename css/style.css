@@ -47,9 +47,7 @@ body {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  background:
-    linear-gradient(180deg, rgba(20, 80, 140, 0.32) 0%, rgba(4, 28, 52, 0.55) 100%),
-    url("../assets/ocean.jpg?v=4") center / cover no-repeat;
+  background: linear-gradient(180deg, #0c2248 0%, #081830 48%, #040c1c 100%);
   transition: background 0.7s ease, color 0.55s ease;
 }
 
@@ -120,7 +118,7 @@ body {
   min-height: 0;
   width: 100%;
   overflow: hidden;
-  background: #1a7aa8;
+  background: #081830;
 }
 
 .aura {

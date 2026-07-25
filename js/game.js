@@ -37,13 +37,8 @@ const DEATH = {
   HUNGER: "свет иссяк — слишком долго без пищи",
 };
 
-const PHOTO_VER = "4";
+const PHOTO_VER = "5";
 const PHOTOS = {
-  ocean: {
-    src: new URL(`../assets/ocean.jpg?v=${PHOTO_VER}`, import.meta.url).href,
-    img: null,
-    ready: false,
-  },
   fish: {
     src: new URL(`../assets/fish-evil.png?v=${PHOTO_VER}`, import.meta.url).href,
     img: null,
@@ -65,24 +60,8 @@ function loadImage(entry) {
   });
 }
 
-function prepareOceanBlur() {
-  if (!PHOTOS.ocean.ready || PHOTOS.ocean.blur) return;
-  const src = PHOTOS.ocean.img;
-  const c = document.createElement("canvas");
-  const scale = 0.42;
-  c.width = Math.max(4, Math.floor(src.naturalWidth * scale));
-  c.height = Math.max(4, Math.floor(src.naturalHeight * scale));
-  const bx = c.getContext("2d");
-  bx.filter = "blur(7px)";
-  bx.drawImage(src, 0, 0, c.width, c.height);
-  bx.filter = "none";
-  PHOTOS.ocean.blur = c;
-}
-
 function loadPhotos() {
-  return Promise.all([loadImage(PHOTOS.ocean), loadImage(PHOTOS.fish)]).then(() => {
-    prepareOceanBlur();
-  });
+  return loadImage(PHOTOS.fish);
 }
 
 function drawImageCover(img, x, y, w, h) {
@@ -997,8 +976,10 @@ function eatSparkBlast(spark, opening = false) {
   }
 
   if (spark.type === "super") {
-    floatText(x, y - 26, "СУПЕР", gold, 20);
-    buzz([12, 18, 12, 24]);
+    state.shake = Math.max(state.shake, 26);
+    state.flash = Math.max(state.flash, 1.25);
+    floatText(x, y - 26, "СУПЕР", gold, 22);
+    buzz([14, 20, 14, 28]);
   }
 }
 
@@ -2023,14 +2004,29 @@ function sparkProfile(type) {
 }
 
 function rollSparkType() {
-  if (inInkDive()) return Math.random() < 0.7 ? "deep" : Math.random() < 0.35 ? "super" : "rare";
+  if (inInkDive()) return Math.random() < 0.7 ? "deep" : "rare";
   const r = Math.random();
-  if (r < 0.045) return "super";
-  if (r < 0.12) return "rare";
+  if (r < 0.1) return "rare";
   if (r < 0.2) return "cool";
   if (r < 0.27) return "bait";
   if (r < 0.32 && !state.symbiote) return "seed";
   return "normal";
+}
+
+function maybeSpawnSuperStar() {
+  if (!state.running || state.superStarSpawned || state.score >= 100) return;
+  if (state.sparks.some((s) => s.type === "super")) {
+    state.superStarSpawned = true;
+    return;
+  }
+  const ready = state.stats.sparkEats >= 1 || state.elapsed > OPENING_SEC * 0.55;
+  if (!ready) return;
+  const near = state.life
+    ? { x: state.life.x + rand(-40, 40), y: state.life.y - rand(80, 140) }
+    : { x: state.width * 0.55, y: state.height * 0.28 };
+  spawnSpark({ type: "super", near });
+  state.superStarSpawned = true;
+  tipOnce("super", "СУПЕР ЗВЕЗДА", 1600);
 }
 
 function spawnComet() {
@@ -2113,7 +2109,7 @@ function spawnHunter(slow = false) {
     y,
     vx: 0,
     vy: 0,
-    r: rand(9, 13),
+    r: rand(17, 23),
     anger,
     slow,
     warn: slow ? 1 : 0,
@@ -2205,6 +2201,7 @@ function resetRun() {
   state.symbiote = null;
   state.openingBurst = false;
   state.firstEatDone = false;
+  state.superStarSpawned = false;
   app.classList.remove("ink-dive");
   setDiveMeter(0);
   resetStats();
@@ -2232,7 +2229,7 @@ function resetRun() {
     y: state.height * 0.22,
     vx: 70,
     vy: 10,
-    r: 12,
+    r: 20,
     anger: 0.55,
     slow: true,
     warn: 1,
@@ -2241,6 +2238,7 @@ function resetRun() {
     parade: true,
   });
   state.slowHunterSeen = true;
+  state.superStarSpawned = false;
 }
 
 function resetDemo() {
@@ -2266,7 +2264,7 @@ function resetDemo() {
     y: state.height * 0.28,
     vx: 48,
     vy: 8,
-    r: 11,
+    r: 19,
     anger: 0.4,
     slow: true,
     warn: 0,
@@ -2490,7 +2488,6 @@ function eatSpark(index, spark) {
     floatText(spark.x, spark.y - 18, "!", cssVar("--gold", "#ffe898"), 22);
   }
   if (state.stats.sparkEats === 1) tipOnce("move", "ТЯНИСЬ К СВЕТУ", 1600);
-  if (spark.type === "super") tipOnce("super", "СУПЕР ЗВЕЗДА", 1400);
   playSparkTone(spark.type);
   eatSparkBlast(spark, openingEat);
   addScore(spark.worth, spark.x, spark.y - 12, { color: spark.color });
@@ -2667,8 +2664,8 @@ function updateRun(dt) {
     state.life.px = state.life.x;
     state.life.py = state.life.y;
     state.life.wobble += dt * 7.2;
-    state.life.r = 25 + Math.min(6, state.combo * 0.6) + Math.sin(state.life.wobble) * 1.0;
-    if (state.fever) state.life.r += 2.2;
+    state.life.r = 17 + Math.min(4, state.combo * 0.45) + Math.sin(state.life.wobble) * 0.8;
+    if (state.fever) state.life.r += 1.4;
     state.life.teeth = hasMut("fang") && state.combo >= 4 ? Math.min(1, state.life.teeth + dt * 3) : Math.max(0, state.life.teeth - dt * 3);
     clampLife();
     updateHum();
@@ -2717,6 +2714,7 @@ function updateRun(dt) {
       });
     }
   }
+  maybeSpawnSuperStar();
   updateSparks(dt);
   tryCompleteByHunger();
   if (!state.running) return;
@@ -2748,7 +2746,7 @@ function updateDemo(dt) {
     state.life.wobble += dt * 6;
     state.life.x = state.width * 0.5 + Math.sin(state.demoClock * 1.35) * state.width * 0.17;
     state.life.y = state.height * 0.58 + Math.cos(state.demoClock * 0.92) * state.height * 0.07;
-    state.life.r = 22 + Math.sin(state.demoClock * 2.8) * 1.0;
+    state.life.r = 16 + Math.sin(state.demoClock * 2.8) * 0.8;
     for (let i = state.sparks.length - 1; i >= 0; i -= 1) {
       const spark = state.sparks[i];
       if (dist(spark.x, spark.y, state.life.x, state.life.y) < state.life.r * 0.72 + spark.r) {
@@ -2799,89 +2797,28 @@ function drawOceanBackground() {
   const w = state.width;
   const h = state.height;
   const t = state.time;
-  if (inInkDive()) {
-    const grad = ctx.createLinearGradient(0, h, 0, 0);
-    grad.addColorStop(0, "#041828");
-    grad.addColorStop(0.45, "#0a2848");
-    grad.addColorStop(1, "#1a1848");
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, w, h);
-    const glow = ctx.createRadialGradient(w * 0.5, h * 0.55, 20, w * 0.5, h * 0.5, Math.max(w, h) * 0.65);
-    glow.addColorStop(0, `rgba(80, 200, 255, ${0.12 + Math.sin(t * 2) * 0.03})`);
-    glow.addColorStop(1, "transparent");
-    ctx.fillStyle = glow;
-    ctx.fillRect(0, 0, w, h);
-    return;
-  }
-  if (PHOTOS.ocean.ready) {
-    prepareOceanBlur();
-    drawImageCover(PHOTOS.ocean.blur || PHOTOS.ocean.img, 0, 0, w, h);
-    const shade = ctx.createLinearGradient(0, 0, 0, h);
-    shade.addColorStop(0, "rgba(10, 60, 110, 0.22)");
-    shade.addColorStop(0.4, "rgba(6, 40, 70, 0.12)");
-    shade.addColorStop(1, "rgba(2, 18, 36, 0.38)");
-    ctx.fillStyle = shade;
-    ctx.fillRect(0, 0, w, h);
-    const caustic = ctx.createRadialGradient(w * 0.45, h * 0.12, 8, w * 0.5, h * 0.55, Math.max(w, h) * 0.7);
-    caustic.addColorStop(0, `rgba(180,230,255,${0.06 + Math.sin(t * 0.35) * 0.02})`);
-    caustic.addColorStop(1, "transparent");
-    ctx.fillStyle = caustic;
-    ctx.fillRect(0, 0, w, h);
-    return;
-  }
   const grad = ctx.createLinearGradient(0, 0, 0, h);
-  grad.addColorStop(0, "#72d4f0");
-  grad.addColorStop(0.22, "#3aabce");
-  grad.addColorStop(0.52, "#1a7aa8");
-  grad.addColorStop(0.78, "#0e5078");
-  grad.addColorStop(1, "#062840");
+  if (inInkDive()) {
+    grad.addColorStop(0, "#041828");
+    grad.addColorStop(0.5, "#0a2848");
+    grad.addColorStop(1, "#121438");
+  } else {
+    grad.addColorStop(0, "#0c2248");
+    grad.addColorStop(0.45, "#081830");
+    grad.addColorStop(1, "#040c1c");
+  }
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, w, h);
-  for (let i = 0; i < 6; i += 1) {
-    const sway = Math.sin(t * 0.25 + i * 1.4) * w * 0.03;
-    const x = w * (0.08 + i * 0.16) + sway;
-    const ray = ctx.createLinearGradient(x, 0, x + w * 0.08, h * 0.82);
-    ray.addColorStop(0, `rgba(255,255,255,${0.1 + (i % 3) * 0.02})`);
-    ray.addColorStop(0.55, "rgba(180,235,255,0.04)");
-    ray.addColorStop(1, "transparent");
-    ctx.fillStyle = ray;
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x + w * 0.14, 0);
-    ctx.lineTo(x + w * 0.04, h);
-    ctx.lineTo(x - w * 0.08, h);
-    ctx.closePath();
-    ctx.fill();
-  }
-  for (let i = 0; i < 14; i += 1) {
-    const phase = (i * 0.17 + t * 0.045) % 1;
-    const bx = w * ((i * 0.11 + Math.sin(t * 0.4 + i) * 0.04) % 1);
-    const by = h * (1 - phase);
-    const br = 1.8 + (i % 5);
-    ctx.globalAlpha = 0.1 + (1 - phase) * 0.18;
-    ctx.strokeStyle = "rgba(230,250,255,0.65)";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(bx, by, br, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-  ctx.globalAlpha = 1;
-  const floor = ctx.createLinearGradient(0, h * 0.88, 0, h);
-  floor.addColorStop(0, "transparent");
-  floor.addColorStop(1, "rgba(4, 24, 40, 0.55)");
-  ctx.fillStyle = floor;
-  ctx.fillRect(0, h * 0.88, w, h * 0.12);
-  for (let i = 0; i < 8; i += 1) {
-    const sx = w * (0.06 + i * 0.12);
-    const sh = 8 + (i % 3) * 6 + Math.sin(t * 0.6 + i) * 3;
-    ctx.globalAlpha = 0.08;
-    ctx.fillStyle = "#0a3848";
-    ctx.beginPath();
-    ctx.moveTo(sx, h);
-    ctx.quadraticCurveTo(sx + 10, h - sh * 1.8, sx + 20, h);
-    ctx.fill();
-  }
-  ctx.globalAlpha = 1;
+  const glow = ctx.createRadialGradient(w * 0.5, h * 0.42, 20, w * 0.5, h * 0.5, Math.max(w, h) * 0.7);
+  glow.addColorStop(0, `rgba(40, 120, 200, ${0.1 + Math.sin(t * 1.4) * 0.025})`);
+  glow.addColorStop(1, "transparent");
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, w, h);
+  const vignette = ctx.createRadialGradient(w * 0.5, h * 0.5, Math.min(w, h) * 0.28, w * 0.5, h * 0.5, Math.max(w, h) * 0.72);
+  vignette.addColorStop(0, "transparent");
+  vignette.addColorStop(1, "rgba(0, 4, 16, 0.45)");
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, w, h);
 }
 
 function drawBackground() {
@@ -3260,8 +3197,8 @@ function drawEvilFish(hunter, alpha = 1, ghost = false) {
   const wobble = Math.sin(hunter.phase || 0) * 0.1;
   if (PHOTOS.fish.ready) {
     const img = PHOTOS.fish.img;
-    const fishW = r * 3.6;
-    const fishH = r * 1.9;
+    const fishW = r * 4.8;
+    const fishH = r * 2.45;
     ctx.save();
     ctx.translate(hunter.x, hunter.y);
     ctx.rotate(angle + wobble);
@@ -3622,8 +3559,13 @@ function draw() {
   drawHungerVignette();
   if (state.flash > 0) {
     const flashRgb = hexToRgb(cssVar("--gold", "#ffe08a"));
-    ctx.fillStyle = `rgba(${flashRgb[0]},${flashRgb[1]},${flashRgb[2]},${state.flash * 0.16})`;
+    const strength = Math.min(0.72, state.flash * (state.flash > 0.7 ? 0.55 : 0.22));
+    ctx.fillStyle = `rgba(${flashRgb[0]},${flashRgb[1]},${flashRgb[2]},${strength})`;
     ctx.fillRect(0, 0, state.width, state.height);
+    if (state.flash > 0.7) {
+      ctx.fillStyle = `rgba(255,255,255,${Math.min(0.35, (state.flash - 0.7) * 0.5)})`;
+      ctx.fillRect(0, 0, state.width, state.height);
+    }
   }
   drawPauseHint();
   ctx.restore();
@@ -3752,7 +3694,7 @@ function boot() {
   const nativeShell = !!window.OttiskNative?.isNative;
   if ("serviceWorker" in navigator && !nativeShell) {
     navigator.serviceWorker
-      .register("./sw.js?v=31")
+      .register("./sw.js?v=32")
       .then((reg) => reg.update())
       .catch(() => {});
   }

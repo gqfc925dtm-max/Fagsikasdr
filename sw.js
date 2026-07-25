@@ -1,4 +1,4 @@
-const CACHE = "ottisk-v31";
+const CACHE = "ottisk-v32";
 const ASSETS = [
   "./",
   "./index.html",
@@ -8,7 +8,6 @@ const ASSETS = [
   "./js/game.js",
   "./js/native.js",
   "./manifest.json",
-  "./assets/ocean.jpg",
   "./assets/fish-evil.png",
   "./icons/icon-192.png",
   "./icons/icon-512.png",

@@ -6,7 +6,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="ОТТИСК" />
-  <meta name="theme-color" content="#0a3a5c" />
+  <meta name="theme-color" content="#081830" />
   <meta name="description" content="ОТТИСК — удерживай палец: существо живёт только в касании." />
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
@@ -15,8 +15,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
-  <link rel="preload" href="assets/ocean.jpg?v=4" as="image" />
-  <link rel="preload" href="assets/fish-evil.png?v=4" as="image" />
+  <link rel="preload" href="assets/fish-evil.png?v=5" as="image" />
   <title>ОТТИСК</title>
 </head>
 <body>
@@ -163,11 +162,11 @@
   </div>
   <script>
     (async () => {
-      const stamp = "ottisk-force-v31";
+      const stamp = "ottisk-force-v32";
       if (sessionStorage.getItem(stamp)) return;
       if (!("caches" in window)) return;
       const keys = await caches.keys();
-      const stale = keys.filter((k) => k.startsWith("ottisk-") && k !== "ottisk-v31");
+      const stale = keys.filter((k) => k.startsWith("ottisk-") && k !== "ottisk-v32");
       if (!stale.length) return;
       sessionStorage.setItem(stamp, "1");
       await Promise.all(stale.map((k) => caches.delete(k)));
@@ -179,6 +178,6 @@
     })();
   </script>
   <script src="js/native.js" type="module"></script>
-  <script src="js/game.js?v=stars1" type="module"></script>
+  <script src="js/game.js?v=deep1" type="module"></script>
 </body>
 </html>
