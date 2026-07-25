@@ -189,7 +189,6 @@ const state = {
   veins: [],
   particles: [],
   floaters: [],
-  ash: [],
   spawnAcc: 0,
   hunterAcc: 0,
   slowHunterSeen: false,
@@ -226,7 +225,6 @@ const state = {
   glyphIndex: 0,
   glyphSpawnAcc: 0,
   wordDone: false,
-  stains: [],
   symbiote: null,
   openingBurst: false,
   firstEatDone: false,
@@ -580,14 +578,6 @@ function maybeAwakenEcho() {
   spawnShadowHunter(state.echo.x, state.echo.y);
 }
 
-function pushStain(x, y) {
-  if (!state.life || (state.life.speed || 0) < 8) return;
-  const last = state.stains[state.stains.length - 1];
-  if (last && dist(last.x, last.y, x, y) < 18) return;
-  state.stains.push({ x, y, life: 1, r: rand(10, 16) });
-  if (state.stains.length > 90) state.stains.shift();
-}
-
 function spawnGlyph(x, y) {
   if (state.wordDone || state.glyphIndex >= SECRET_WORD.length) return;
   const ch = SECRET_WORD[state.glyphIndex];
@@ -686,17 +676,11 @@ function updateWeirdSystems(dt) {
   }
 
   if (state.life) {
-    pushStain(state.life.x, state.life.y);
     state.glyphSpawnAcc += dt * clamp((state.life.speed || 0) / 18, 0, 1);
     if (!state.wordDone && state.glyphSpawnAcc > 1.35 && state.glyphs.length < 2 && state.elapsed > OPENING_SEC + 8) {
       state.glyphSpawnAcc = 0;
       if (Math.random() < 0.55) spawnGlyph(state.life.x, state.life.y);
     }
-  }
-
-  for (let i = state.stains.length - 1; i >= 0; i -= 1) {
-    state.stains[i].life -= dt * 0.08;
-    if (state.stains[i].life <= 0) state.stains.splice(i, 1);
   }
 
   if (state.symbiote) {
@@ -1213,7 +1197,6 @@ function applyThemeFromScore(announce = false) {
   document.querySelector('meta[name="theme-color"]')?.setAttribute("content", cssVar("--bg0", "#241828"));
   if (changed && announce && state.score >= 100) {
     pulseUnlock(cssVar("--accent-a", "#ff9a62"), 0.18);
-    seedAsh();
     burst(state.width * 0.5, state.height * 0.4, cssVar("--accent-a", "#ff9a62"), 28, 5.2);
   }
 }
@@ -1350,31 +1333,12 @@ function resize() {
     state.echo.x *= sx;
     state.echo.y *= sy;
   }
-  for (const list of [state.sparks, state.hunters, state.veins, state.particles, state.floaters, state.ash]) {
+  for (const list of [state.sparks, state.hunters, state.veins, state.particles, state.floaters]) {
     for (const item of list) {
       if ("x" in item) item.x *= sx;
       if ("y" in item) item.y *= sy;
     }
   }
-  if (!state.ash.length) seedAsh();
-}
-
-function seedAsh() {
-  const palette = [
-    cssVar("--accent-a", "#ff7a45"),
-    cssVar("--accent-b", "#5fe8b8"),
-    cssVar("--gold", "#ffd27a"),
-    cssVar("--foam", "#fff6ec"),
-  ];
-  state.ash = Array.from({ length: 88 }, () => ({
-    x: Math.random() * state.width,
-    y: Math.random() * state.height,
-    r: rand(0.9, 2.8),
-    vx: rand(-0.24, 0.24),
-    vy: rand(-0.2, 0.08),
-    a: rand(0.16, 0.48),
-    color: palette[Math.floor(Math.random() * palette.length)],
-  }));
 }
 
 function pointerPos(e) {
@@ -1973,7 +1937,6 @@ function resetRun() {
   state.glyphIndex = 0;
   state.glyphSpawnAcc = 0;
   state.wordDone = false;
-  state.stains = [];
   state.symbiote = null;
   state.openingBurst = false;
   state.firstEatDone = false;
@@ -2132,17 +2095,6 @@ function onCanvasUp(e) {
   state.touchActive = false;
   state.pointerId = null;
   if (state.running) releaseLife();
-}
-
-function updateAsh(dt) {
-  for (const a of state.ash) {
-    a.x += a.vx * dt * 60;
-    a.y += a.vy * dt * 60;
-    if (a.x < 0) a.x = state.width;
-    if (a.x > state.width) a.x = 0;
-    if (a.y < 0) a.y = state.height;
-    if (a.y > state.height) a.y = 0;
-  }
 }
 
 function updateSparkMotion(spark, dt) {
@@ -2387,7 +2339,6 @@ function updateParticles(dt) {
 
 function updateRun(dt) {
   if (state.paused) {
-    updateAsh(dt * 0.35);
     updateParticles(dt);
     state.flash = Math.max(0, state.flash - dt * 1.2);
     return;
@@ -2446,7 +2397,7 @@ function updateRun(dt) {
   } else {
     state.hungerWarnClock = 0;
   }
-  updateAsh(dt);
+  updateParticles(dt);
   const opening = inOpening();
   const targetSparkCount = (opening ? 14 : 8) + Math.min(4, Math.floor(state.score / 80));
   const spawnInterval = opening ? 0.26 : 0.55;
@@ -2478,7 +2429,6 @@ function updateRun(dt) {
 function updateDemo(dt) {
   state.time += dt;
   state.demoClock += dt;
-  updateAsh(dt);
   if (state.sparks.length < 8 && Math.random() < 0.04) spawnSpark();
   for (const spark of state.sparks) updateSparkMotion(spark, dt * 0.7);
   if (state.life) {
@@ -2514,7 +2464,6 @@ function updateDemo(dt) {
 
 function updateOver(dt) {
   state.time += dt;
-  updateAsh(dt);
   updateParticles(dt);
   state.flash = Math.max(0, state.flash - dt * 1.4);
   state.shake *= Math.pow(0.9, dt * 60);
@@ -2535,67 +2484,12 @@ function drawBackground() {
     grad.addColorStop(1, "#301828");
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, state.width, state.height);
-    const wash = ctx.createRadialGradient(
-      state.width * 0.5,
-      state.height * 0.6,
-      20,
-      state.width * 0.5,
-      state.height * 0.55,
-      Math.max(state.width, state.height) * 0.7
-    );
-    wash.addColorStop(0, `rgba(100, 220, 255, ${0.14 + Math.sin(state.time * 2.2) * 0.04})`);
-    wash.addColorStop(0.55, "rgba(255, 120, 180, 0.08)");
-    wash.addColorStop(1, "transparent");
-    ctx.fillStyle = wash;
-    ctx.fillRect(0, 0, state.width, state.height);
   } else {
     const grad = ctx.createLinearGradient(0, 0, 0, state.height);
     grad.addColorStop(0, cssVar("--bg1", "#261c28"));
     grad.addColorStop(0.55, cssVar("--bg0", "#141018"));
     grad.addColorStop(1, cssVar("--bg2", "#3a241c"));
     ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, state.width, state.height);
-
-    const a = hexToRgb(cssVar("--accent-a", "#ff7a45"));
-    const b = hexToRgb(cssVar("--accent-b", "#5fe8b8"));
-    const orbA = ctx.createRadialGradient(
-      state.width * (0.22 + Math.sin(state.time * 0.35) * 0.04),
-      state.height * 0.2,
-      10,
-      state.width * 0.22,
-      state.height * 0.2,
-      state.width * 0.55
-    );
-    orbA.addColorStop(0, `rgba(${a[0]},${a[1]},${a[2]},0.22)`);
-    orbA.addColorStop(1, "transparent");
-    ctx.fillStyle = orbA;
-    ctx.fillRect(0, 0, state.width, state.height);
-
-    const orbB = ctx.createRadialGradient(
-      state.width * (0.78 + Math.cos(state.time * 0.28) * 0.03),
-      state.height * 0.72,
-      8,
-      state.width * 0.78,
-      state.height * 0.72,
-      state.width * 0.5
-    );
-    orbB.addColorStop(0, `rgba(${b[0]},${b[1]},${b[2]},0.18)`);
-    orbB.addColorStop(1, "transparent");
-    ctx.fillStyle = orbB;
-    ctx.fillRect(0, 0, state.width, state.height);
-
-    const gold = hexToRgb(cssVar("--gold", "#ffe08a"));
-    const orbC = ctx.createRadialGradient(
-      state.width * 0.5,
-      state.height * 0.08,
-      4,
-      state.width * 0.5,
-      state.height * 0.05,
-      state.width * 0.42
-    );
-    orbC.addColorStop(0, `rgba(${gold[0]},${gold[1]},${gold[2]},0.1)`);
-    orbC.addColorStop(1, "transparent");
-    ctx.fillStyle = orbC;
     ctx.fillRect(0, 0, state.width, state.height);
   }
   if (state.bloomPulse > 0) {
@@ -2610,21 +2504,6 @@ function drawBackground() {
     ctx.fillRect(0, 0, state.width, state.height);
     ctx.globalAlpha = 1;
   }
-  for (const stain of state.stains) {
-    ctx.globalAlpha = 0.2 * stain.life;
-    ctx.fillStyle = inInkDive() ? "#8ae0ff" : activeSkin().color;
-    ctx.beginPath();
-    ctx.ellipse(stain.x, stain.y, stain.r * 1.25, stain.r * 0.86, 0.2, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  for (const a of state.ash) {
-    ctx.globalAlpha = inInkDive() ? Math.min(1, a.a * 1.8) : Math.min(1, a.a * 1.35);
-    ctx.fillStyle = inInkDive() ? "#b0e8ff" : (a.color || "#fffaf2");
-    ctx.beginPath();
-    ctx.arc(a.x, a.y, a.r * 1.15, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.globalAlpha = 1;
 }
 
 function drawGlyphs() {
