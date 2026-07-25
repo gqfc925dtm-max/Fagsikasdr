@@ -37,6 +37,41 @@ const DEATH = {
   HUNGER: "свет иссяк — слишком долго без пищи",
 };
 
+const PHOTOS = {
+  ocean: { src: "./assets/ocean.jpg", img: null, ready: false },
+  fish: { src: "./assets/fish-evil.jpg", img: null, ready: false },
+};
+
+function loadImage(entry) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.decoding = "async";
+    img.onload = () => {
+      entry.img = img;
+      entry.ready = true;
+      resolve(true);
+    };
+    img.onerror = () => resolve(false);
+    img.src = entry.src;
+  });
+}
+
+function loadPhotos() {
+  return Promise.all([loadImage(PHOTOS.ocean), loadImage(PHOTOS.fish)]);
+}
+
+function drawImageCover(img, x, y, w, h) {
+  const iw = img.naturalWidth;
+  const ih = img.naturalHeight;
+  if (!iw || !ih) return;
+  const scale = Math.max(w / iw, h / ih);
+  const sw = w / scale;
+  const sh = h / scale;
+  const sx = (iw - sw) * 0.5;
+  const sy = (ih - sh) * 0.5;
+  ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+}
+
 const MUTATIONS = [
   { id: "spark", at: 0, name: "искра" },
   { id: "cool", at: 5, name: "хладь" },
@@ -1851,14 +1886,14 @@ function spawnHunter(slow = false) {
     y,
     vx: 0,
     vy: 0,
-    r: rand(12, 16),
+    r: rand(18, 24),
     anger,
     slow,
     warn: slow ? 1 : 0,
     phase: Math.random() * Math.PI * 2,
     nearMissed: false,
   });
-  if (state.running && !state.tipFlags.hunter) tipOnce("hunter", "ОХОТНИК", 1500);
+  if (state.running && !state.tipFlags.hunter) tipOnce("hunter", "ХИЩНИК", 1500);
 }
 
 function registerNearMiss(hunter, x, y) {
@@ -2501,6 +2536,21 @@ function drawOceanBackground() {
     ctx.fillRect(0, 0, w, h);
     return;
   }
+  if (PHOTOS.ocean.ready) {
+    drawImageCover(PHOTOS.ocean.img, 0, 0, w, h);
+    const shade = ctx.createLinearGradient(0, 0, 0, h);
+    shade.addColorStop(0, "rgba(8, 40, 64, 0.08)");
+    shade.addColorStop(0.45, "rgba(4, 28, 48, 0.18)");
+    shade.addColorStop(1, "rgba(2, 16, 32, 0.42)");
+    ctx.fillStyle = shade;
+    ctx.fillRect(0, 0, w, h);
+    const caustic = ctx.createRadialGradient(w * 0.5, h * 0.08, 10, w * 0.5, h * 0.35, w * 0.75);
+    caustic.addColorStop(0, `rgba(255,255,255,${0.07 + Math.sin(t * 0.35) * 0.02})`);
+    caustic.addColorStop(1, "transparent");
+    ctx.fillStyle = caustic;
+    ctx.fillRect(0, 0, w, h);
+    return;
+  }
   const grad = ctx.createLinearGradient(0, 0, 0, h);
   grad.addColorStop(0, "#72d4f0");
   grad.addColorStop(0.22, "#3aabce");
@@ -2819,6 +2869,21 @@ function drawEvilFish(hunter, alpha = 1, ghost = false) {
   const angle = Math.atan2(hunter.vy || 0.001, hunter.vx || 0.001);
   const r = hunter.r * (ghost ? 1.05 : 1);
   const wobble = Math.sin(hunter.phase || 0) * 0.1;
+  if (PHOTOS.fish.ready) {
+    const img = PHOTOS.fish.img;
+    const fishW = r * 4.6;
+    const fishH = r * 2.85;
+    ctx.save();
+    ctx.translate(hunter.x, hunter.y);
+    ctx.rotate(angle + wobble);
+    ctx.globalAlpha = alpha;
+    if (ghost) {
+      ctx.filter = "brightness(1.35) saturate(0.35)";
+    }
+    ctx.drawImage(img, -fishW * 0.52, -fishH * 0.5, fishW, fishH);
+    ctx.restore();
+    return;
+  }
   ctx.save();
   ctx.translate(hunter.x, hunter.y);
   ctx.rotate(angle + wobble);
@@ -3173,6 +3238,7 @@ function frame(ts) {
 }
 
 function boot() {
+  loadPhotos();
   state.meta = loadMeta();
   saveMeta();
   touchPlayDay();
