@@ -88,8 +88,6 @@ body {
 
 .status.hidden { display: none !important; }
 
-.stage { order: 1; }
-
 .status-score {
   flex: 0 0 auto;
   min-width: 54px;
