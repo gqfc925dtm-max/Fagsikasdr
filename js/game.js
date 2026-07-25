@@ -1973,7 +1973,7 @@ async function shareRun() {
 
 function sparkProfile(type) {
   if (type === "super") {
-    return { type, worth: 10, restore: 48, color: "#ffe566", r: rand(18, 22), super: true };
+    return { type, worth: 10, restore: 48, color: "#ffe566", r: rand(20, 24), super: true };
   }
   if (type === "rare") {
     return { type, worth: 3, restore: 35, color: "#ffcc44", r: rand(15, 19) };
@@ -2014,19 +2014,46 @@ function rollSparkType() {
 }
 
 function maybeSpawnSuperStar() {
-  if (!state.running || state.superStarSpawned || state.score >= 100) return;
-  if (state.sparks.some((s) => s.type === "super")) {
-    state.superStarSpawned = true;
-    return;
-  }
-  const ready = state.stats.sparkEats >= 1 || state.elapsed > OPENING_SEC * 0.55;
+  if (!state.running || state.score >= 100 || state.superStarEaten) return;
+  if (state.sparks.some((s) => s.type === "super")) return;
+  const ready = state.stats.sparkEats >= 1 || state.elapsed > 3.2;
   if (!ready) return;
-  const near = state.life
-    ? { x: state.life.x + rand(-40, 40), y: state.life.y - rand(80, 140) }
-    : { x: state.width * 0.55, y: state.height * 0.28 };
-  spawnSpark({ type: "super", near });
+  const margin = 56;
+  const side = Math.floor(Math.random() * 4);
+  let x = state.width * 0.72;
+  let y = state.height * 0.28;
+  if (side === 0) {
+    x = rand(margin, state.width - margin);
+    y = margin + 24;
+  } else if (side === 1) {
+    x = state.width - margin - 10;
+    y = rand(margin, state.height * 0.55);
+  } else if (side === 2) {
+    x = rand(margin, state.width - margin);
+    y = state.height - margin - 24;
+  } else {
+    x = margin + 10;
+    y = rand(margin, state.height * 0.55);
+  }
+  if (state.life && dist(x, y, state.life.x, state.life.y) < 110) {
+    x = clamp(state.width - state.life.x, margin, state.width - margin);
+    y = clamp(state.height * 0.25, margin, state.height - margin);
+  }
+  const profile = sparkProfile("super");
+  state.sparks.push({
+    x,
+    y,
+    vx: rand(-0.25, 0.25),
+    vy: rand(-0.25, 0.25),
+    pulse: Math.random() * Math.PI * 2,
+    tutorial: false,
+    grace: 0.55,
+    pinned: true,
+    ...profile,
+  });
   state.superStarSpawned = true;
-  tipOnce("super", "СУПЕР ЗВЕЗДА", 1600);
+  tipOnce("super", "СУПЕР ЗВЕЗДА", 1800);
+  floatText(x, y - 28, "СУПЕР", cssVar("--gold", "#ffe898"), 18);
 }
 
 function spawnComet() {
@@ -2115,6 +2142,9 @@ function spawnHunter(slow = false) {
     warn: slow ? 1 : 0,
     phase: Math.random() * Math.PI * 2,
     nearMissed: false,
+    orbit: (state.hunters.length * 2.1) + Math.random() * 1.2,
+    orbitR: rand(30, 58),
+    orbitSpeed: rand(0.7, 1.25) * (Math.random() < 0.5 ? -1 : 1),
   });
   if (state.running && !state.tipFlags.hunter) tipOnce("hunter", "ХИЩНИК", 1500);
 }
@@ -2202,6 +2232,7 @@ function resetRun() {
   state.openingBurst = false;
   state.firstEatDone = false;
   state.superStarSpawned = false;
+  state.superStarEaten = false;
   app.classList.remove("ink-dive");
   setDiveMeter(0);
   resetStats();
@@ -2238,7 +2269,6 @@ function resetRun() {
     parade: true,
   });
   state.slowHunterSeen = true;
-  state.superStarSpawned = false;
 }
 
 function resetDemo() {
@@ -2423,7 +2453,7 @@ function updateSparks(dt) {
       state.sparks.splice(i, 1);
       continue;
     }
-    if (state.life && magnetPull > 0 && !spark.comet) {
+    if (state.life && magnetPull > 0 && !spark.comet && spark.type !== "super") {
       const d = dist(spark.x, spark.y, state.life.x, state.life.y);
       if (d < 200) {
         const force = (1 - d / 200) * magnetPull;
@@ -2461,6 +2491,7 @@ function updateSparks(dt) {
 function eatSpark(index, spark) {
   state.sparks.splice(index, 1);
   state.stats.sparkEats += 1;
+  if (spark.type === "super") state.superStarEaten = true;
   if (spark.type === "rare" || spark.type === "super") state.stats.rareEats += 1;
   const moveFactor = state.life ? clamp((state.life.speed || 0) / 12, 0.2, 1) : 0.2;
   // AFK / standing eats barely refill hunger — must hunt light
@@ -2523,6 +2554,9 @@ function updateHunters(dt) {
         hunter.parade = false;
         hunter.slow = false;
         hunter.warn = 1;
+        hunter.orbit = (i * 2.15) + Math.random();
+        hunter.orbitR = rand(30, 58);
+        hunter.orbitSpeed = rand(0.7, 1.2) * (i % 2 === 0 ? -1 : 1);
       } else {
         hunter.x += (hunter.vx || 55) * dt;
         hunter.y += Math.sin(hunter.phase) * 22 * dt;
@@ -2536,8 +2570,20 @@ function updateHunters(dt) {
     let tx = state.width * 0.5;
     let ty = state.height * 0.5;
     if (state.life) {
-      tx = state.life.x;
-      ty = state.life.y;
+      const dLife = dist(hunter.x, hunter.y, state.life.x, state.life.y);
+      const orbit = hunter.orbit ?? i * 2.1;
+      const orbitR = hunter.orbitR ?? 42;
+      const orbitSpeed = hunter.orbitSpeed ?? 0.9;
+      const angOff = orbit + state.time * orbitSpeed;
+      if (dLife > 160) {
+        // Far away: chase the player directly.
+        tx = state.life.x;
+        ty = state.life.y;
+      } else {
+        // Close in: flank on unique orbits so fish don't stack.
+        tx = state.life.x + Math.cos(angOff) * orbitR;
+        ty = state.life.y + Math.sin(angOff) * orbitR * 0.85;
+      }
     } else if (state.echo) {
       tx = state.echo.x;
       ty = state.echo.y;
@@ -2545,12 +2591,25 @@ function updateHunters(dt) {
     const ang = Math.atan2(ty - hunter.y, tx - hunter.x);
     let speed = (0.95 + state.score * 0.012) * hunter.anger;
     if (hunter.shadow) speed *= 0.9;
+    if (hunter.slow) speed *= 0.72;
     if (hasMut("cool") && state.hunger < 50) speed *= 0.85;
     if (activeEventId() === "calm") speed *= 0.62;
     if (activeEventId() === "raid") speed *= 1.12;
     if (inInkDive()) speed *= 0.35;
     hunter.vx += Math.cos(ang) * speed * dt * 3.1;
     hunter.vy += Math.sin(ang) * speed * dt * 3.1;
+    // Keep fish apart so they don't pile into one blob.
+    for (let j = 0; j < state.hunters.length; j += 1) {
+      if (j === i) continue;
+      const other = state.hunters[j];
+      const gap = dist(hunter.x, hunter.y, other.x, other.y);
+      const minGap = hunter.r + other.r + 34;
+      if (gap > 0.1 && gap < minGap) {
+        const push = ((minGap - gap) / minGap) * 0.55;
+        hunter.vx += ((hunter.x - other.x) / gap) * push;
+        hunter.vy += ((hunter.y - other.y) / gap) * push;
+      }
+    }
     hunter.vx *= 0.955;
     hunter.vy *= 0.955;
     hunter.x += hunter.vx * dt * 60;
