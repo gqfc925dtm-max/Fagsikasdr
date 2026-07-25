@@ -2,7 +2,17 @@ const BEST_KEY = "ottisk-best-v2";
 const META_KEY = "ottisk-meta-v1";
 const HOLD_SECONDS = 0.62;
 const HUNGER_DRAIN_PER_SEC = 100 / 12;
+const ECHO_FADE_SEC = 2.35;
+const SHARE_URL = "https://gqfc925dtm-max.github.io/Fagsikasdr/";
 const THEME_NAMES = ["уголь", "глубина", "янтарь", "мох", "дымка", "пыльца"];
+const SCORE_MILESTONES = [
+  { at: 10, marks: 2, text: "первый ритм" },
+  { at: 25, marks: 3, text: "след держится" },
+  { at: 50, marks: 5, text: "половина сотни" },
+  { at: 100, marks: 8, text: "новая тема" },
+  { at: 150, marks: 10, text: "глубокий след" },
+  { at: 200, marks: 12, text: "легенда света" },
+];
 const DEATH = {
   HUNTER: "охотник поймал оттиск",
   ECHO: "тень сожрала след",
@@ -74,6 +84,7 @@ const btnSkipContinue = document.getElementById("btn-skip-continue");
 const btnShare = document.getElementById("btn-share");
 const streakOverEl = document.getElementById("streak-over");
 const dailyResultEl = document.getElementById("daily-result");
+const marksResultEl = document.getElementById("marks-result");
 const shareCanvasEl = document.getElementById("share-canvas");
 
 const GOAL_DEFS = [
@@ -119,6 +130,12 @@ const GOAL_DEFS = [
     label: (s) => `охота ${Math.min(s.stats.hunterEats, 2)}/2`,
     check: (s) => s.stats.hunterEats >= 2,
   },
+  {
+    id: "dodge4",
+    title: "4 мимо",
+    label: (s) => `мимо ${Math.min(s.stats.nearMisses, 4)}/4`,
+    check: (s) => s.stats.nearMisses >= 4,
+  },
 ];
 
 const DAILY_DEFS = [
@@ -145,6 +162,18 @@ const DAILY_DEFS = [
     title: "клык за забег",
     label: () => (hasMut("fang") ? "клык" : `${Math.min(state.score, 30)}/30`),
     check: () => hasMut("fang"),
+  },
+  {
+    id: "combo5",
+    title: "цепь ×5",
+    label: (s) => `цепь ${Math.min(s.stats.maxCombo, 5)}/5`,
+    check: (s) => s.stats.maxCombo >= 5,
+  },
+  {
+    id: "dodge3",
+    title: "3 мимо",
+    label: (s) => `мимо ${Math.min(s.stats.nearMisses, 3)}/3`,
+    check: (s) => s.stats.nearMisses >= 3,
   },
 ];
 
@@ -199,11 +228,22 @@ const state = {
   continueAdStartedAt: 0,
   continueAdRaf: 0,
   continueClickGuardUntil: 0,
+  paused: false,
+  runMarks: 0,
+  milestonesHit: [],
+  hungerWarnClock: 0,
+  tipFlags: {
+    move: false,
+    hunter: false,
+    hunger: false,
+    echo: false,
+  },
   stats: {
     sparkEats: 0,
     rareEats: 0,
     hunterEats: 0,
     maxCombo: 0,
+    nearMisses: 0,
   },
   audio: null,
   humNode: null,
@@ -373,13 +413,28 @@ function showToast(text, ms = 1450) {
   showToast.timer = setTimeout(() => toastEl.classList.remove("show"), ms);
 }
 
-function showCoach(text, ms = 1600) {
-  if (state.coachCount >= 2) return;
-  state.coachCount += 1;
+function showCoach(text, ms = 1600, force = false) {
+  if (!force && state.coachCount >= 3) return;
+  if (!force) state.coachCount += 1;
   coachEl.textContent = text;
   coachEl.className = "coach show";
   clearTimeout(showCoach.timer);
   showCoach.timer = setTimeout(() => coachEl.classList.remove("show"), ms);
+}
+
+function tipOnce(key, text, ms = 1700) {
+  if (state.tipFlags[key]) return;
+  state.tipFlags[key] = true;
+  showCoach(text, ms, true);
+}
+
+function difficultyScale() {
+  const best = Math.max(state.best || 0, state.meta?.best || 0);
+  if (best < 12) return 0.52;
+  if (best < 30) return 0.68;
+  if (best < 60) return 0.82;
+  if (best < 100) return 0.92;
+  return 1;
 }
 
 function floatText(x, y, text, color = "#f2c15a", size = 16) {
@@ -543,13 +598,31 @@ function renderDaily() {
 
 function awardMarks(amount, opts = {}) {
   if (!state.meta || !amount) return;
-  state.meta.marks = Math.max(0, Math.round((state.meta.marks || 0) + amount));
+  const gained = Math.max(0, Math.round(amount));
+  state.meta.marks = Math.max(0, Math.round((state.meta.marks || 0) + gained));
+  if (!opts.metaOnly) state.runMarks += gained;
   saveMeta();
   updateEconomyLabels();
   renderDaily();
   renderSkinMeta();
   if (opts.x != null && opts.y != null) {
-    floatText(opts.x, opts.y, `+${amount} следов`, opts.color || cssVar("--gold", "#f2c15a"), opts.size || 15);
+    floatText(opts.x, opts.y, `+${gained} следов`, opts.color || cssVar("--gold", "#f2c15a"), opts.size || 15);
+  }
+}
+
+function checkScoreMilestones() {
+  for (const mile of SCORE_MILESTONES) {
+    if (state.score < mile.at || state.milestonesHit.includes(mile.at)) continue;
+    state.milestonesHit.push(mile.at);
+    showToast(mile.text);
+    goalChime();
+    buzz([8, 16, 8]);
+    awardMarks(mile.marks, {
+      x: state.width * 0.5,
+      y: state.height * 0.2,
+      color: cssVar("--gold", "#f2c15a"),
+      size: 16,
+    });
   }
 }
 
@@ -705,6 +778,8 @@ function updateHungerUi() {
   heatFillEl.style.width = `${pct}%`;
   heatPctEl.textContent = `${pct}%`;
   heatEl.classList.toggle("low", pct < 30);
+  heatEl.classList.toggle("critical", pct < 18);
+  if (pct < 28 && state.running && state.life) tipOnce("hunger", "ЕШЬ СВЕТ", 1500);
 }
 
 function renderGoals() {
@@ -748,9 +823,14 @@ function renderDailyResult() {
   if (!dailyResultEl || !daily) return;
   if (state.meta?.dailyDone) {
     dailyResultEl.textContent = `ежедневка: ${daily.title} · +15 следов`;
-    return;
+  } else {
+    dailyResultEl.textContent = `ежедневка: ${daily.title} · ${daily.label(state)}`;
   }
-  dailyResultEl.textContent = `ежедневка: ${daily.title} · ${daily.label(state)}`;
+  if (marksResultEl) {
+    marksResultEl.textContent = state.runMarks > 0
+      ? `за забег · +${state.runMarks} следов`
+      : "за забег · следы не набраны";
+  }
 }
 
 function pickRunGoals() {
@@ -814,9 +894,11 @@ function afterScoreChange(pop = false) {
   const newlyUnlockedSkins = syncMetaFromBest();
   if (newlyUnlockedSkins.length) {
     state.runUnlockedSkins.push(...newlyUnlockedSkins.filter((id) => !state.runUnlockedSkins.includes(id)));
+    showToast(`оттиск: ${skinById(newlyUnlockedSkins[newlyUnlockedSkins.length - 1]).name}`);
   }
   syncMutation();
   applyThemeFromScore(pop);
+  checkScoreMilestones();
   renderGoals();
   evaluateGoals();
 }
@@ -829,6 +911,15 @@ function addScore(amount, x, y, opts = {}) {
     state.comboClock = 2.8;
     state.stats.maxCombo = Math.max(state.stats.maxCombo, state.combo);
     if (state.combo >= 2) showCombo(`цепь ×${state.combo}`);
+    if (state.combo === 8) {
+      awardMarks(2, {
+        x: state.width * 0.5,
+        y: state.height * 0.16,
+        color: cssVar("--gold", "#f2c15a"),
+        size: 14,
+      });
+      showToast("цепь ×8");
+    }
     if (hasMut("bloom") && state.combo > 0 && state.combo % 6 === 0 && state.life) {
       state.bloomPulse = 1;
       // Spawn at edges — never on top of the player (prevents AFK magnet farm)
@@ -1052,22 +1143,30 @@ function createLife(x, y, opts = {}) {
 
 function releaseLife() {
   if (!state.life) return;
-  state.echo = { x: state.life.x, y: state.life.y, r: state.life.r * 0.92, wobble: state.life.wobble };
+  state.echo = {
+    x: state.life.x,
+    y: state.life.y,
+    r: state.life.r * 0.92,
+    wobble: state.life.wobble,
+    life: 1,
+  };
   state.life = null;
   hum(false);
+  if (state.running) tipOnce("echo", "СЛЕД УЯЗВИМ", 1400);
 }
 
 function grantContinue() {
   state.pendingDeathReason = "";
   state.continueUsed = true;
+  state.paused = false;
   state.running = true;
   state.demo = false;
   state.touchActive = false;
   state.pointerId = null;
-  state.hunger = 60;
+  state.hunger = 68;
   state.hunters = [];
   state.echo = null;
-  state.safeUntil = performance.now() + 2500;
+  state.safeUntil = performance.now() + 2800;
   if (!state.life) createLife(state.width * 0.5, state.height * 0.56);
   else hum(true);
   updateHungerUi();
@@ -1076,12 +1175,16 @@ function grantContinue() {
   screenContinueEl?.classList.add("hidden");
   screenOverEl.classList.add("hidden");
   state.lastTs = performance.now();
-  state.flash = Math.max(state.flash, 0.1);
-  showToast("ещё шанс");
+  state.flash = Math.max(state.flash, 0.14);
+  burst(state.width * 0.5, state.height * 0.56, cssVar("--life", "#6fd9b0"), 22, 4.8);
+  tone(520, 0.08, "triangle", 0.03);
+  tone(780, 0.12, "sine", 0.026, 0.07);
+  showToast("щит · 3 сек");
+  buzz([8, 20, 8]);
 }
 
 function shareText() {
-  return `Мой след в ОТТИСК: ${state.score} света. Рекорд ${state.best}.`;
+  return `Мой след в ОТТИСК: ${state.score} света. Рекорд ${state.best}. ${SHARE_URL}`;
 }
 
 function canvasToBlob(canvasEl) {
@@ -1142,7 +1245,10 @@ function buildShareCard() {
 
   shareCtx.fillStyle = "rgba(243,238,232,0.62)";
   shareCtx.font = "600 22px Instrument Sans, sans-serif";
-  shareCtx.fillText(shareText(), 90, 770);
+  shareCtx.fillText(`gqfc925dtm-max.github.io/Fagsikasdr`, 90, 770);
+  if (state.runMarks > 0) {
+    shareCtx.fillText(`+${state.runMarks} следов за забег`, 90, 808);
+  }
 
   return shareCanvasEl;
 }
@@ -1261,7 +1367,8 @@ function spawnHunter(slow = false) {
     x = -pad;
     y = rand(0, state.height);
   }
-  const anger = slow ? 0.35 : rand(0.72, 1.08) + Math.min(0.52, state.score * 0.006);
+  const soft = difficultyScale();
+  const anger = (slow ? 0.35 : rand(0.72, 1.08) + Math.min(0.52, state.score * 0.006)) * soft;
   state.hunters.push({
     x,
     y,
@@ -1272,7 +1379,22 @@ function spawnHunter(slow = false) {
     slow,
     warn: slow ? 1 : 0,
     phase: Math.random() * Math.PI * 2,
+    nearMissed: false,
   });
+  if (state.running && !state.tipFlags.hunter) tipOnce("hunter", "ОХОТНИК", 1500);
+}
+
+function registerNearMiss(hunter, x, y) {
+  if (hunter.nearMissed) return;
+  hunter.nearMissed = true;
+  state.stats.nearMisses += 1;
+  floatText(x, y - 18, "мимо", cssVar("--foam", "#f3eee8"), 14);
+  tone(880, 0.045, "triangle", 0.02);
+  buzz(4);
+  if (state.stats.nearMisses === 1 || state.stats.nearMisses % 4 === 0) {
+    showToast("мимо");
+  }
+  evaluateGoals();
 }
 
 function resetStats() {
@@ -1280,6 +1402,7 @@ function resetStats() {
   state.stats.rareEats = 0;
   state.stats.hunterEats = 0;
   state.stats.maxCombo = 0;
+  state.stats.nearMisses = 0;
 }
 
 function resetRun() {
@@ -1315,7 +1438,12 @@ function resetRun() {
   state.continueUsed = false;
   state.safeUntil = 0;
   state.continueClickGuardUntil = 0;
+  state.paused = false;
+  state.runMarks = 0;
+  state.milestonesHit = [];
+  state.hungerWarnClock = 0;
   state.coachCount = 0;
+  state.tipFlags = { move: false, hunter: false, hunger: false, echo: false };
   resetStats();
   clearHold();
   stopContinueAd(true);
@@ -1332,6 +1460,7 @@ function resetRun() {
   mutSummaryEl.textContent = "";
   skinResultEl.textContent = "";
   dailyResultEl.textContent = "";
+  if (marksResultEl) marksResultEl.textContent = "";
   screenContinueEl?.classList.add("hidden");
   goalsResultEl.textContent = "";
   pickRunGoals();
@@ -1374,6 +1503,7 @@ function startGame() {
     resize();
     resetRun();
     state.running = true;
+    state.paused = false;
     state.demo = false;
     state.lastTs = performance.now();
     showCoach("УДЕРЖИВАЙ", 1700);
@@ -1383,6 +1513,7 @@ function startGame() {
 function finishRun(reason) {
   if (!state.running) return;
   state.running = false;
+  state.paused = false;
   state.demo = false;
   state.touchActive = false;
   state.pointerId = null;
@@ -1542,6 +1673,7 @@ function eatSpark(index, spark) {
   const restore = spark.restore * (0.35 + 0.65 * moveFactor);
   state.hunger = clamp(state.hunger + restore, 0, 100);
   updateHungerUi();
+  if (state.stats.sparkEats === 1) tipOnce("move", "ДВИГАЙСЯ", 1600);
   if (spark.type === "bait") {
     showToast("приманка");
     spawnHunter(false);
@@ -1556,18 +1688,20 @@ function eatSpark(index, spark) {
 }
 
 function updateHunters(dt) {
-  const maxHunters = Math.min(7, 2 + Math.floor(state.score / 18));
+  const soft = difficultyScale();
+  const maxHunters = Math.min(7, Math.max(1, Math.floor((2 + Math.floor(state.score / 18)) * soft)));
   state.hunterAcc += dt;
-  let interval = Math.max(1.05, 3.4 - state.score * 0.026);
-  if (!state.slowHunterSeen) interval = Math.max(interval, 4.8);
+  let interval = Math.max(1.05, 3.4 - state.score * 0.026) / Math.max(0.55, soft);
+  if (!state.slowHunterSeen) interval = Math.max(interval, 4.8 + (1 - soft) * 1.6);
+  const firstHunterAt = soft < 0.7 ? 8.5 : 6;
   while (state.hunters.length < maxHunters && state.hunterAcc >= interval) {
     state.hunterAcc -= interval;
     if (!state.slowHunterSeen && state.stats.sparkEats > 0) {
       spawnHunter(true);
       state.slowHunterSeen = true;
-    } else if (state.elapsed > 6) {
+    } else if (state.elapsed > firstHunterAt) {
       spawnHunter(false);
-      if (state.score > 45 && Math.random() < 0.22 && state.hunters.length < maxHunters) spawnHunter(false);
+      if (state.score > 45 && Math.random() < 0.22 * soft && state.hunters.length < maxHunters) spawnHunter(false);
     }
   }
 
@@ -1596,9 +1730,19 @@ function updateHunters(dt) {
 
     if (state.life) {
       const d = dist(hunter.x, hunter.y, state.life.x, state.life.y);
-      if (d < hunter.r * 0.72 + state.life.r * 0.75) {
+      const killR = hunter.r * 0.72 + state.life.r * 0.75;
+      const nearR = killR + 18;
+      if (d < nearR && d >= killR) {
+        registerNearMiss(hunter, state.life.x, state.life.y);
+      } else if (d >= nearR + 24) {
+        hunter.nearMissed = false;
+      }
+      if (d < killR) {
         if (state.safeUntil > performance.now()) {
           hunter.warn = 1;
+          const push = 2.4;
+          hunter.vx -= Math.cos(ang) * push;
+          hunter.vy -= Math.sin(ang) * push;
           continue;
         }
         if (hasMut("fang") && state.combo >= 4) {
@@ -1617,7 +1761,11 @@ function updateHunters(dt) {
       }
     } else if (state.echo) {
       const d = dist(hunter.x, hunter.y, state.echo.x, state.echo.y);
-      if (d < hunter.r * 0.72 + state.echo.r * 0.78) {
+      const killR = hunter.r * 0.72 + state.echo.r * 0.78;
+      if (d < killR + 16 && d >= killR) {
+        registerNearMiss(hunter, state.echo.x, state.echo.y);
+      }
+      if (d < killR) {
         finishRun(DEATH.ECHO);
         return;
       }
@@ -1655,6 +1803,12 @@ function updateParticles(dt) {
 }
 
 function updateRun(dt) {
+  if (state.paused) {
+    updateAsh(dt * 0.35);
+    updateParticles(dt);
+    state.flash = Math.max(0, state.flash - dt * 1.2);
+    return;
+  }
   state.time += dt;
   state.elapsed += dt;
   state.spawnAcc += dt;
@@ -1672,13 +1826,30 @@ function updateRun(dt) {
     state.life.teeth = hasMut("fang") && state.combo >= 4 ? Math.min(1, state.life.teeth + dt * 3) : Math.max(0, state.life.teeth - dt * 3);
     clampLife();
     updateHum();
+  } else if (state.echo) {
+    state.echo.wobble += dt * 4.2;
+    state.echo.life = Math.max(0, (state.echo.life ?? 1) - dt / ECHO_FADE_SEC);
+    state.echo.r = Math.max(8, state.echo.r * (1 - dt * 0.08));
+    if (state.echo.life <= 0) state.echo = null;
   }
   state.guideSpark = state.life ? nearestSpark(state.life.x, state.life.y) : null;
   // Standing still drains hunger faster — no AFK farming
   const stillPenalty = state.life && (state.life.speed || 0) < 6 ? 1.55 : 1;
-  state.hunger -= HUNGER_DRAIN_PER_SEC * dt * (hasMut("cool") ? 0.7 : 1) * stillPenalty;
-  state.hunger = Math.max(0, state.hunger);
+  if (state.life) {
+    state.hunger -= HUNGER_DRAIN_PER_SEC * dt * (hasMut("cool") ? 0.7 : 1) * stillPenalty;
+    state.hunger = Math.max(0, state.hunger);
+  }
   updateHungerUi();
+  if (state.hunger < 18 && state.life) {
+    state.hungerWarnClock -= dt;
+    if (state.hungerWarnClock <= 0) {
+      state.hungerWarnClock = 0.55;
+      buzz(6);
+      tone(140 + (18 - state.hunger) * 4, 0.05, "triangle", 0.018);
+    }
+  } else {
+    state.hungerWarnClock = 0;
+  }
   updateAsh(dt);
   const targetSparkCount = 8 + Math.min(4, Math.floor(state.score / 80));
   while (state.spawnAcc >= 0.55) {
@@ -1908,8 +2079,9 @@ function drawLifeBody(body, alpha = 1) {
 
 function drawEcho() {
   if (!state.echo) return;
+  const fade = clamp(state.echo.life ?? 1, 0, 1);
   ctx.save();
-  ctx.globalAlpha = 0.58;
+  ctx.globalAlpha = 0.22 + fade * 0.42;
   ctx.strokeStyle = "rgba(246,239,230,0.65)";
   ctx.lineWidth = 1.8;
   ctx.setLineDash([5, 6]);
@@ -1920,6 +2092,54 @@ function drawEcho() {
   ctx.ellipse(state.echo.x, state.echo.y, state.echo.r * 0.52, state.echo.r * 0.68, 0.18, 0.4, Math.PI * 1.76);
   ctx.stroke();
   ctx.setLineDash([]);
+  ctx.restore();
+}
+
+function drawSafeShield() {
+  if (!state.life || state.safeUntil <= performance.now()) return;
+  const remain = clamp((state.safeUntil - performance.now()) / 2800, 0, 1);
+  const pulse = 0.35 + Math.sin(state.time * 9) * 0.12;
+  ctx.save();
+  ctx.globalAlpha = pulse * remain;
+  ctx.strokeStyle = cssVar("--life", "#6fd9b0");
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(state.life.x, state.life.y, state.life.r * (1.45 + (1 - remain) * 0.35), 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.globalAlpha = pulse * 0.22 * remain;
+  ctx.fillStyle = cssVar("--life", "#6fd9b0");
+  ctx.beginPath();
+  ctx.arc(state.life.x, state.life.y, state.life.r * 1.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawHungerVignette() {
+  if (!state.running || state.hunger >= 28 || !state.life) return;
+  const strength = clamp((28 - state.hunger) / 28, 0, 1);
+  const grad = ctx.createRadialGradient(
+    state.width * 0.5,
+    state.height * 0.5,
+    Math.min(state.width, state.height) * 0.28,
+    state.width * 0.5,
+    state.height * 0.5,
+    Math.max(state.width, state.height) * 0.72
+  );
+  grad.addColorStop(0, "transparent");
+  grad.addColorStop(1, `rgba(226, 85, 109, ${0.08 + strength * 0.28})`);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, state.width, state.height);
+}
+
+function drawPauseHint() {
+  if (!state.paused || !state.running) return;
+  ctx.save();
+  ctx.fillStyle = "rgba(12,10,14,0.34)";
+  ctx.fillRect(0, 0, state.width, state.height);
+  ctx.fillStyle = "rgba(243,238,232,0.82)";
+  ctx.font = "700 14px Instrument Sans, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("пауза", state.width * 0.5, state.height * 0.48);
   ctx.restore();
 }
 
@@ -2002,6 +2222,7 @@ function draw() {
   drawEcho();
   drawGuide();
   if (state.life) {
+    drawSafeShield();
     drawLifeBody(state.life);
   } else if (state.running && !state.hasTouchedCanvas) {
     drawHoldHint();
@@ -2009,10 +2230,12 @@ function draw() {
     drawLifeBody(state.life, 0.86);
   }
   drawParticles();
+  drawHungerVignette();
   if (state.flash > 0) {
     ctx.fillStyle = `rgba(246,239,230,${state.flash * 0.18})`;
     ctx.fillRect(0, 0, state.width, state.height);
   }
+  drawPauseHint();
   ctx.restore();
 }
 
@@ -2079,13 +2302,30 @@ function boot() {
   });
   window.addEventListener("resize", resize);
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden && state.touchActive) {
-      state.touchActive = false;
-      state.pointerId = null;
-      if (state.running) releaseLife();
+    if (document.hidden) {
+      if (state.touchActive) {
+        state.touchActive = false;
+        state.pointerId = null;
+      }
+      if (state.running && !state.pendingDeathReason) {
+        state.life = null;
+        state.echo = null;
+        state.paused = true;
+        hum(false);
+      }
+      if (state.continueAdActive) stopContinueAd(true);
+      return;
     }
-    if (document.hidden && state.continueAdActive) stopContinueAd(true);
+    state.lastTs = performance.now();
+    if (state.paused && state.running) {
+      state.paused = false;
+      state.safeUntil = performance.now() + 1200;
+      showToast("удерживай снова");
+    }
   });
+  if (state.meta?.streak > 1) {
+    setTimeout(() => showToast(`серия · ${state.meta.streak} дн`), 650);
+  }
   requestAnimationFrame(frame);
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("./sw.js").catch(() => {});

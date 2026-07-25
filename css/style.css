@@ -204,6 +204,16 @@ body {
   background: linear-gradient(90deg, var(--ember), var(--danger));
 }
 
+.heat.critical i {
+  background: linear-gradient(90deg, var(--danger), #ff8a9a);
+  animation: hunger-pulse 0.55s ease-in-out infinite;
+}
+
+@keyframes hunger-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
 .mut-track {
   width: 100%;
   height: 2px;
@@ -341,11 +351,17 @@ body {
   color: var(--gold);
 }
 
-.daily-result {
+.daily-result,
+.marks-result {
   width: 100%;
   font-size: 12px;
   font-weight: 600;
   color: var(--life);
+  margin-bottom: 4px;
+}
+
+.marks-result {
+  color: var(--gold);
   margin-bottom: 4px;
 }
 
