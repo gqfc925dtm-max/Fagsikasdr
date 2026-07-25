@@ -1,7 +1,7 @@
 :root {
-  --bg0: #241828;
-  --bg1: #442840;
-  --bg2: #5a3428;
+  --bg0: #062840;
+  --bg1: #1a7aa8;
+  --bg2: #0e5078;
   --foam: #fffdf8;
   --sand: #e8d0b8;
   --ember: #ff9a62;
@@ -48,17 +48,18 @@ body {
   display: flex;
   flex-direction: column;
   background:
-    radial-gradient(120% 80% at 10% 0%, color-mix(in srgb, var(--accent-a) 18%, transparent), transparent 58%),
-    radial-gradient(100% 70% at 90% 8%, color-mix(in srgb, var(--accent-b) 14%, transparent), transparent 52%),
-    linear-gradient(165deg, var(--bg1) 0%, var(--bg0) 52%, var(--bg2) 100%);
+    linear-gradient(180deg, #72d4f0 0%, #1a7aa8 42%, #062840 100%);
   transition: background 0.7s ease, color 0.55s ease;
 }
 
 #app.ink-dive .stage .aura {
   background:
-    radial-gradient(80% 55% at 50% 100%, rgba(120, 210, 255, 0.22), transparent 60%),
-    radial-gradient(60% 40% at 20% 20%, rgba(255, 150, 200, 0.16), transparent 55%),
-    linear-gradient(0deg, transparent 55%, rgba(20, 40, 55, 0.5));
+    radial-gradient(80% 55% at 50% 100%, rgba(60, 180, 255, 0.18), transparent 60%),
+    linear-gradient(0deg, rgba(4, 20, 40, 0.65), transparent 55%);
+}
+
+#app.ink-dive {
+  background: linear-gradient(180deg, #0a2848 0%, #041828 100%);
 }
 
 .dive-meter {
@@ -118,19 +119,16 @@ body {
   min-height: 0;
   width: 100%;
   overflow: hidden;
-  background: var(--bg0);
+  background: #1a7aa8;
 }
 
 .aura {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--accent-a) 8%, transparent) 0%,
-    transparent 42%,
-    color-mix(in srgb, var(--panel) 18%, transparent) 100%
-  );
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, transparent 28%),
+    linear-gradient(180deg, transparent 55%, rgba(4, 24, 40, 0.22) 100%);
   z-index: 0;
 }
 
