@@ -46,14 +46,14 @@ const MUTATIONS = [
 ];
 
 const SKINS = [
-  { id: "ink", name: "чернь", at: 0, color: "#f2eee7" },
-  { id: "mint", name: "мята", at: 25, color: "#9cf0d0" },
-  { id: "ember", name: "жар", at: 60, color: "#ffc07d" },
-  { id: "frost", name: "иней", at: 100, color: "#cfe1ff" },
-  { id: "void", name: "пусто", at: 160, color: "#d7baff" },
-  { id: "pulse", name: "пульс", at: 220, color: "#ff9ab8" },
-  { id: "solar", name: "солнце", at: 9999, cost: 40, color: "#ffd27a", premium: true },
-  { id: "noir", name: "нуар", at: 9999, cost: 70, color: "#9aa0ff", premium: true },
+  { id: "ink", name: "чернь", at: 0, color: "#fff1e4" },
+  { id: "mint", name: "мята", at: 25, color: "#7dffc8" },
+  { id: "ember", name: "жар", at: 60, color: "#ffb068" },
+  { id: "frost", name: "иней", at: 100, color: "#b8dcff" },
+  { id: "void", name: "пусто", at: 160, color: "#e0b8ff" },
+  { id: "pulse", name: "пульс", at: 220, color: "#ff8ab4" },
+  { id: "solar", name: "солнце", at: 9999, cost: 40, color: "#ffe08a", premium: true },
+  { id: "noir", name: "нуар", at: 9999, cost: 70, color: "#8ab4ff", premium: true },
 ];
 
 const app = document.getElementById("app");
@@ -734,6 +734,7 @@ function floatText(x, y, text, color = "#f2c15a", size = 16) {
 }
 
 function burst(x, y, color, count = 12, speed = 3.5) {
+  const accent = cssVar("--accent-b", cssVar("--gold", "#ffd27a"));
   for (let i = 0; i < count; i += 1) {
     const a = Math.random() * Math.PI * 2;
     const s = rand(0.7, speed);
@@ -744,8 +745,8 @@ function burst(x, y, color, count = 12, speed = 3.5) {
       vy: Math.sin(a) * s,
       life: 1,
       decay: rand(0.012, 0.028),
-      size: rand(1.2, 3.4),
-      color,
+      size: rand(1.4, 3.8),
+      color: Math.random() < 0.35 ? accent : color,
     });
   }
 }
@@ -1211,7 +1212,9 @@ function applyThemeFromScore(announce = false) {
     tone(720, 0.08, "triangle", 0.03, 0);
     tone(940, 0.12, "sine", 0.024, 0.08);
     buzz([10, 18, 10]);
-    state.flash = Math.max(state.flash, 0.12);
+    state.flash = Math.max(state.flash, 0.16);
+    seedAsh();
+    burst(state.width * 0.5, state.height * 0.4, cssVar("--accent-a", "#ff7a45"), 24, 5);
   }
 }
 
@@ -1364,13 +1367,20 @@ function resize() {
 }
 
 function seedAsh() {
-  state.ash = Array.from({ length: 56 }, () => ({
+  const palette = [
+    cssVar("--accent-a", "#ff7a45"),
+    cssVar("--accent-b", "#5fe8b8"),
+    cssVar("--gold", "#ffd27a"),
+    cssVar("--foam", "#fff6ec"),
+  ];
+  state.ash = Array.from({ length: 72 }, () => ({
     x: Math.random() * state.width,
     y: Math.random() * state.height,
-    r: rand(0.5, 1.7),
-    vx: rand(-0.18, 0.18),
-    vy: rand(-0.14, 0.04),
-    a: rand(0.06, 0.22),
+    r: rand(0.7, 2.4),
+    vx: rand(-0.22, 0.22),
+    vy: rand(-0.18, 0.06),
+    a: rand(0.1, 0.34),
+    color: palette[Math.floor(Math.random() * palette.length)],
   }));
 }
 
@@ -1753,24 +1763,31 @@ async function shareRun() {
 
 function sparkProfile(type) {
   if (type === "rare") {
-    return { type, worth: 3, restore: 35, color: "#f2c15a", r: rand(7, 9.5) };
+    return { type, worth: 3, restore: 35, color: "#ffd45c", r: rand(7, 9.5) };
   }
   if (type === "cool") {
-    return { type, worth: 1, restore: 25, color: "#83bcff", r: rand(6, 8.5) };
+    return { type, worth: 1, restore: 25, color: "#6ec8ff", r: rand(6, 8.5) };
   }
   if (type === "bait") {
-    return { type, worth: 1, restore: 12, color: "#ff7fd7", r: rand(6, 8.5) };
+    return { type, worth: 1, restore: 12, color: "#ff6ad8", r: rand(6, 8.5) };
   }
   if (type === "comet") {
-    return { type, worth: 5, restore: 28, color: "#ffe08a", r: rand(8, 10.5), comet: true };
+    return { type, worth: 5, restore: 28, color: "#ffe66e", r: rand(8, 10.5), comet: true };
   }
   if (type === "deep") {
-    return { type, worth: 4, restore: 32, color: "#c4b5ff", r: rand(7, 9.2), deep: true };
+    return { type, worth: 4, restore: 32, color: "#8ae0ff", r: rand(7, 9.2), deep: true };
   }
   if (type === "seed") {
-    return { type, worth: 2, restore: 16, color: "#9cf0d0", r: rand(6.5, 8.2), seed: true };
+    return { type, worth: 2, restore: 16, color: "#6affc4", r: rand(6.5, 8.2), seed: true };
   }
-  return { type: "normal", worth: 1, restore: 18, color: "#ffe2b0", r: rand(5.5, 7.6) };
+  const normals = ["#ffe2a8", "#ffc48a", "#fff0c8", cssVar("--accent-b", "#5fe8b8")];
+  return {
+    type: "normal",
+    worth: 1,
+    restore: 18,
+    color: normals[Math.floor(Math.random() * normals.length)],
+    r: rand(5.5, 7.6),
+  };
 }
 
 function rollSparkType() {
@@ -2485,37 +2502,85 @@ function lifeInkColor() {
 function drawBackground() {
   if (inInkDive()) {
     const grad = ctx.createLinearGradient(0, state.height, 0, 0);
-    grad.addColorStop(0, "#1a1228");
-    grad.addColorStop(0.55, "#0c1822");
-    grad.addColorStop(1, "#140c18");
+    grad.addColorStop(0, "#123048");
+    grad.addColorStop(0.45, "#1c1840");
+    grad.addColorStop(1, "#301828");
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, state.width, state.height);
-    ctx.fillStyle = `rgba(180, 140, 255, ${0.04 + Math.sin(state.time * 2.2) * 0.02})`;
+    const wash = ctx.createRadialGradient(
+      state.width * 0.5,
+      state.height * 0.6,
+      20,
+      state.width * 0.5,
+      state.height * 0.55,
+      Math.max(state.width, state.height) * 0.7
+    );
+    wash.addColorStop(0, `rgba(100, 220, 255, ${0.14 + Math.sin(state.time * 2.2) * 0.04})`);
+    wash.addColorStop(0.55, "rgba(255, 120, 180, 0.08)");
+    wash.addColorStop(1, "transparent");
+    ctx.fillStyle = wash;
     ctx.fillRect(0, 0, state.width, state.height);
   } else {
     const grad = ctx.createLinearGradient(0, 0, 0, state.height);
-    grad.addColorStop(0, cssVar("--bg1", "#1c1820"));
-    grad.addColorStop(1, cssVar("--bg0", "#121014"));
+    grad.addColorStop(0, cssVar("--bg1", "#261c28"));
+    grad.addColorStop(0.55, cssVar("--bg0", "#141018"));
+    grad.addColorStop(1, cssVar("--bg2", "#3a241c"));
     ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, state.width, state.height);
+
+    const a = hexToRgb(cssVar("--accent-a", "#ff7a45"));
+    const b = hexToRgb(cssVar("--accent-b", "#5fe8b8"));
+    const orbA = ctx.createRadialGradient(
+      state.width * (0.22 + Math.sin(state.time * 0.35) * 0.04),
+      state.height * 0.2,
+      10,
+      state.width * 0.22,
+      state.height * 0.2,
+      state.width * 0.55
+    );
+    orbA.addColorStop(0, `rgba(${a[0]},${a[1]},${a[2]},0.22)`);
+    orbA.addColorStop(1, "transparent");
+    ctx.fillStyle = orbA;
+    ctx.fillRect(0, 0, state.width, state.height);
+
+    const orbB = ctx.createRadialGradient(
+      state.width * (0.78 + Math.cos(state.time * 0.28) * 0.03),
+      state.height * 0.72,
+      8,
+      state.width * 0.78,
+      state.height * 0.72,
+      state.width * 0.5
+    );
+    orbB.addColorStop(0, `rgba(${b[0]},${b[1]},${b[2]},0.18)`);
+    orbB.addColorStop(1, "transparent");
+    ctx.fillStyle = orbB;
     ctx.fillRect(0, 0, state.width, state.height);
   }
   if (state.bloomPulse > 0) {
-    ctx.fillStyle = cssVar("--gold", "#e6c07b");
-    ctx.globalAlpha = state.bloomPulse * 0.05;
+    ctx.fillStyle = cssVar("--gold", "#ffd27a");
+    ctx.globalAlpha = state.bloomPulse * 0.09;
+    ctx.fillRect(0, 0, state.width, state.height);
+    ctx.globalAlpha = 1;
+  }
+  if (state.fever) {
+    ctx.fillStyle = cssVar("--ember", "#ff7a45");
+    ctx.globalAlpha = 0.05 + Math.sin(state.time * 7) * 0.02;
     ctx.fillRect(0, 0, state.width, state.height);
     ctx.globalAlpha = 1;
   }
   for (const stain of state.stains) {
-    ctx.globalAlpha = 0.07 * stain.life;
-    ctx.fillStyle = inInkDive() ? "#b8a0ff" : activeSkin().color;
+    ctx.globalAlpha = 0.12 * stain.life;
+    ctx.fillStyle = inInkDive() ? "#8ae0ff" : activeSkin().color;
     ctx.beginPath();
-    ctx.ellipse(stain.x, stain.y, stain.r, stain.r * 0.72, 0.2, 0, Math.PI * 2);
+    ctx.ellipse(stain.x, stain.y, stain.r * 1.15, stain.r * 0.8, 0.2, 0, Math.PI * 2);
     ctx.fill();
   }
   for (const a of state.ash) {
-    ctx.globalAlpha = inInkDive() ? a.a * 1.4 : a.a;
-    ctx.fillStyle = inInkDive() ? "#d7c8ff" : "#f6efe6";
-    ctx.fillRect(a.x, a.y, a.r, a.r);
+    ctx.globalAlpha = inInkDive() ? a.a * 1.5 : a.a;
+    ctx.fillStyle = inInkDive() ? "#9ad8ff" : (a.color || "#fff6ec");
+    ctx.beginPath();
+    ctx.arc(a.x, a.y, a.r, 0, Math.PI * 2);
+    ctx.fill();
   }
   ctx.globalAlpha = 1;
 }
@@ -2573,45 +2638,46 @@ function drawVeins() {
 }
 
 function drawSpark(spark) {
-  const pulse = 1 + Math.sin(spark.pulse) * 0.15;
+  const pulse = 1 + Math.sin(spark.pulse) * 0.18;
   const r = spark.r * pulse;
   if (spark.comet) {
     const ang = Math.atan2(spark.vy, spark.vx || 0.001);
     ctx.save();
     ctx.translate(spark.x, spark.y);
     ctx.rotate(ang);
-    const trail = ctx.createLinearGradient(-28, 0, 10, 0);
+    const trail = ctx.createLinearGradient(-34, 0, 12, 0);
     trail.addColorStop(0, "transparent");
-    trail.addColorStop(1, spark.color);
+    trail.addColorStop(0.55, spark.color);
+    trail.addColorStop(1, "#fff8e8");
     ctx.fillStyle = trail;
-    ctx.globalAlpha = 0.72;
+    ctx.globalAlpha = 0.85;
     ctx.beginPath();
-    ctx.moveTo(-30, 0);
-    ctx.lineTo(4, -4.5);
-    ctx.lineTo(4, 4.5);
+    ctx.moveTo(-34, 0);
+    ctx.lineTo(6, -5.5);
+    ctx.lineTo(6, 5.5);
     ctx.closePath();
     ctx.fill();
     ctx.restore();
   }
-  const glow = ctx.createRadialGradient(spark.x, spark.y, 0, spark.x, spark.y, r * 3.4);
-  glow.addColorStop(0, spark.color);
-  glow.addColorStop(0.32, spark.color);
+  const glow = ctx.createRadialGradient(spark.x, spark.y, 0, spark.x, spark.y, r * 4.1);
+  glow.addColorStop(0, "#fff8ef");
+  glow.addColorStop(0.22, spark.color);
   glow.addColorStop(1, "transparent");
-  ctx.globalAlpha = 0.88;
+  ctx.globalAlpha = 0.95;
   ctx.fillStyle = glow;
   ctx.beginPath();
-  ctx.arc(spark.x, spark.y, r * 3.4, 0, Math.PI * 2);
+  ctx.arc(spark.x, spark.y, r * 4.1, 0, Math.PI * 2);
   ctx.fill();
   ctx.globalAlpha = 1;
-  ctx.fillStyle = "#fff8ef";
+  ctx.fillStyle = "#fffaf2";
   ctx.beginPath();
-  ctx.arc(spark.x, spark.y, Math.max(1.6, r * 0.42), 0, Math.PI * 2);
+  ctx.arc(spark.x, spark.y, Math.max(1.8, r * 0.48), 0, Math.PI * 2);
   ctx.fill();
-  if (spark.type === "rare" || spark.comet) {
-    ctx.strokeStyle = "rgba(242,193,90,0.7)";
-    ctx.lineWidth = 1.25;
+  if (spark.type === "rare" || spark.comet || spark.deep) {
+    ctx.strokeStyle = spark.deep ? "rgba(138,224,255,0.75)" : "rgba(255,212,92,0.8)";
+    ctx.lineWidth = 1.4;
     ctx.beginPath();
-    ctx.arc(spark.x, spark.y, r * 1.6, 0, Math.PI * 2);
+    ctx.arc(spark.x, spark.y, r * 1.75, 0, Math.PI * 2);
     ctx.stroke();
   }
   if (spark.tutorial) {
@@ -2689,17 +2755,30 @@ function drawHunter(hunter) {
 }
 
 function drawLifeBody(body, alpha = 1) {
+  const ink = lifeInkColor();
+  const accent = cssVar("--accent-a", "#ff7a45");
   ctx.save();
   ctx.globalAlpha = alpha;
-  ctx.strokeStyle = lifeInkColor();
+  const bloom = ctx.createRadialGradient(body.x, body.y, 2, body.x, body.y, body.r * 2.3);
+  bloom.addColorStop(0, mixColor(ink, "#ffffff", 0.35));
+  bloom.addColorStop(0.35, ink);
+  bloom.addColorStop(1, "transparent");
+  ctx.globalAlpha = alpha * (state.fever ? 0.34 : 0.22);
+  ctx.fillStyle = bloom;
+  ctx.beginPath();
+  ctx.arc(body.x, body.y, body.r * 2.3, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = ink;
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
   const rings = hasMut("fang") ? 5 : 4;
   for (let i = 0; i < rings; i += 1) {
     const t = (i + 1) / rings;
     const wob = Math.sin(body.wobble * 1.1 + i * 0.8) * (1 + i * 0.28);
-    ctx.lineWidth = Math.max(1.2, 2.7 - i * 0.3);
-    ctx.globalAlpha = alpha * (0.36 + t * 0.5);
+    ctx.lineWidth = Math.max(1.35, 3.1 - i * 0.32);
+    ctx.globalAlpha = alpha * (0.42 + t * 0.52);
+    ctx.strokeStyle = i % 2 === 0 ? ink : mixColor(ink, accent, 0.35);
     ctx.beginPath();
     ctx.ellipse(
       body.x + Math.sin(body.wobble * 0.35 + i) * 0.7,
@@ -2712,21 +2791,22 @@ function drawLifeBody(body, alpha = 1) {
     );
     ctx.stroke();
   }
-  ctx.globalAlpha = alpha * 0.42;
-  ctx.lineWidth = 1;
+  ctx.globalAlpha = alpha * 0.5;
+  ctx.strokeStyle = cssVar("--accent-b", "#5fe8b8");
+  ctx.lineWidth = 1.1;
   ctx.setLineDash([3, 5]);
   ctx.beginPath();
   ctx.ellipse(body.x, body.y, body.r * 0.52, body.r * 0.68, 0.2, 0.2, Math.PI * 1.74);
   ctx.stroke();
   ctx.setLineDash([]);
   if (hasMut("fang") && state.combo >= 4) {
-    ctx.globalAlpha = alpha * 0.84;
-    ctx.strokeStyle = cssVar("--danger", "#e2556d");
-    ctx.lineWidth = 1.5;
+    ctx.globalAlpha = alpha * 0.9;
+    ctx.strokeStyle = cssVar("--danger", "#ff5d7a");
+    ctx.lineWidth = 1.7;
     for (let i = 0; i < 6; i += 1) {
       const a = (i / 6) * Math.PI * 2 + body.wobble * 0.08;
       const r0 = body.r * 0.92;
-      const r1 = body.r * 1.18;
+      const r1 = body.r * 1.22;
       ctx.beginPath();
       ctx.moveTo(body.x + Math.cos(a) * r0, body.y + Math.sin(a) * r0);
       ctx.lineTo(body.x + Math.cos(a) * r1, body.y + Math.sin(a) * r1);
@@ -2862,18 +2942,28 @@ function drawHoldHint() {
 function drawParticles() {
   for (const p of state.particles) {
     ctx.globalAlpha = Math.max(0, p.life);
-    ctx.fillStyle = p.color;
+    const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size * 2.8);
+    glow.addColorStop(0, p.color);
+    glow.addColorStop(1, "transparent");
+    ctx.fillStyle = glow;
     ctx.beginPath();
-    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, p.size * 2.8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#fffaf2";
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, Math.max(0.8, p.size * 0.45), 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.globalAlpha = 1;
   for (const f of state.floaters) {
     ctx.globalAlpha = Math.max(0, f.life);
     ctx.fillStyle = f.color;
+    ctx.shadowColor = f.color;
+    ctx.shadowBlur = 12;
     ctx.font = `800 ${f.size}px Syne, sans-serif`;
     ctx.textAlign = "center";
     ctx.fillText(f.text, f.x, f.y);
+    ctx.shadowBlur = 0;
   }
   ctx.globalAlpha = 1;
 }
