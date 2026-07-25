@@ -265,14 +265,14 @@ function pulseUnlock(color = cssVar("--life", "#7affd4"), strength = 0.14) {
 }
 
 function spawnOpeningRing(x, y) {
-  const count = 9;
+  const count = 4;
   for (let i = 0; i < count; i += 1) {
-    const a = (i / count) * Math.PI * 2 + rand(-0.08, 0.08);
-    const d = rand(62, 108);
+    const a = (i / count) * Math.PI * 2 + rand(-0.1, 0.1);
+    const d = rand(110, 165);
     spawnSpark({
       near: { x: x + Math.cos(a) * d, y: y + Math.sin(a) * d },
-      type: i === 1 ? "rare" : "normal",
-      tutorial: true,
+      type: i === 0 ? "rare" : "normal",
+      tutorial: i === 0,
       opening: true,
     });
   }
@@ -1493,8 +1493,9 @@ function createLife(x, y, opts = {}) {
     px: x,
     py: y,
     speed: 0,
-    r: 22,
+    r: 28,
     wobble: Math.random() * Math.PI * 2,
+    aim: -Math.PI / 2,
     teeth: 0,
   };
   state.lastVeinX = x;
@@ -1558,6 +1559,7 @@ function releaseLife() {
     y,
     r,
     wobble,
+    aim: state.life.aim ?? -Math.PI / 2,
     life: 1,
   };
   state.life = null;
@@ -1732,22 +1734,22 @@ async function shareRun() {
 
 function sparkProfile(type) {
   if (type === "rare") {
-    return { type, worth: 3, restore: 35, color: "#ffcc44", r: rand(6, 7.8) };
+    return { type, worth: 3, restore: 35, color: "#ffcc44", r: rand(8.5, 11) };
   }
   if (type === "cool") {
-    return { type, worth: 1, restore: 25, color: "#58c8ff", r: rand(5.2, 6.8) };
+    return { type, worth: 1, restore: 25, color: "#58c8ff", r: rand(7.5, 9.5) };
   }
   if (type === "bait") {
-    return { type, worth: 1, restore: 12, color: "#ff58d0", r: rand(5.2, 6.8) };
+    return { type, worth: 1, restore: 12, color: "#ff58d0", r: rand(7.5, 9.5) };
   }
   if (type === "comet") {
-    return { type, worth: 5, restore: 28, color: "#ffd840", r: rand(6.5, 8.2), comet: true };
+    return { type, worth: 5, restore: 28, color: "#ffd840", r: rand(9, 11.5), comet: true };
   }
   if (type === "deep") {
-    return { type, worth: 4, restore: 32, color: "#70d8ff", r: rand(5.8, 7.2), deep: true };
+    return { type, worth: 4, restore: 32, color: "#70d8ff", r: rand(8, 10), deep: true };
   }
   if (type === "seed") {
-    return { type, worth: 2, restore: 16, color: "#58ffb0", r: rand(5.4, 6.8), seed: true };
+    return { type, worth: 2, restore: 16, color: "#58ffb0", r: rand(7.8, 9.8), seed: true };
   }
   const normals = ["#ffd080", "#ffb868", "#fff0a0", cssVar("--accent-b", "#62f0c8")];
   return {
@@ -1755,7 +1757,7 @@ function sparkProfile(type) {
     worth: 1,
     restore: 18,
     color: normals[Math.floor(Math.random() * normals.length)],
-    r: rand(5, 6.8),
+    r: rand(7.5, 10),
   };
 }
 
@@ -1960,8 +1962,8 @@ function resetRun() {
   dailyResultEl.textContent = "";
   if (marksResultEl) marksResultEl.textContent = "";
   screenContinueEl?.classList.add("hidden");
-  for (let i = 0; i < 12; i += 1) spawnSpark({ opening: true });
-  spawnSpark({ tutorial: true, type: "normal", near: { x: state.width * 0.5, y: state.height * 0.42 }, opening: true });
+  for (let i = 0; i < 4; i += 1) spawnSpark();
+  spawnSpark({ tutorial: true, type: "normal", near: { x: state.width * 0.5, y: state.height * 0.42 } });
 }
 
 function resetDemo() {
@@ -2357,12 +2359,13 @@ function updateRun(dt) {
     const prevX = state.life.px ?? state.life.x;
     const prevY = state.life.py ?? state.life.y;
     const moved = dist(state.life.x, state.life.y, prevX, prevY);
+    if (moved > 0.6) state.life.aim = Math.atan2(state.life.y - prevY, state.life.x - prevX);
     state.life.speed = (state.life.speed || 0) * 0.78 + moved * 0.22;
     state.life.px = state.life.x;
     state.life.py = state.life.y;
     state.life.wobble += dt * 7.2;
-    state.life.r = 20 + Math.min(8, state.combo * 0.7) + Math.sin(state.life.wobble) * 1.05;
-    if (state.fever) state.life.r += 2;
+    state.life.r = 24 + Math.min(8, state.combo * 0.75) + Math.sin(state.life.wobble) * 1.1;
+    if (state.fever) state.life.r += 2.2;
     state.life.teeth = hasMut("fang") && state.combo >= 4 ? Math.min(1, state.life.teeth + dt * 3) : Math.max(0, state.life.teeth - dt * 3);
     clampLife();
     updateHum();
@@ -2399,17 +2402,17 @@ function updateRun(dt) {
   }
   updateParticles(dt);
   const opening = inOpening();
-  const targetSparkCount = (opening ? 14 : 8) + Math.min(4, Math.floor(state.score / 80));
-  const spawnInterval = opening ? 0.26 : 0.55;
+  const targetSparkCount = opening ? 5 : 7 + Math.min(3, Math.floor(state.score / 80));
+  const spawnInterval = opening ? 0.9 : 0.55;
   while (state.spawnAcc >= spawnInterval) {
     state.spawnAcc -= spawnInterval;
     if (state.sparks.length < targetSparkCount) {
-      const nearPlayer = opening && state.life && Math.random() < 0.78;
+      const nearPlayer = opening && state.life && state.elapsed > 4 && Math.random() < 0.22;
       spawnSpark({
-        edge: !nearPlayer && Math.random() < 0.55,
+        edge: !nearPlayer,
         near: nearPlayer ? { x: state.life.x, y: state.life.y } : undefined,
         opening,
-        type: opening && Math.random() < 0.14 ? "rare" : null,
+        type: opening && Math.random() < 0.1 ? "rare" : null,
       });
     }
   }
@@ -2435,7 +2438,7 @@ function updateDemo(dt) {
     state.life.wobble += dt * 6;
     state.life.x = state.width * 0.5 + Math.sin(state.demoClock * 1.35) * state.width * 0.17;
     state.life.y = state.height * 0.58 + Math.cos(state.demoClock * 0.92) * state.height * 0.07;
-    state.life.r = 21 + Math.sin(state.demoClock * 2.8) * 1.1;
+    state.life.r = 26 + Math.sin(state.demoClock * 2.8) * 1.2;
     for (let i = state.sparks.length - 1; i >= 0; i -= 1) {
       const spark = state.sparks[i];
       if (dist(spark.x, spark.y, state.life.x, state.life.y) < state.life.r * 0.72 + spark.r) {
@@ -2446,7 +2449,13 @@ function updateDemo(dt) {
     }
     state.demoDownClock -= dt;
     if (state.demoDownClock <= 0) {
-      state.echo = { x: state.life.x, y: state.life.y, r: state.life.r * 0.9, wobble: state.life.wobble };
+      state.echo = {
+        x: state.life.x,
+        y: state.life.y,
+        r: state.life.r * 0.9,
+        wobble: state.life.wobble,
+        aim: state.life.aim ?? -Math.PI / 2,
+      };
       state.life = null;
       state.demoDownClock = rand(0.5, 0.9);
     }
@@ -2558,64 +2567,173 @@ function drawVeins() {
   }
 }
 
+function drawLightShard(x, y, r, color, rot, alpha = 1) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rot);
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  for (let i = 0; i < 8; i += 1) {
+    const a = (i / 8) * Math.PI * 2;
+    const rad = i % 2 === 0 ? r : r * 0.36;
+    const px = Math.cos(a) * rad;
+    const py = Math.sin(a) * rad;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = mixColor(color, "#ffffff", 0.22);
+  ctx.lineWidth = 1.8;
+  ctx.globalAlpha = alpha * 0.8;
+  ctx.stroke();
+  ctx.fillStyle = mixColor(color, "#ffffff", 0.38);
+  ctx.globalAlpha = alpha;
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,0.9)";
+  ctx.beginPath();
+  ctx.arc(-r * 0.18, -r * 0.18, Math.max(1.4, r * 0.14), 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function stampSealPath(s) {
+  ctx.beginPath();
+  for (let i = 0; i < 8; i += 1) {
+    const a = (i / 8) * Math.PI * 2 - Math.PI / 8;
+    const rr = s * (i % 2 === 0 ? 1 : 0.84);
+    const px = Math.cos(a) * rr;
+    const py = Math.sin(a) * rr * 0.9;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+}
+
+function drawStampCreature(body, alpha = 1) {
+  const ink = lifeInkColor();
+  const accent = cssVar("--accent-a", "#ff9a62");
+  const accentB = cssVar("--accent-b", "#7affd4");
+  const aim = body.aim ?? -Math.PI / 2;
+  const s = body.r;
+  ctx.save();
+  ctx.translate(body.x, body.y);
+  ctx.rotate(aim + Math.sin(body.wobble) * 0.07);
+  if ((body.speed || 0) > 5) {
+    ctx.globalAlpha = alpha * 0.38;
+    ctx.fillStyle = mixColor(ink, accentB, 0.3);
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.25, 0);
+    ctx.quadraticCurveTo(-s * 1.7, Math.sin(body.wobble) * s * 0.45, -s * 2.2, 0);
+    ctx.quadraticCurveTo(-s * 1.7, -Math.sin(body.wobble) * s * 0.45, -s * 0.25, 0);
+    ctx.fill();
+  }
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = mixColor(ink, accent, 0.32);
+  if (typeof ctx.roundRect === "function") {
+    ctx.beginPath();
+    ctx.roundRect(-s * 0.24, -s * 1.38, s * 0.48, s * 0.58, s * 0.1);
+    ctx.fill();
+  } else {
+    ctx.fillRect(-s * 0.24, -s * 1.38, s * 0.48, s * 0.58);
+  }
+  ctx.fillStyle = mixColor(ink, "#120818", 0.18);
+  ctx.strokeStyle = ink;
+  ctx.lineWidth = 2.4;
+  stampSealPath(s);
+  ctx.fill();
+  ctx.stroke();
+  ctx.strokeStyle = mixColor(ink, accentB, 0.45);
+  ctx.lineWidth = 1.5;
+  ctx.globalAlpha = alpha * 0.88;
+  for (let ring = 0; ring < 3; ring += 1) {
+    const rr = s * (0.28 + ring * 0.2);
+    ctx.beginPath();
+    ctx.arc(0, s * 0.06, rr, Math.PI * 0.2, Math.PI * 0.82);
+    ctx.stroke();
+  }
+  ctx.fillStyle = accent;
+  ctx.globalAlpha = alpha;
+  ctx.beginPath();
+  ctx.arc(0, s * 0.1, s * 0.13, 0, Math.PI * 2);
+  ctx.fill();
+  if (hasMut("fang") && state.combo >= 4) {
+    ctx.strokeStyle = cssVar("--danger", "#ff5d7a");
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = alpha * 0.92;
+    for (let i = 0; i < 6; i += 1) {
+      const a = (i / 6) * Math.PI * 2 + body.wobble * 0.08;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * s * 0.88, Math.sin(a) * s * 0.88);
+      ctx.lineTo(Math.cos(a) * s * 1.18, Math.sin(a) * s * 1.18);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
 function drawSpark(spark) {
-  const pulse = 1 + Math.sin(spark.pulse) * 0.1;
+  const pulse = 1 + Math.sin(spark.pulse) * 0.08;
   const r = spark.r * pulse;
+  const rot = spark.pulse * 0.35 + (spark.comet ? Math.atan2(spark.vy, spark.vx || 0.001) : 0);
   if (spark.comet) {
     const ang = Math.atan2(spark.vy, spark.vx || 0.001);
     ctx.save();
     ctx.translate(spark.x, spark.y);
     ctx.rotate(ang);
-    const trail = ctx.createLinearGradient(-28, 0, 10, 0);
+    const trail = ctx.createLinearGradient(-32, 0, 12, 0);
     trail.addColorStop(0, "transparent");
     trail.addColorStop(0.65, spark.color);
     trail.addColorStop(1, mixColor(spark.color, "#fff4d8", 0.28));
     ctx.fillStyle = trail;
     ctx.globalAlpha = 0.95;
     ctx.beginPath();
-    ctx.moveTo(-28, 0);
-    ctx.lineTo(6, -4.5);
-    ctx.lineTo(6, 4.5);
+    ctx.moveTo(-32, 0);
+    ctx.lineTo(8, -5);
+    ctx.lineTo(8, 5);
     ctx.closePath();
     ctx.fill();
     ctx.restore();
   }
-  ctx.globalAlpha = 1;
-  ctx.fillStyle = spark.color;
-  ctx.beginPath();
-  ctx.arc(spark.x, spark.y, r, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = mixColor(spark.color, "#ffffff", 0.28);
-  ctx.beginPath();
-  ctx.arc(spark.x, spark.y, r * 0.58, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "rgba(255,255,255,0.92)";
-  ctx.beginPath();
-  ctx.arc(spark.x - r * 0.22, spark.y - r * 0.22, Math.max(1.2, r * 0.2), 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = mixColor(spark.color, "#ffffff", 0.18);
-  ctx.lineWidth = 1.6;
-  ctx.globalAlpha = 0.72;
-  ctx.beginPath();
-  ctx.arc(spark.x, spark.y, r * 1.22, 0, Math.PI * 2);
-  ctx.stroke();
+  if (spark.type === "seed") {
+    ctx.save();
+    ctx.translate(spark.x, spark.y);
+    ctx.rotate(rot);
+    ctx.fillStyle = spark.color;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, r * 0.55, r, 0.3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = mixColor(spark.color, "#ffffff", 0.3);
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(0, -r * 1.1);
+    ctx.lineTo(0, r * 0.35);
+    ctx.stroke();
+    ctx.restore();
+  } else {
+    drawLightShard(spark.x, spark.y, r, spark.color, rot);
+  }
   if (spark.type === "rare" || spark.comet || spark.deep) {
     ctx.strokeStyle = spark.deep ? "#90e8ff" : "#ffe070";
-    ctx.lineWidth = 1.5;
-    ctx.globalAlpha = 0.88;
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 0.85;
     ctx.beginPath();
-    ctx.arc(spark.x, spark.y, r * 1.48, 0, Math.PI * 2);
+    ctx.arc(spark.x, spark.y, r * 1.35, 0, Math.PI * 2);
     ctx.stroke();
+    ctx.globalAlpha = 1;
   }
   if (spark.tutorial) {
     const t = (state.time * 1.4) % 1;
     for (let i = 0; i < 2; i += 1) {
       const phase = (t + i * 0.5) % 1;
-      ctx.globalAlpha = (1 - phase) * 0.55;
+      ctx.globalAlpha = (1 - phase) * 0.5;
       ctx.strokeStyle = spark.color;
-      ctx.lineWidth = 1.4;
+      ctx.lineWidth = 1.6;
       ctx.beginPath();
-      ctx.arc(spark.x, spark.y, r * (1.35 + phase * 2.2), 0, Math.PI * 2);
+      ctx.arc(spark.x, spark.y, r * (1.4 + phase * 2), 0, Math.PI * 2);
       ctx.stroke();
     }
     ctx.globalAlpha = 1;
@@ -2682,70 +2800,21 @@ function drawHunter(hunter) {
 }
 
 function drawLifeBody(body, alpha = 1) {
-  const ink = lifeInkColor();
-  const accent = cssVar("--accent-a", "#ff7a45");
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.strokeStyle = ink;
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  const rings = hasMut("fang") ? 5 : 4;
-  for (let i = 0; i < rings; i += 1) {
-    const t = (i + 1) / rings;
-    const wob = Math.sin(body.wobble * 1.1 + i * 0.8) * (1 + i * 0.28);
-    ctx.lineWidth = Math.max(1.5, 3.4 - i * 0.3);
-    ctx.globalAlpha = alpha * (0.58 + t * 0.38);
-    ctx.strokeStyle = i % 2 === 0 ? ink : mixColor(ink, accent, 0.28);
-    ctx.beginPath();
-    ctx.ellipse(
-      body.x + Math.sin(body.wobble * 0.35 + i) * 0.7,
-      body.y + Math.cos(body.wobble * 0.28 + i) * 0.55,
-      body.r * (0.28 + t * 0.72) + wob * 0.14,
-      body.r * (0.34 + t * 0.64) + wob * 0.1,
-      Math.sin(body.wobble * 0.18) * 0.12,
-      0.15 + i * 0.1,
-      Math.PI * 1.86 - i * 0.04
-    );
-    ctx.stroke();
-  }
-  ctx.globalAlpha = alpha * 0.62;
-  ctx.strokeStyle = cssVar("--accent-b", "#5fe8b8");
-  ctx.lineWidth = 1.25;
-  ctx.setLineDash([3, 5]);
-  ctx.beginPath();
-  ctx.ellipse(body.x, body.y, body.r * 0.52, body.r * 0.68, 0.2, 0.2, Math.PI * 1.74);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  if (hasMut("fang") && state.combo >= 4) {
-    ctx.globalAlpha = alpha * 0.9;
-    ctx.strokeStyle = cssVar("--danger", "#ff5d7a");
-    ctx.lineWidth = 1.7;
-    for (let i = 0; i < 6; i += 1) {
-      const a = (i / 6) * Math.PI * 2 + body.wobble * 0.08;
-      const r0 = body.r * 0.92;
-      const r1 = body.r * 1.22;
-      ctx.beginPath();
-      ctx.moveTo(body.x + Math.cos(a) * r0, body.y + Math.sin(a) * r0);
-      ctx.lineTo(body.x + Math.cos(a) * r1, body.y + Math.sin(a) * r1);
-      ctx.stroke();
-    }
-  }
-  ctx.restore();
+  drawStampCreature(body, alpha);
 }
 
 function drawEcho() {
   if (!state.echo) return;
   const fade = clamp(state.echo.life ?? 1, 0, 1);
+  const ink = lifeInkColor();
   ctx.save();
-  ctx.globalAlpha = 0.22 + fade * 0.42;
-  ctx.strokeStyle = "rgba(246,239,230,0.65)";
-  ctx.lineWidth = 1.8;
+  ctx.translate(state.echo.x, state.echo.y);
+  ctx.rotate(state.echo.aim ?? -Math.PI / 2);
+  ctx.globalAlpha = 0.14 + fade * 0.34;
+  ctx.strokeStyle = mixColor(ink, cssVar("--foam", "#fffdf8"), 0.35);
+  ctx.lineWidth = 2;
   ctx.setLineDash([5, 6]);
-  ctx.beginPath();
-  ctx.ellipse(state.echo.x, state.echo.y, state.echo.r * 0.82, state.echo.r, 0.2, 0.15, Math.PI * 1.88);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.ellipse(state.echo.x, state.echo.y, state.echo.r * 0.52, state.echo.r * 0.68, 0.18, 0.4, Math.PI * 1.76);
+  stampSealPath(state.echo.r);
   ctx.stroke();
   ctx.setLineDash([]);
   ctx.restore();
