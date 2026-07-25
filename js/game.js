@@ -580,7 +580,8 @@ function addScore(amount, x, y, opts = {}) {
     if (state.combo >= 2) showCombo(`цепь ×${state.combo}`);
     if (hasMut("bloom") && state.combo > 0 && state.combo % 6 === 0 && state.life) {
       state.bloomPulse = 1;
-      for (let i = 0; i < 6; i += 1) spawnSpark({ near: state.life, type: Math.random() < 0.12 ? "rare" : null });
+      // Spawn at edges — never on top of the player (prevents AFK magnet farm)
+      for (let i = 0; i < 4; i += 1) spawnSpark({ edge: true, type: Math.random() < 0.12 ? "rare" : null });
       showToast("цветение");
       tone(560, 0.08, "triangle", 0.03);
       tone(860, 0.12, "sine", 0.026, 0.08);
@@ -756,9 +757,22 @@ function spawnSpark(opts = {}) {
   let y = rand(margin + 28, state.height - margin);
   if (opts.near) {
     const a = Math.random() * Math.PI * 2;
-    const d = rand(26, 80);
+    const d = rand(90, 160);
     x = clamp(opts.near.x + Math.cos(a) * d, margin, state.width - margin);
     y = clamp(opts.near.y + Math.sin(a) * d, margin, state.height - margin);
+  }
+  if (opts.edge) {
+    const side = Math.floor(Math.random() * 4);
+    if (side === 0) { x = rand(margin, state.width - margin); y = margin + 10; }
+    else if (side === 1) { x = state.width - margin - 10; y = rand(margin, state.height - margin); }
+    else if (side === 2) { x = rand(margin, state.width - margin); y = state.height - margin - 10; }
+    else { x = margin + 10; y = rand(margin, state.height - margin); }
+  }
+  // Never spawn inside the player's eat radius
+  if (state.life && dist(x, y, state.life.x, state.life.y) < state.life.r + 48) {
+    const a = Math.atan2(y - state.life.y, x - state.life.x) || rand(0, Math.PI * 2);
+    x = clamp(state.life.x + Math.cos(a) * 120, margin, state.width - margin);
+    y = clamp(state.life.y + Math.sin(a) * 120, margin, state.height - margin);
   }
   state.sparks.push({
     x,
@@ -767,6 +781,7 @@ function spawnSpark(opts = {}) {
     vy: rand(-0.55, 0.55),
     pulse: Math.random() * Math.PI * 2,
     tutorial: !!opts.tutorial,
+    grace: 0.35,
     ...profile,
   });
 }
@@ -1011,21 +1026,24 @@ function updateSparkMotion(spark, dt) {
 }
 
 function updateSparks(dt) {
-  const veinPull = hasMut("veins") ? 0.12 : 0;
-  const magnetPull = hasMut("magnet") ? 0.16 : 0;
+  const moveFactor = state.life ? clamp((state.life.speed || 0) / 14, 0, 1) : 0;
+  // Magnet/veins only help while moving — standing still can't vacuum the map
+  const veinPull = hasMut("veins") ? 0.12 * moveFactor : 0;
+  const magnetPull = hasMut("magnet") ? 0.14 * moveFactor : 0;
   for (let i = state.sparks.length - 1; i >= 0; i -= 1) {
     const spark = state.sparks[i];
+    spark.grace = Math.max(0, (spark.grace || 0) - dt);
     if (state.life && magnetPull > 0) {
       const d = dist(spark.x, spark.y, state.life.x, state.life.y);
-      if (d < 240) {
-        const force = (1 - d / 240) * magnetPull;
+      if (d < 200) {
+        const force = (1 - d / 200) * magnetPull;
         spark.vx += ((state.life.x - spark.x) / (d || 1)) * force;
         spark.vy += ((state.life.y - spark.y) / (d || 1)) * force;
       }
     }
     if (veinPull > 0 && state.veins.length) {
       let target = null;
-      let bestD = 150;
+      let bestD = 130;
       for (const vein of state.veins) {
         const d = dist(spark.x, spark.y, vein.x, vein.y);
         if (d < bestD) {
@@ -1034,13 +1052,17 @@ function updateSparks(dt) {
         }
       }
       if (target) {
-        const force = (1 - bestD / 150) * veinPull;
+        const force = (1 - bestD / 130) * veinPull;
         spark.vx += ((target.x - spark.x) / (bestD || 1)) * force;
         spark.vy += ((target.y - spark.y) / (bestD || 1)) * force;
       }
     }
     updateSparkMotion(spark, dt);
-    if (state.life && dist(spark.x, spark.y, state.life.x, state.life.y) < state.life.r * 0.76 + spark.r) {
+    if (
+      state.life &&
+      spark.grace <= 0 &&
+      dist(spark.x, spark.y, state.life.x, state.life.y) < state.life.r * 0.72 + spark.r
+    ) {
       eatSpark(i, spark);
     }
   }
@@ -1050,7 +1072,10 @@ function eatSpark(index, spark) {
   state.sparks.splice(index, 1);
   state.stats.sparkEats += 1;
   if (spark.type === "rare") state.stats.rareEats += 1;
-  state.hunger = clamp(state.hunger + spark.restore, 0, 100);
+  const moveFactor = state.life ? clamp((state.life.speed || 0) / 12, 0.2, 1) : 0.2;
+  // AFK / standing eats barely refill hunger — must hunt light
+  const restore = spark.restore * (0.35 + 0.65 * moveFactor);
+  state.hunger = clamp(state.hunger + restore, 0, 100);
   updateHungerUi();
   if (spark.type === "bait") {
     showToast("приманка");
@@ -1167,6 +1192,12 @@ function updateRun(dt) {
   state.comboClock = Math.max(0, state.comboClock - dt);
   if (state.comboClock <= 0 && state.combo !== 0) state.combo = 0;
   if (state.life) {
+    const prevX = state.life.px ?? state.life.x;
+    const prevY = state.life.py ?? state.life.y;
+    const moved = dist(state.life.x, state.life.y, prevX, prevY);
+    state.life.speed = (state.life.speed || 0) * 0.78 + moved * 0.22;
+    state.life.px = state.life.x;
+    state.life.py = state.life.y;
     state.life.wobble += dt * 7.2;
     state.life.r = 22 + Math.min(9, state.combo * 0.75) + Math.sin(state.life.wobble) * 1.25;
     state.life.teeth = hasMut("fang") && state.combo >= 4 ? Math.min(1, state.life.teeth + dt * 3) : Math.max(0, state.life.teeth - dt * 3);
@@ -1174,14 +1205,16 @@ function updateRun(dt) {
     updateHum();
   }
   state.guideSpark = state.life ? nearestSpark(state.life.x, state.life.y) : null;
-  state.hunger -= HUNGER_DRAIN_PER_SEC * dt * (hasMut("cool") ? 0.6 : 1);
+  // Standing still drains hunger faster — no AFK farming
+  const stillPenalty = state.life && (state.life.speed || 0) < 6 ? 1.55 : 1;
+  state.hunger -= HUNGER_DRAIN_PER_SEC * dt * (hasMut("cool") ? 0.7 : 1) * stillPenalty;
   state.hunger = Math.max(0, state.hunger);
   updateHungerUi();
   updateAsh(dt);
-  const targetSparkCount = 12 + Math.min(8, Math.floor(state.score / 10));
-  while (state.spawnAcc >= 0.42) {
-    state.spawnAcc -= 0.42;
-    if (state.sparks.length < targetSparkCount) spawnSpark();
+  const targetSparkCount = 8 + Math.min(4, Math.floor(state.score / 80));
+  while (state.spawnAcc >= 0.55) {
+    state.spawnAcc -= 0.55;
+    if (state.sparks.length < targetSparkCount) spawnSpark({ edge: Math.random() < 0.55 });
   }
   updateSparks(dt);
   tryCompleteByHunger();
