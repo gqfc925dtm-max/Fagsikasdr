@@ -2598,77 +2598,95 @@ function drawLightShard(x, y, r, color, rot, alpha = 1) {
   ctx.restore();
 }
 
-function stampSealPath(s) {
+function inkPolypBodyPath(s) {
   ctx.beginPath();
-  for (let i = 0; i < 8; i += 1) {
-    const a = (i / 8) * Math.PI * 2 - Math.PI / 8;
-    const rr = s * (i % 2 === 0 ? 1 : 0.84);
-    const px = Math.cos(a) * rr;
-    const py = Math.sin(a) * rr * 0.9;
-    if (i === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
-  }
+  ctx.moveTo(s * 1.05, 0);
+  ctx.bezierCurveTo(s * 0.55, -s * 0.72, -s * 0.35, -s * 0.68, -s * 0.55, -s * 0.15);
+  ctx.bezierCurveTo(-s * 0.62, s * 0.35, -s * 0.2, s * 0.78, s * 0.15, s * 0.62);
+  ctx.bezierCurveTo(s * 0.65, s * 0.45, s * 1.0, s * 0.25, s * 1.05, 0);
   ctx.closePath();
 }
 
-function drawStampCreature(body, alpha = 1) {
+function drawInkPolyp(body, alpha = 1) {
   const ink = lifeInkColor();
   const accent = cssVar("--accent-a", "#ff9a62");
   const accentB = cssVar("--accent-b", "#7affd4");
   const aim = body.aim ?? -Math.PI / 2;
   const s = body.r;
+  const wob = body.wobble;
   ctx.save();
   ctx.translate(body.x, body.y);
-  ctx.rotate(aim + Math.sin(body.wobble) * 0.07);
-  if ((body.speed || 0) > 5) {
-    ctx.globalAlpha = alpha * 0.38;
-    ctx.fillStyle = mixColor(ink, accentB, 0.3);
+  ctx.rotate(aim);
+  const tentacles = 5;
+  ctx.lineCap = "round";
+  for (let i = 0; i < tentacles; i += 1) {
+    const spread = (i - (tentacles - 1) / 2) * 0.38;
+    const len = s * (1.05 + Math.sin(wob * 1.3 + i) * 0.18);
+    ctx.globalAlpha = alpha * (0.5 + i * 0.07);
+    ctx.strokeStyle = mixColor(ink, accentB, 0.22 + i * 0.06);
+    ctx.lineWidth = Math.max(2.2, s * 0.12 - i * 0.012);
     ctx.beginPath();
-    ctx.moveTo(-s * 0.25, 0);
-    ctx.quadraticCurveTo(-s * 1.7, Math.sin(body.wobble) * s * 0.45, -s * 2.2, 0);
-    ctx.quadraticCurveTo(-s * 1.7, -Math.sin(body.wobble) * s * 0.45, -s * 0.25, 0);
-    ctx.fill();
-  }
-  ctx.globalAlpha = alpha;
-  ctx.fillStyle = mixColor(ink, accent, 0.32);
-  if (typeof ctx.roundRect === "function") {
-    ctx.beginPath();
-    ctx.roundRect(-s * 0.24, -s * 1.38, s * 0.48, s * 0.58, s * 0.1);
-    ctx.fill();
-  } else {
-    ctx.fillRect(-s * 0.24, -s * 1.38, s * 0.48, s * 0.58);
-  }
-  ctx.fillStyle = mixColor(ink, "#120818", 0.18);
-  ctx.strokeStyle = ink;
-  ctx.lineWidth = 2.4;
-  stampSealPath(s);
-  ctx.fill();
-  ctx.stroke();
-  ctx.strokeStyle = mixColor(ink, accentB, 0.45);
-  ctx.lineWidth = 1.5;
-  ctx.globalAlpha = alpha * 0.88;
-  for (let ring = 0; ring < 3; ring += 1) {
-    const rr = s * (0.28 + ring * 0.2);
-    ctx.beginPath();
-    ctx.arc(0, s * 0.06, rr, Math.PI * 0.2, Math.PI * 0.82);
+    ctx.moveTo(-s * 0.12, spread * s * 0.5);
+    ctx.quadraticCurveTo(
+      -s * 0.85 - Math.sin(wob + i) * s * 0.14,
+      spread * s * 1.05 + Math.cos(wob * 0.8 + i) * s * 0.22,
+      -len,
+      spread * s * 0.8 + Math.sin(wob * 1.1 + i * 0.7) * s * 0.38
+    );
     ctx.stroke();
   }
-  ctx.fillStyle = accent;
+  if ((body.speed || 0) > 5) {
+    ctx.globalAlpha = alpha * 0.32;
+    ctx.fillStyle = mixColor(ink, accentB, 0.38);
+    ctx.beginPath();
+    ctx.ellipse(-s * 1.05, 0, s * 0.5, s * 0.32, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
   ctx.globalAlpha = alpha;
-  ctx.beginPath();
-  ctx.arc(0, s * 0.1, s * 0.13, 0, Math.PI * 2);
+  ctx.fillStyle = mixColor(ink, "#140818", 0.12);
+  ctx.strokeStyle = ink;
+  ctx.lineWidth = 2.8;
+  inkPolypBodyPath(s);
   ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = mixColor(accent, accentB, 0.42 + Math.sin(wob * 2.1) * 0.12);
+  ctx.globalAlpha = alpha * 0.78;
+  ctx.beginPath();
+  ctx.ellipse(s * 0.12, s * 0.06, s * 0.36, s * 0.26, 0.12, 0, Math.PI * 2);
+  ctx.fill();
+  const eyeX = s * 0.4;
+  const blink = Math.sin(wob * 0.35) > 0.94 ? 0.22 : 1;
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = "#fffdf8";
+  ctx.beginPath();
+  ctx.ellipse(eyeX, -s * 0.06, s * 0.21, s * 0.26 * blink, -0.12, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#1a1020";
+  ctx.beginPath();
+  ctx.arc(eyeX + s * 0.05, -s * 0.04, s * 0.1 * blink, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.arc(eyeX + s * 0.09, -s * 0.09, s * 0.038, 0, Math.PI * 2);
+  ctx.fill();
+  if (state.fever) {
+    ctx.strokeStyle = cssVar("--ember", "#ff9a62");
+    ctx.lineWidth = 1.8;
+    ctx.globalAlpha = alpha * (0.45 + Math.sin(state.time * 9) * 0.2);
+    inkPolypBodyPath(s * 1.08);
+    ctx.stroke();
+  }
   if (hasMut("fang") && state.combo >= 4) {
     ctx.strokeStyle = cssVar("--danger", "#ff5d7a");
-    ctx.lineWidth = 2;
-    ctx.globalAlpha = alpha * 0.92;
-    for (let i = 0; i < 6; i += 1) {
-      const a = (i / 6) * Math.PI * 2 + body.wobble * 0.08;
-      ctx.beginPath();
-      ctx.moveTo(Math.cos(a) * s * 0.88, Math.sin(a) * s * 0.88);
-      ctx.lineTo(Math.cos(a) * s * 1.18, Math.sin(a) * s * 1.18);
-      ctx.stroke();
-    }
+    ctx.lineWidth = 2.4;
+    ctx.lineCap = "round";
+    ctx.globalAlpha = alpha * 0.95;
+    ctx.beginPath();
+    ctx.moveTo(s * 1.05, 0);
+    ctx.lineTo(s * 1.42, -s * 0.14);
+    ctx.moveTo(s * 1.05, 0);
+    ctx.lineTo(s * 1.42, s * 0.14);
+    ctx.stroke();
   }
   ctx.restore();
 }
@@ -2798,22 +2816,31 @@ function drawHunter(hunter) {
 }
 
 function drawLifeBody(body, alpha = 1) {
-  drawStampCreature(body, alpha);
+  drawInkPolyp(body, alpha);
 }
 
 function drawEcho() {
   if (!state.echo) return;
   const fade = clamp(state.echo.life ?? 1, 0, 1);
   const ink = lifeInkColor();
+  const s = state.echo.r;
+  const aim = state.echo.aim ?? -Math.PI / 2;
   ctx.save();
   ctx.translate(state.echo.x, state.echo.y);
-  ctx.rotate(state.echo.aim ?? -Math.PI / 2);
-  ctx.globalAlpha = 0.14 + fade * 0.34;
-  ctx.strokeStyle = mixColor(ink, cssVar("--foam", "#fffdf8"), 0.35);
-  ctx.lineWidth = 2;
-  ctx.setLineDash([5, 6]);
-  stampSealPath(state.echo.r);
+  ctx.rotate(aim);
+  ctx.globalAlpha = 0.1 + fade * 0.3;
+  ctx.strokeStyle = mixColor(ink, cssVar("--foam", "#fffdf8"), 0.45);
+  ctx.lineWidth = 2.2;
+  ctx.setLineDash([5, 7]);
+  inkPolypBodyPath(s);
   ctx.stroke();
+  for (let i = 0; i < 3; i += 1) {
+    const spread = (i - 1) * 0.42;
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.1, spread * s * 0.45);
+    ctx.quadraticCurveTo(-s * 0.75, spread * s * 0.9, -s * 0.95, spread * s * 0.7);
+    ctx.stroke();
+  }
   ctx.setLineDash([]);
   ctx.restore();
 }
