@@ -3219,12 +3219,24 @@ function drawSpark(spark) {
   }
   if (spark.type === "super") {
     const t = (state.time * 1.8) % 1;
-    ctx.globalAlpha = (1 - t) * 0.55;
+    ctx.globalAlpha = (1 - t) * 0.65;
     ctx.strokeStyle = "#ffe898";
-    ctx.lineWidth = 2.2;
+    ctx.lineWidth = 2.6;
     ctx.beginPath();
-    ctx.arc(spark.x, spark.y, r * (1.5 + t * 1.4), 0, Math.PI * 2);
+    ctx.arc(spark.x, spark.y, r * (1.55 + t * 1.5), 0, Math.PI * 2);
     ctx.stroke();
+    ctx.globalAlpha = 0.9;
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(spark.x, spark.y, r * 1.28, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 0.95;
+    ctx.fillStyle = "#ffe898";
+    ctx.font = "800 13px Syne, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "bottom";
+    ctx.fillText("СУПЕР", spark.x, spark.y - r * 1.7);
     ctx.globalAlpha = 1;
   } else if (spark.type === "rare" || spark.comet || spark.deep) {
     ctx.strokeStyle = spark.deep ? "#90e8ff" : "#ffe070";
@@ -3753,7 +3765,7 @@ function boot() {
   const nativeShell = !!window.OttiskNative?.isNative;
   if ("serviceWorker" in navigator && !nativeShell) {
     navigator.serviceWorker
-      .register("./sw.js?v=33")
+      .register("./sw.js?v=34")
       .then((reg) => reg.update())
       .catch(() => {});
   }
