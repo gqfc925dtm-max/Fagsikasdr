@@ -66,29 +66,55 @@ body {
 
 .hud {
   position: absolute;
-  top: calc(12px + var(--safe-top));
-  left: 0;
-  right: 0;
+  inset: 0;
   z-index: 5;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
   pointer-events: none;
-  padding: 0 20px;
 }
 
-.hud-top {
+.hud-float {
+  position: absolute;
+  top: calc(18px + var(--safe-top));
+  left: 16px;
+  right: 16px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
 }
 
+.hud-dock {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: calc(14px + var(--safe-bottom));
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(18, 13, 20, 0.2), rgba(18, 13, 20, 0.72));
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(10px);
+}
+
+.hud-dock-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.hud-dock-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .hud-label,
 .heat-label {
   display: block;
-  text-align: center;
   font-size: 10px;
   letter-spacing: 0.28em;
   text-transform: uppercase;
@@ -96,11 +122,14 @@ body {
   font-weight: 700;
 }
 
+.hud-score .hud-label {
+  text-align: left;
+}
+
 #score {
   display: block;
-  text-align: center;
   font-family: "Syne", sans-serif;
-  font-size: clamp(44px, 13vw, 72px);
+  font-size: clamp(34px, 10vw, 48px);
   font-weight: 800;
   letter-spacing: -0.045em;
   line-height: 0.92;
@@ -115,27 +144,32 @@ body {
 
 .mut-badge {
   font-family: "Syne", sans-serif;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #1a1014;
   background: linear-gradient(120deg, var(--life), var(--gold));
-  padding: 6px 12px;
+  padding: 5px 10px;
   border-radius: 999px;
   box-shadow: 0 8px 24px rgba(109, 255, 194, 0.18);
   opacity: 0.95;
+  flex-shrink: 0;
 }
 
 .heat-wrap {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   gap: 4px;
 }
 
+.heat-wrap .heat-label {
+  text-align: left;
+}
+
 .heat {
-  width: min(46vw, 200px);
+  width: 100%;
   height: 7px;
   border-radius: 999px;
   background: rgba(246, 239, 230, 0.1);
@@ -328,7 +362,7 @@ body {
 }
 
 .mut-track {
-  width: min(46vw, 200px);
+  width: 100%;
   height: 3px;
   border-radius: 999px;
   background: rgba(246, 239, 230, 0.08);
@@ -343,11 +377,15 @@ body {
 
 .next-mut {
   min-height: 14px;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: rgba(203, 183, 163, 0.85);
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .coach {

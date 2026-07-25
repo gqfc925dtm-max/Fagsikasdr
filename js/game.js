@@ -356,7 +356,7 @@ function beginLife(x, y) {
   state.lastX = x;
   state.lastY = y;
   state.stillTimer = 0;
-  state.heat = Math.max(0, state.heat - (hasMut("cool") ? 0.28 : 0.16));
+  state.heat = Math.max(0, state.heat - (hasMut("cool") ? 0.12 : 0.05));
   burst(x, y, "#6dffc2", 14, 3.5);
   if (state.running) {
     tone(540, 0.06, "triangle", 0.032);
@@ -469,7 +469,7 @@ function onPointerDown(e) {
   const wasEmpty = !state.life;
   beginLife(e.clientX, e.clientY);
   if (wasEmpty && state.relocateCool > 0) {
-    state.heat = Math.max(0, state.heat - 0.2);
+    state.heat = Math.max(0, state.heat - 0.08);
     state.safeUntil = Math.max(state.safeUntil, 0.45);
     floatText(e.clientX, e.clientY - 24, "перенос", "#6dffc2");
     burst(e.clientX, e.clientY, "#6dffc2", 12, 3);
@@ -613,14 +613,15 @@ function update(dt) {
 
   if (state.life) {
     const moved = dist(state.life.x, state.life.y, state.lastX, state.lastY);
-    const coolFactor = hasMut("cool") ? 0.62 : 1;
-    if (moved < 2.4) {
+    // Standing still builds heat quickly; slow drift only cools gently
+    const coolFactor = hasMut("cool") ? 0.72 : 1;
+    if (moved < 3.2) {
       state.stillTimer += dt;
-      const heatRate = (0.15 + state.stillTimer * 0.13) * (0.85 + diff * 0.08) * coolFactor;
+      const heatRate = (0.55 + state.stillTimer * 0.55) * (0.95 + diff * 0.05) * coolFactor;
       state.heat = Math.min(1, state.heat + heatRate * dt);
     } else {
       state.stillTimer = 0;
-      state.heat = Math.max(0, state.heat - (0.62 + (hasMut("cool") ? 0.2 : 0)) * dt);
+      state.heat = Math.max(0, state.heat - (0.16 + (hasMut("cool") ? 0.08 : 0)) * dt);
       if (Math.random() < 0.4) {
         state.burns.push({
           x: state.life.x,
@@ -657,7 +658,7 @@ function update(dt) {
       return;
     }
   } else {
-    state.heat = Math.max(0, state.heat - 0.28 * dt);
+    state.heat = Math.max(0, state.heat - 0.12 * dt);
   }
 
   heatFill.style.width = `${Math.round(state.heat * 100)}%`;
@@ -710,8 +711,8 @@ function update(dt) {
 
     if (state.life && dist(s.x, s.y, state.life.x, state.life.y) < state.life.r + s.r * 0.15) {
       state.sparks.splice(i, 1);
-      if (s.type === "cool") state.heat = Math.max(0, state.heat - 0.22);
-      else state.heat = Math.max(0, state.heat - 0.05);
+      if (s.type === "cool") state.heat = Math.max(0, state.heat - 0.18);
+      else state.heat = Math.max(0, state.heat - 0.015);
       if (s.type === "bait") {
         spawnHunter();
         showToast("приманка!");
@@ -1048,7 +1049,7 @@ function draw() {
     ctx.fillStyle = "#cbb7a3";
     ctx.font = "700 12px Sora, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText(`тихо ещё ${state.grace.toFixed(1)}с`, state.width / 2, state.height - 28);
+    ctx.fillText(`тихо ещё ${state.grace.toFixed(1)}с`, state.width / 2, state.height * 0.14);
     ctx.restore();
   }
 

@@ -23,24 +23,31 @@
     <canvas id="game" aria-label="Игровое поле ОТТИСК"></canvas>
 
     <div id="hud" class="hud hidden">
-      <div class="hud-top">
+      <div class="hud-float">
+        <div id="combo" class="combo"></div>
+        <div id="toast" class="toast"></div>
+        <div id="coach" class="coach"></div>
+      </div>
+
+      <div class="hud-dock">
         <div class="hud-score">
           <span class="hud-label">след</span>
           <span id="score">0</span>
         </div>
-        <div id="mut-badge" class="mut-badge">искра</div>
+        <div class="hud-dock-main">
+          <div class="hud-dock-row">
+            <div id="mut-badge" class="mut-badge">искра</div>
+            <div id="next-mut" class="next-mut"></div>
+          </div>
+          <div class="heat-wrap">
+            <span class="heat-label">жар</span>
+            <div id="heat" class="heat"><i id="heat-fill"></i></div>
+          </div>
+          <div class="mut-track">
+            <div id="mut-track-fill" class="mut-track-fill"></div>
+          </div>
+        </div>
       </div>
-      <div class="heat-wrap">
-        <span class="heat-label">жар</span>
-        <div id="heat" class="heat"><i id="heat-fill"></i></div>
-      </div>
-      <div class="mut-track">
-        <div id="mut-track-fill" class="mut-track-fill"></div>
-      </div>
-      <div id="next-mut" class="next-mut"></div>
-      <div id="combo" class="combo"></div>
-      <div id="toast" class="toast"></div>
-      <div id="coach" class="coach"></div>
     </div>
 
     <div id="screen-start" class="screen">
