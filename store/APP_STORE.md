@@ -1,82 +1,87 @@
 # ОТТИСК → App Store
 
+## Если у тебя Windows
+
+Читай сначала: **[WINDOWS.md](./WINDOWS.md)**
+
+На Windows нет Xcode. Собираем iOS через облачный Mac (Codemagic) или чужой/арендованный Mac.
+
 ## Что уже готово в репозитории
 
-- Capacitor-конфиг (`capacitor.config.json`)
-- Сборка веб-ассетов в `www/` (`npm run build:www`)
+- Capacitor + папка `ios/`
+- `codemagic.yaml` для облачной сборки
 - Честный continue без фейковой рекламы
-- `privacy.html` и `support.html` для App Store Connect
+- `privacy.html` и `support.html`
 - Метаданные: `store/metadata.ru.txt`
 
-## Что нужно у тебя на Mac
+## Обязательно у любого разработчика
 
-1. [Apple Developer Program](https://developer.apple.com/programs/) ($99/год)
-2. Xcode (последний стабильный)
-3. CocoaPods или встроенный SPM от Capacitor 7
+1. [Apple Developer Program](https://developer.apple.com/programs/) — $99/год  
+2. Приложение в App Store Connect  
+3. Bundle ID: `com.amelin.ottisk`
 
-## Сборка iOS-проекта
+## Путь A — Windows + Codemagic (рекомендуется)
+
+1. Зайди на [codemagic.io](https://codemagic.io) через GitHub  
+2. Подключи `Fagsikasdr`  
+3. Настрой code signing и App Store Connect API key  
+4. Запусти workflow **ios-app-store**  
+5. Проверь TestFlight на iPhone  
+
+Подробности: [WINDOWS.md](./WINDOWS.md)
+
+## Путь B — есть Mac
 
 ```bash
-cd Fagsikasdr
 npm install
 npm run build:www
-npx cap add ios          # один раз
 npx cap sync ios
 npx cap open ios
 ```
 
-В Xcode:
-
-1. Signing & Capabilities → твоя Team
-2. Bundle ID: `com.amelin.ottisk` (или свой уникальный)
-3. Deployment target: iOS 15+
-4. Добавь иконку 1024×1024 в `Assets.xcassets/AppIcon`
-5. Product → Archive → Distribute App → App Store Connect
+В Xcode: Signing → Archive → Distribute → App Store Connect.
 
 ## App Store Connect
 
 Обязательные ссылки:
 
-- Privacy Policy URL: `https://gqfc925dtm-max.github.io/Fagsikasdr/privacy.html`
+- Privacy Policy: `https://gqfc925dtm-max.github.io/Fagsikasdr/privacy.html`
 - Support URL: `https://gqfc925dtm-max.github.io/Fagsikasdr/support.html`
 
 Заполни:
 
 - Название: ОТТИСК
 - Подзаголовок: Живёт только под пальцем
-- Категория: Games → Casual / Action
+- Категория: Games → Casual
 - Возраст: 4+
 - Скриншоты iPhone 6.7" и 6.1"
 - App Privacy: Data Not Collected (пока нет аналитики/рекламы)
 
-## Монетизация сейчас
+Текст для карточки: `store/metadata.ru.txt`
+
+## Монетизация
 
 - 1 бесплатный continue за забег
-- Дополнительный continue за следы (внутриигровая валюта)
+- Доп. continue за следы
 - Косметика за следы / рекорд
-- Кнопка `+60 следов` уже зовёт `OttiskNative.purchase('ottisk_marks_60')`
+- Кнопка `+60 следов` → `OttiskNative.purchase('ottisk_marks_60')`
 
-### Подключить StoreKit
+### StoreKit позже
 
-1. App Store Connect → In-App Purchase → Consumable  
-   Product ID: `ottisk_marks_60`
-2. В Xcode добавь StoreKit / RevenueCat / `@capgo/native-purchases`
-3. Проброс в `window.Capacitor.Plugins.OttiskIAP.purchase({ productId })`
-4. После успешной оплаты игра сама начислит 60 следов
-
-Оценка: кнопка «Оценить» после сильных забегов → `requestReview()`.
+1. App Store Connect → Consumable `ottisk_marks_60`
+2. Подключи плагин покупок в iOS-оболочке
+3. Проброс в `Capacitor.Plugins.OttiskIAP`
 
 ## TestFlight
 
-1. Archive → Upload
-2. Добавь себя и 5–20 тестеров
-3. Проверь: первый запуск, фон/пауза, continue, shop, share
+1. Залей билд (Codemagic или Xcode)
+2. Добавь себя тестером
+3. Проверь: старт, пауза, continue, shop, share
 4. Submit for Review
 
-## Частые причины отказа
+## Частые отказы
 
 - Фейковая реклама / фейковые IAP
 - Битые Privacy/Support URL
 - Крэш на запуске
-- «Минимальная функциональность» — у ОТТИСК полноценный геймплей, это ок
 - Неверные App Privacy labels
