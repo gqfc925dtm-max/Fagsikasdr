@@ -60,6 +60,18 @@ function blockPalette(index) {
   return { top, front, side, edge };
 }
 
+function playFocusY() {
+  // Keep the moving block in the middle band, below the HUD
+  return state.height * 0.46;
+}
+
+function syncCamera(instant = false) {
+  const focus = state.current || state.blocks[state.blocks.length - 1];
+  if (!focus) return;
+  state.targetCameraY = focus.y - playFocusY();
+  if (instant) state.cameraY = state.targetCameraY;
+}
+
 function createBaseBlock() {
   const w = Math.min(state.width * 0.58, 240);
   const h = Math.max(22, Math.min(28, state.width * 0.055));
@@ -89,6 +101,7 @@ function spawnCurrent() {
     maxX: prev.x + travel,
   };
   state.speed = Math.min(4.2 + state.score * 0.085, 11.5);
+  syncCamera();
 }
 
 function resetGame() {
@@ -103,6 +116,7 @@ function resetGame() {
   state.cameraY = 0;
   state.targetCameraY = 0;
   spawnCurrent();
+  syncCamera(true);
   scoreEl.textContent = "0";
   comboEl.className = "combo";
   comboEl.textContent = "";
@@ -186,7 +200,7 @@ function placeBlock() {
     placedW = prev.w;
     placedX = prev.x;
     state.combo += 1;
-    state.score += 1 + Math.min(state.combo, 8);
+    state.score += 1;
     state.flash = 0.55;
     state.shake = 5;
     showCombo(state.combo >= 3 ? `идеально ×${state.combo}` : "идеально", true);
@@ -224,7 +238,7 @@ function placeBlock() {
 
   state.current = null;
   state.direction *= -1;
-  state.targetCameraY = state.score * (prev.h * 0.92);
+  syncCamera();
   scoreEl.textContent = String(state.score);
 
   if (state.score > state.best) {
@@ -288,9 +302,8 @@ function updateDemo(dt) {
   if (!state.current) {
     if (state.blocks.length > 8) {
       state.blocks = [createBaseBlock()];
-      state.cameraY = 0;
-      state.targetCameraY = 0;
       state.hueBase = 160 + Math.random() * 40;
+      syncCamera(true);
     }
     state.direction = Math.random() > 0.5 ? 1 : -1;
     spawnCurrent();
@@ -328,7 +341,7 @@ function updateDemo(dt) {
     palette: cur.palette,
   });
   state.current = null;
-  state.targetCameraY = (state.blocks.length - 1) * (prev.h * 0.9);
+  syncCamera();
 }
 
 function update(dt) {
@@ -345,7 +358,7 @@ function update(dt) {
     updateDemo(dt);
   }
 
-  state.cameraY += (state.targetCameraY - state.cameraY) * Math.min(1, dt * 8);
+  state.cameraY += (state.targetCameraY - state.cameraY) * Math.min(1, dt * 12);
   state.shake *= Math.pow(0.88, dt * 60);
   state.flash = Math.max(0, state.flash - dt * 1.8);
 
