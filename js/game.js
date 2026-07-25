@@ -65,13 +65,29 @@ function loadImage(entry) {
   });
 }
 
+function prepareOceanBlur() {
+  if (!PHOTOS.ocean.ready || PHOTOS.ocean.blur) return;
+  const src = PHOTOS.ocean.img;
+  const c = document.createElement("canvas");
+  const scale = 0.42;
+  c.width = Math.max(4, Math.floor(src.naturalWidth * scale));
+  c.height = Math.max(4, Math.floor(src.naturalHeight * scale));
+  const bx = c.getContext("2d");
+  bx.filter = "blur(7px)";
+  bx.drawImage(src, 0, 0, c.width, c.height);
+  bx.filter = "none";
+  PHOTOS.ocean.blur = c;
+}
+
 function loadPhotos() {
-  return Promise.all([loadImage(PHOTOS.ocean), loadImage(PHOTOS.fish)]);
+  return Promise.all([loadImage(PHOTOS.ocean), loadImage(PHOTOS.fish)]).then(() => {
+    prepareOceanBlur();
+  });
 }
 
 function drawImageCover(img, x, y, w, h) {
-  const iw = img.naturalWidth;
-  const ih = img.naturalHeight;
+  const iw = img.naturalWidth || img.width;
+  const ih = img.naturalHeight || img.height;
   if (!iw || !ih) return;
   const scale = Math.max(w / iw, h / ih);
   const sw = w / scale;
@@ -80,6 +96,22 @@ function drawImageCover(img, x, y, w, h) {
   const sy = (ih - sh) * 0.5;
   ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
 }
+
+const BLAST_STYLES = [
+  "spray",
+  "ring",
+  "nova",
+  "shards",
+  "spiral",
+  "cross",
+  "rain",
+  "bloom",
+  "scatter",
+  "pulse",
+  "streaks",
+  "firework",
+];
+let lastBlastStyle = -1;
 
 const MUTATIONS = [
   { id: "spark", at: 0, name: "искра" },
@@ -479,7 +511,11 @@ function mutationDing() {
 }
 
 function playSparkTone(type) {
-  if (type === "rare") {
+  if (type === "super") {
+    tone(520, 0.08, "triangle", 0.036);
+    tone(780, 0.1, "sine", 0.03, 0.05);
+    tone(1180, 0.14, "triangle", 0.028, 0.1);
+  } else if (type === "rare") {
     tone(980, 0.11, "triangle", 0.04);
   } else if (type === "cool") {
     tone(420, 0.1, "sine", 0.026);
@@ -770,12 +806,29 @@ function floatText(x, y, text, color = "#f2c15a", size = 16) {
   state.floaters.push({ x, y, text, color, size, life: 1, vy: -0.45 });
 }
 
+function pushParticle(p) {
+  state.particles.push({
+    x: p.x,
+    y: p.y,
+    vx: p.vx || 0,
+    vy: p.vy || 0,
+    life: p.life ?? 1,
+    decay: p.decay ?? rand(0.012, 0.028),
+    size: p.size ?? rand(1.4, 3.8),
+    color: p.color,
+    kind: p.kind || "dot",
+    rot: p.rot || 0,
+    spin: p.spin || 0,
+    grav: p.grav ?? 0.03,
+  });
+}
+
 function burst(x, y, color, count = 12, speed = 3.5) {
   const accent = cssVar("--accent-b", cssVar("--gold", "#ffd27a"));
   for (let i = 0; i < count; i += 1) {
     const a = Math.random() * Math.PI * 2;
     const s = rand(0.7, speed);
-    state.particles.push({
+    pushParticle({
       x,
       y,
       vx: Math.cos(a) * s,
@@ -784,7 +837,168 @@ function burst(x, y, color, count = 12, speed = 3.5) {
       decay: rand(0.012, 0.028),
       size: rand(1.4, 3.8),
       color: Math.random() < 0.35 ? accent : color,
+      kind: "dot",
     });
+  }
+}
+
+function pickBlastStyle() {
+  if (BLAST_STYLES.length <= 1) return BLAST_STYLES[0];
+  let idx = Math.floor(Math.random() * BLAST_STYLES.length);
+  if (idx === lastBlastStyle) idx = (idx + 1 + Math.floor(Math.random() * (BLAST_STYLES.length - 1))) % BLAST_STYLES.length;
+  lastBlastStyle = idx;
+  return BLAST_STYLES[idx];
+}
+
+function eatSparkBlast(spark, opening = false) {
+  const style = pickBlastStyle();
+  const power =
+    (spark.type === "super" ? 1.85 : spark.type === "rare" || spark.comet ? 1.4 : spark.type === "deep" ? 1.25 : 1) *
+    (opening ? 1.25 : 1);
+  const color = spark.color;
+  const accent = mixColor(color, "#ffffff", 0.35);
+  const gold = cssVar("--gold", "#ffe898");
+  const x = spark.x;
+  const y = spark.y;
+  state.shake = Math.max(state.shake, (7 + Math.random() * 9) * power);
+  state.flash = Math.max(state.flash, (0.1 + Math.random() * 0.08) * power);
+
+  if (style === "spray") {
+    for (let i = 0; i < Math.round(16 * power); i += 1) {
+      const a = Math.random() * Math.PI * 2;
+      const s = rand(1.2, 4.8) * power;
+      pushParticle({
+        x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s,
+        size: rand(1.6, 4.2), color: Math.random() < 0.4 ? accent : color, kind: "dot",
+      });
+    }
+  } else if (style === "ring") {
+    const n = Math.round(22 * power);
+    for (let i = 0; i < n; i += 1) {
+      const a = (i / n) * Math.PI * 2;
+      const s = (2.6 + Math.random() * 0.6) * power;
+      pushParticle({
+        x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s,
+        size: rand(1.8, 3.2), color: i % 2 ? accent : color, kind: "ring", grav: 0.01, decay: 0.018,
+      });
+    }
+  } else if (style === "nova") {
+    for (let i = 0; i < Math.round(10 * power); i += 1) {
+      const a = (i / Math.round(10 * power)) * Math.PI * 2;
+      const s = (4.2 + Math.random()) * power;
+      pushParticle({
+        x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s,
+        size: rand(2.2, 5), color: gold, kind: "streak", rot: a, spin: 0, grav: 0.005, decay: 0.02,
+      });
+    }
+    burst(x, y, color, Math.round(12 * power), 2.4 * power);
+  } else if (style === "shards") {
+    for (let i = 0; i < Math.round(14 * power); i += 1) {
+      const a = Math.random() * Math.PI * 2;
+      const s = rand(1.8, 5.2) * power;
+      pushParticle({
+        x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s,
+        size: rand(2.4, 5.5), color: Math.random() < 0.5 ? accent : color,
+        kind: "shard", rot: a, spin: rand(-0.35, 0.35), grav: 0.04,
+      });
+    }
+  } else if (style === "spiral") {
+    for (let i = 0; i < Math.round(20 * power); i += 1) {
+      const a = i * 0.55;
+      const s = (1.2 + i * 0.12) * power * 0.35;
+      pushParticle({
+        x, y, vx: Math.cos(a) * s * 3.2, vy: Math.sin(a) * s * 3.2,
+        size: rand(1.5, 3.6), color: i % 3 ? color : accent, kind: "dot", grav: 0.015, decay: 0.016,
+      });
+    }
+  } else if (style === "cross") {
+    for (let arm = 0; arm < 4; arm += 1) {
+      const base = (arm * Math.PI) / 2 + Math.random() * 0.2;
+      for (let i = 0; i < Math.round(5 * power); i += 1) {
+        const a = base + (Math.random() - 0.5) * 0.28;
+        const s = rand(2, 5.5) * power;
+        pushParticle({
+          x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s,
+          size: rand(1.8, 4), color: arm % 2 ? gold : color, kind: "streak", rot: a, grav: 0.02,
+        });
+      }
+    }
+  } else if (style === "rain") {
+    for (let i = 0; i < Math.round(18 * power); i += 1) {
+      pushParticle({
+        x: x + rand(-18, 18) * power,
+        y: y + rand(-8, 8),
+        vx: rand(-0.6, 0.6),
+        vy: rand(-4.8, -2.2) * power,
+        size: rand(1.4, 3.4),
+        color: Math.random() < 0.35 ? accent : color,
+        kind: "dot",
+        grav: 0.12,
+        decay: 0.014,
+      });
+    }
+  } else if (style === "bloom") {
+    for (let i = 0; i < Math.round(12 * power); i += 1) {
+      const a = (i / Math.round(12 * power)) * Math.PI * 2 + rand(-0.1, 0.1);
+      const s = rand(0.8, 2.2) * power;
+      pushParticle({
+        x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s,
+        size: rand(3.5, 7), color: mixColor(color, "#ffffff", 0.2),
+        kind: "bloom", rot: a, spin: rand(-0.08, 0.08), grav: 0.008, decay: 0.011, life: 1.15,
+      });
+    }
+  } else if (style === "scatter") {
+    for (let c = 0; c < 3; c += 1) {
+      const cx = x + rand(-22, 22);
+      const cy = y + rand(-22, 22);
+      for (let i = 0; i < Math.round(6 * power); i += 1) {
+        const a = Math.random() * Math.PI * 2;
+        const s = rand(0.8, 3.2) * power;
+        pushParticle({
+          x: cx, y: cy, vx: Math.cos(a) * s, vy: Math.sin(a) * s,
+          size: rand(1.5, 3.8), color: c === 1 ? gold : color, kind: "dot",
+        });
+      }
+    }
+  } else if (style === "pulse") {
+    for (let ring = 0; ring < 2; ring += 1) {
+      const n = Math.round(16 * power);
+      const speed = (1.6 + ring * 1.8) * power;
+      for (let i = 0; i < n; i += 1) {
+        const a = (i / n) * Math.PI * 2;
+        pushParticle({
+          x, y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed,
+          size: rand(1.6, 3.2), color: ring ? accent : color, kind: "ring", grav: 0, decay: 0.02,
+        });
+      }
+    }
+  } else if (style === "streaks") {
+    for (let i = 0; i < Math.round(16 * power); i += 1) {
+      const a = Math.random() * Math.PI * 2;
+      const s = rand(2.5, 6) * power;
+      pushParticle({
+        x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s,
+        size: rand(2, 4.5), color: Math.random() < 0.4 ? gold : color,
+        kind: "streak", rot: a, grav: 0.01, decay: 0.022,
+      });
+    }
+  } else {
+    // firework: tight core then secondary scatter
+    burst(x, y, color, Math.round(10 * power), 2.2 * power);
+    for (let i = 0; i < Math.round(14 * power); i += 1) {
+      const a = Math.random() * Math.PI * 2;
+      const s = rand(2.8, 5.8) * power;
+      pushParticle({
+        x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s,
+        size: rand(1.8, 4.2), color: i % 2 ? gold : accent,
+        kind: "shard", rot: a, spin: rand(-0.4, 0.4), grav: 0.05, decay: 0.015,
+      });
+    }
+  }
+
+  if (spark.type === "super") {
+    floatText(x, y - 26, "СУПЕР", gold, 20);
+    buzz([12, 18, 12, 24]);
   }
 }
 
@@ -1777,6 +1991,9 @@ async function shareRun() {
 }
 
 function sparkProfile(type) {
+  if (type === "super") {
+    return { type, worth: 10, restore: 48, color: "#ffe566", r: rand(18, 22), super: true };
+  }
   if (type === "rare") {
     return { type, worth: 3, restore: 35, color: "#ffcc44", r: rand(15, 19) };
   }
@@ -1806,12 +2023,13 @@ function sparkProfile(type) {
 }
 
 function rollSparkType() {
-  if (inInkDive()) return Math.random() < 0.7 ? "deep" : "rare";
+  if (inInkDive()) return Math.random() < 0.7 ? "deep" : Math.random() < 0.35 ? "super" : "rare";
   const r = Math.random();
-  if (r < 0.07) return "rare";
-  if (r < 0.15) return "cool";
-  if (r < 0.22) return "bait";
-  if (r < 0.27 && !state.symbiote) return "seed";
+  if (r < 0.045) return "super";
+  if (r < 0.12) return "rare";
+  if (r < 0.2) return "cool";
+  if (r < 0.27) return "bait";
+  if (r < 0.32 && !state.symbiote) return "seed";
   return "normal";
 }
 
@@ -1968,7 +2186,8 @@ function resetRun() {
   state.milestonesHit = [];
   state.hungerWarnClock = 0;
   state.coachCount = 0;
-  state.tipFlags = { move: false, hunter: false, hunger: false, echo: false, dive: false, shadow: false, word: false };
+  state.tipFlags = { move: false, hunter: false, hunger: false, echo: false, dive: false, shadow: false, word: false, super: false };
+  lastBlastStyle = -1;
   state.event = null;
   state.eventAcc = 0;
   state.eventNext = rand(9, 13);
@@ -2244,7 +2463,7 @@ function updateSparks(dt) {
 function eatSpark(index, spark) {
   state.sparks.splice(index, 1);
   state.stats.sparkEats += 1;
-  if (spark.type === "rare") state.stats.rareEats += 1;
+  if (spark.type === "rare" || spark.type === "super") state.stats.rareEats += 1;
   const moveFactor = state.life ? clamp((state.life.speed || 0) / 12, 0.2, 1) : 0.2;
   // AFK / standing eats barely refill hunger — must hunt light
   const restore = spark.restore * (0.35 + 0.65 * moveFactor);
@@ -2253,32 +2472,27 @@ function eatSpark(index, spark) {
   if (spark.type === "bait") {
     spawnHunter(false);
     buzz([10, 20, 10]);
-    state.flash = Math.max(state.flash, 0.1);
   } else if (spark.type === "comet") {
     buzz([8, 12, 8]);
-    state.flash = Math.max(state.flash, 0.14);
   } else if (spark.type === "deep") {
     buzz(6);
-    state.flash = Math.max(state.flash, 0.09);
   } else if (spark.type === "seed") {
     attachSymbiote(spark.x, spark.y);
-  } else {
+  } else if (spark.type !== "super") {
     buzz(5);
   }
   const openingEat = inOpening() && !state.firstEatDone;
   if (openingEat) {
     state.firstEatDone = true;
-    burst(spark.x, spark.y, cssVar("--gold", "#ffe898"), 24, 5.2);
-    state.flash = Math.max(state.flash, 0.18);
     tone(520, 0.08, "triangle", 0.034);
     tone(780, 0.11, "sine", 0.028, 0.07);
     buzz([10, 18, 10]);
     floatText(spark.x, spark.y - 18, "!", cssVar("--gold", "#ffe898"), 22);
   }
   if (state.stats.sparkEats === 1) tipOnce("move", "ТЯНИСЬ К СВЕТУ", 1600);
+  if (spark.type === "super") tipOnce("super", "СУПЕР ЗВЕЗДА", 1400);
   playSparkTone(spark.type);
-  burst(spark.x, spark.y, spark.color, 10 + spark.worth * 2, openingEat ? 4.8 : 3.8);
-  state.flash = Math.max(state.flash, spark.comet ? 0.14 : openingEat ? 0.12 : 0.08);
+  eatSparkBlast(spark, openingEat);
   addScore(spark.worth, spark.x, spark.y - 12, { color: spark.color });
 }
 
@@ -2414,7 +2628,9 @@ function updateParticles(dt) {
     const p = state.particles[i];
     p.x += p.vx * dt * 60;
     p.y += p.vy * dt * 60;
-    p.vy += 0.03 * dt * 60;
+    p.vy += (p.grav ?? 0.03) * dt * 60;
+    p.vx *= Math.pow(0.992, dt * 60);
+    if (p.spin) p.rot = (p.rot || 0) + p.spin * dt * 60;
     p.life -= p.decay * dt * 60;
     if (p.life <= 0) state.particles.splice(i, 1);
   }
@@ -2451,7 +2667,7 @@ function updateRun(dt) {
     state.life.px = state.life.x;
     state.life.py = state.life.y;
     state.life.wobble += dt * 7.2;
-    state.life.r = 32 + Math.min(8, state.combo * 0.75) + Math.sin(state.life.wobble) * 1.1;
+    state.life.r = 25 + Math.min(6, state.combo * 0.6) + Math.sin(state.life.wobble) * 1.0;
     if (state.fever) state.life.r += 2.2;
     state.life.teeth = hasMut("fang") && state.combo >= 4 ? Math.min(1, state.life.teeth + dt * 3) : Math.max(0, state.life.teeth - dt * 3);
     clampLife();
@@ -2532,7 +2748,7 @@ function updateDemo(dt) {
     state.life.wobble += dt * 6;
     state.life.x = state.width * 0.5 + Math.sin(state.demoClock * 1.35) * state.width * 0.17;
     state.life.y = state.height * 0.58 + Math.cos(state.demoClock * 0.92) * state.height * 0.07;
-    state.life.r = 26 + Math.sin(state.demoClock * 2.8) * 1.2;
+    state.life.r = 22 + Math.sin(state.demoClock * 2.8) * 1.0;
     for (let i = state.sparks.length - 1; i >= 0; i -= 1) {
       const spark = state.sparks[i];
       if (dist(spark.x, spark.y, state.life.x, state.life.y) < state.life.r * 0.72 + spark.r) {
@@ -2598,7 +2814,8 @@ function drawOceanBackground() {
     return;
   }
   if (PHOTOS.ocean.ready) {
-    drawImageCover(PHOTOS.ocean.img, 0, 0, w, h);
+    prepareOceanBlur();
+    drawImageCover(PHOTOS.ocean.blur || PHOTOS.ocean.img, 0, 0, w, h);
     const shade = ctx.createLinearGradient(0, 0, 0, h);
     shade.addColorStop(0, "rgba(10, 60, 110, 0.22)");
     shade.addColorStop(0.4, "rgba(6, 40, 70, 0.12)");
@@ -2735,16 +2952,45 @@ function drawVeins() {
   }
 }
 
-function drawLightShard(x, y, r, color, rot, alpha = 1) {
+function drawLightShard(x, y, r, color, rot, alpha = 1, kind = "normal") {
+  const isSuper = kind === "super";
+  const isRare = kind === "rare" || isSuper;
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(rot);
-  ctx.globalAlpha = alpha;
-  ctx.fillStyle = color;
+  ctx.globalAlpha = alpha * 0.35;
+  const glow = ctx.createRadialGradient(0, 0, r * 0.1, 0, 0, r * (isSuper ? 2.4 : 1.85));
+  glow.addColorStop(0, mixColor(color, "#ffffff", 0.55));
+  glow.addColorStop(0.45, color);
+  glow.addColorStop(1, "transparent");
+  ctx.fillStyle = glow;
   ctx.beginPath();
-  for (let i = 0; i < 8; i += 1) {
-    const a = (i / 8) * Math.PI * 2;
-    const rad = i % 2 === 0 ? r : r * 0.36;
+  ctx.arc(0, 0, r * (isSuper ? 2.4 : 1.85), 0, Math.PI * 2);
+  ctx.fill();
+  if (isSuper) {
+    ctx.globalAlpha = alpha * 0.55;
+    ctx.strokeStyle = mixColor(color, "#ffffff", 0.4);
+    ctx.lineWidth = 1.4;
+    for (let i = 0; i < 6; i += 1) {
+      const a = (i / 6) * Math.PI * 2 + state.time * 1.6;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * r * 0.5, Math.sin(a) * r * 0.5);
+      ctx.lineTo(Math.cos(a) * r * 2.1, Math.sin(a) * r * 2.1);
+      ctx.stroke();
+    }
+  }
+  ctx.globalAlpha = alpha;
+  const points = isSuper ? 12 : 8;
+  const outer = ctx.createLinearGradient(-r, -r, r, r);
+  outer.addColorStop(0, mixColor(color, "#ffffff", 0.55));
+  outer.addColorStop(0.45, color);
+  outer.addColorStop(1, mixColor(color, "#804018", 0.2));
+  ctx.fillStyle = outer;
+  ctx.beginPath();
+  for (let i = 0; i < points; i += 1) {
+    const a = (i / points) * Math.PI * 2 - Math.PI / 2;
+    const long = i % 2 === 0;
+    const rad = long ? r : r * (isSuper ? 0.42 : 0.34);
     const px = Math.cos(a) * rad;
     const py = Math.sin(a) * rad;
     if (i === 0) ctx.moveTo(px, py);
@@ -2752,19 +2998,36 @@ function drawLightShard(x, y, r, color, rot, alpha = 1) {
   }
   ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle = mixColor(color, "#ffffff", 0.22);
-  ctx.lineWidth = 1.8;
-  ctx.globalAlpha = alpha * 0.8;
+  ctx.strokeStyle = mixColor(color, "#ffffff", isRare ? 0.55 : 0.3);
+  ctx.lineWidth = isSuper ? 2.4 : 1.7;
+  ctx.globalAlpha = alpha * 0.9;
   ctx.stroke();
-  ctx.fillStyle = mixColor(color, "#ffffff", 0.38);
   ctx.globalAlpha = alpha;
+  ctx.fillStyle = mixColor(color, "#ffffff", 0.5);
   ctx.beginPath();
-  ctx.arc(0, 0, r * 0.3, 0, Math.PI * 2);
+  for (let i = 0; i < 4; i += 1) {
+    const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+    const rad = r * 0.42;
+    const px = Math.cos(a) * rad;
+    const py = Math.sin(a) * rad;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
   ctx.fill();
-  ctx.fillStyle = "rgba(255,255,255,0.9)";
+  ctx.fillStyle = "rgba(255,255,255,0.95)";
   ctx.beginPath();
-  ctx.arc(-r * 0.18, -r * 0.18, Math.max(1.4, r * 0.14), 0, Math.PI * 2);
+  ctx.arc(-r * 0.12, -r * 0.14, Math.max(1.5, r * 0.16), 0, Math.PI * 2);
   ctx.fill();
+  ctx.globalAlpha = alpha * 0.75;
+  ctx.fillStyle = mixColor(color, "#ffffff", 0.65);
+  for (let i = 0; i < (isSuper ? 4 : 2); i += 1) {
+    const a = state.time * (1.8 + i) + i * 1.7;
+    const pr = r * (0.55 + (i % 2) * 0.2);
+    ctx.beginPath();
+    ctx.arc(Math.cos(a) * pr, Math.sin(a) * pr, Math.max(1, r * 0.08), 0, Math.PI * 2);
+    ctx.fill();
+  }
   ctx.restore();
 }
 
@@ -2955,9 +3218,19 @@ function drawSpark(spark) {
     ctx.stroke();
     ctx.restore();
   } else {
-    drawLightShard(spark.x, spark.y, r, spark.color, rot);
+    const kind = spark.type === "super" ? "super" : spark.type === "rare" ? "rare" : "normal";
+    drawLightShard(spark.x, spark.y, r, spark.color, rot, 1, kind);
   }
-  if (spark.type === "rare" || spark.comet || spark.deep) {
+  if (spark.type === "super") {
+    const t = (state.time * 1.8) % 1;
+    ctx.globalAlpha = (1 - t) * 0.55;
+    ctx.strokeStyle = "#ffe898";
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.arc(spark.x, spark.y, r * (1.5 + t * 1.4), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  } else if (spark.type === "rare" || spark.comet || spark.deep) {
     ctx.strokeStyle = spark.deep ? "#90e8ff" : "#ffe070";
     ctx.lineWidth = 2;
     ctx.globalAlpha = 0.85;
@@ -3251,13 +3524,44 @@ function drawParticles() {
   for (const p of state.particles) {
     ctx.globalAlpha = Math.max(0, p.life);
     ctx.fillStyle = p.color;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, Math.max(1.2, p.size * 0.85), 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = mixColor(p.color, "#ffffff", 0.35);
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, Math.max(0.6, p.size * 0.4), 0, Math.PI * 2);
-    ctx.fill();
+    const kind = p.kind || "dot";
+    if (kind === "streak") {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot || Math.atan2(p.vy, p.vx || 0.001));
+      ctx.fillRect(-p.size * 1.6, -p.size * 0.28, p.size * 3.2, p.size * 0.56);
+      ctx.restore();
+    } else if (kind === "shard") {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot || 0);
+      ctx.beginPath();
+      ctx.moveTo(p.size, 0);
+      ctx.lineTo(0, p.size * 0.55);
+      ctx.lineTo(-p.size * 0.7, 0);
+      ctx.lineTo(0, -p.size * 0.55);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    } else if (kind === "bloom") {
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y, p.size, p.size * 0.62, p.rot || 0, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (kind === "ring") {
+      ctx.strokeStyle = p.color;
+      ctx.lineWidth = Math.max(1.2, p.size * 0.45);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, Math.max(1.5, p.size), 0, Math.PI * 2);
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, Math.max(1.2, p.size * 0.85), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = mixColor(p.color, "#ffffff", 0.35);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, Math.max(0.6, p.size * 0.4), 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
   ctx.globalAlpha = 1;
   for (const f of state.floaters) {
@@ -3448,7 +3752,7 @@ function boot() {
   const nativeShell = !!window.OttiskNative?.isNative;
   if ("serviceWorker" in navigator && !nativeShell) {
     navigator.serviceWorker
-      .register("./sw.js?v=30")
+      .register("./sw.js?v=31")
       .then((reg) => reg.update())
       .catch(() => {});
   }

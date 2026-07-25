@@ -48,7 +48,7 @@ body {
   display: flex;
   flex-direction: column;
   background:
-    linear-gradient(180deg, rgba(20, 80, 140, 0.28) 0%, rgba(4, 28, 52, 0.5) 100%),
+    linear-gradient(180deg, rgba(20, 80, 140, 0.32) 0%, rgba(4, 28, 52, 0.55) 100%),
     url("../assets/ocean.jpg?v=4") center / cover no-repeat;
   transition: background 0.7s ease, color 0.55s ease;
 }

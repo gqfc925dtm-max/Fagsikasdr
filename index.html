@@ -163,11 +163,11 @@
   </div>
   <script>
     (async () => {
-      const stamp = "ottisk-force-v30";
+      const stamp = "ottisk-force-v31";
       if (sessionStorage.getItem(stamp)) return;
       if (!("caches" in window)) return;
       const keys = await caches.keys();
-      const stale = keys.filter((k) => k.startsWith("ottisk-") && k !== "ottisk-v30");
+      const stale = keys.filter((k) => k.startsWith("ottisk-") && k !== "ottisk-v31");
       if (!stale.length) return;
       sessionStorage.setItem(stamp, "1");
       await Promise.all(stale.map((k) => caches.delete(k)));
@@ -179,6 +179,6 @@
     })();
   </script>
   <script src="js/native.js" type="module"></script>
-  <script src="js/game.js?v=octo1" type="module"></script>
+  <script src="js/game.js?v=stars1" type="module"></script>
 </body>
 </html>
