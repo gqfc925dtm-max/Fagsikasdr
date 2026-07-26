@@ -884,38 +884,75 @@ function sfxBubblePop(pitch = 1) {
   });
 }
 
+/** Soft gravitational swallow + crystal ping — eating a light-planet. */
 function sfxPlanktonEat(combo = 0) {
-  const pitch = 1 + Math.min(12, combo) * 0.045;
-  sfxBubblePop(pitch);
+  const pitch = 1 + Math.min(12, combo) * 0.038;
+  // mass absorb (low whoomp)
   playOsc({
-    freq: 640 * pitch,
-    endFreq: 980 * pitch,
-    type: "triangle",
-    gain: 0.026,
-    dur: 0.1,
-    delay: 0.02,
-    filterFreq: 2800,
+    freq: 210 * pitch,
+    endFreq: 68 * pitch,
+    type: "sine",
+    gain: 0.042,
+    dur: 0.15,
+    attack: 0.003,
+    release: 0.08,
+    filterFreq: 520,
   });
   playOsc({
-    freq: 1280 * pitch,
-    endFreq: 860 * pitch,
+    freq: 140 * pitch,
+    endFreq: 48 * pitch,
+    type: "triangle",
+    gain: 0.02,
+    dur: 0.16,
+    attack: 0.004,
+    filterFreq: 380,
+  });
+  // planetary core ting
+  playOsc({
+    freq: 680 * pitch,
+    endFreq: 980 * pitch,
+    type: "triangle",
+    gain: 0.03,
+    dur: 0.11,
+    delay: 0.018,
+    attack: 0.002,
+    filterFreq: 2600,
+    filterQ: 1.2,
+  });
+  // bright overtone sparkle
+  playOsc({
+    freq: 1360 * pitch,
+    endFreq: 1880 * pitch,
     type: "sine",
-    gain: 0.014,
-    dur: 0.08,
+    gain: 0.016,
+    dur: 0.1,
     delay: 0.045,
+    filterFreq: 3400,
+  });
+  // light-dust hush
+  playNoise({
+    gain: 0.02,
+    dur: 0.11,
+    attack: 0.002,
+    release: 0.07,
+    filterFreq: 2600 * pitch,
+    endFilter: 480 * pitch,
+    filterType: "bandpass",
+    filterQ: 1.6,
   });
 }
 
 function sfxRareEat() {
-  playOsc({ freq: 740, endFreq: 1180, type: "triangle", gain: 0.034, dur: 0.12, filterFreq: 3200 });
-  playOsc({ freq: 1180, endFreq: 1560, type: "sine", gain: 0.02, dur: 0.14, delay: 0.05 });
-  playNoise({ gain: 0.02, dur: 0.1, delay: 0.02, filterFreq: 2400, endFilter: 900, filterQ: 1.6 });
+  playOsc({ freq: 160, endFreq: 70, type: "sine", gain: 0.036, dur: 0.18, attack: 0.006, filterFreq: 500 });
+  playOsc({ freq: 740, endFreq: 1180, type: "triangle", gain: 0.032, dur: 0.14, delay: 0.02, filterFreq: 3200 });
+  playOsc({ freq: 1180, endFreq: 1680, type: "sine", gain: 0.02, dur: 0.16, delay: 0.07 });
+  playNoise({ gain: 0.018, dur: 0.12, delay: 0.02, filterFreq: 2800, endFilter: 700, filterQ: 1.8 });
 }
 
 function sfxCoolEat() {
-  playOsc({ freq: 520, endFreq: 260, type: "sine", gain: 0.028, dur: 0.16, filterFreq: 1400 });
-  playOsc({ freq: 780, endFreq: 390, type: "triangle", gain: 0.016, dur: 0.18, delay: 0.03 });
-  playNoise({ gain: 0.018, dur: 0.14, filterFreq: 900, endFilter: 280, filterType: "lowpass" });
+  playOsc({ freq: 420, endFreq: 180, type: "sine", gain: 0.03, dur: 0.18, attack: 0.008, filterFreq: 1200 });
+  playOsc({ freq: 840, endFreq: 420, type: "triangle", gain: 0.018, dur: 0.2, delay: 0.03 });
+  playNoise({ gain: 0.016, dur: 0.16, filterFreq: 1100, endFilter: 220, filterType: "lowpass" });
 }
 
 function sfxBaitEat() {
@@ -937,17 +974,18 @@ function sfxDeepEat() {
 }
 
 function sfxSeedEat() {
-  playOsc({ freq: 660, endFreq: 990, type: "sine", gain: 0.024, dur: 0.12 });
-  playOsc({ freq: 990, endFreq: 1320, type: "triangle", gain: 0.018, dur: 0.14, delay: 0.05 });
-  sfxBubblePop(1.2);
+  playOsc({ freq: 180, endFreq: 90, type: "sine", gain: 0.028, dur: 0.14, attack: 0.006, filterFreq: 480 });
+  playOsc({ freq: 720, endFreq: 1080, type: "triangle", gain: 0.022, dur: 0.13, delay: 0.03, filterFreq: 2600 });
+  playOsc({ freq: 1080, endFreq: 1440, type: "sine", gain: 0.014, dur: 0.12, delay: 0.08 });
+  playNoise({ gain: 0.014, dur: 0.1, delay: 0.02, filterFreq: 2200, endFilter: 600, filterQ: 1.5 });
 }
 
 function sfxPulsarEat() {
-  playNoise({ gain: 0.04, dur: 0.22, filterFreq: 2200, endFilter: 300, filterType: "bandpass", filterQ: 0.9 });
-  playOsc({ freq: 180, endFreq: 90, type: "sine", gain: 0.045, dur: 0.28, attack: 0.01 });
-  playOsc({ freq: 540, endFreq: 1080, type: "triangle", gain: 0.03, dur: 0.18, delay: 0.04 });
-  playOsc({ freq: 1080, endFreq: 1620, type: "sine", gain: 0.022, dur: 0.2, delay: 0.1 });
-  playOsc({ freq: 1620, endFreq: 420, type: "triangle", gain: 0.016, dur: 0.22, delay: 0.16 });
+  playNoise({ gain: 0.038, dur: 0.24, filterFreq: 1800, endFilter: 240, filterType: "bandpass", filterQ: 0.85 });
+  playOsc({ freq: 150, endFreq: 55, type: "sine", gain: 0.048, dur: 0.3, attack: 0.012, filterFreq: 420 });
+  playOsc({ freq: 480, endFreq: 960, type: "triangle", gain: 0.032, dur: 0.2, delay: 0.04, filterFreq: 2800 });
+  playOsc({ freq: 960, endFreq: 1440, type: "sine", gain: 0.024, dur: 0.22, delay: 0.1 });
+  playOsc({ freq: 1440, endFreq: 360, type: "triangle", gain: 0.016, dur: 0.24, delay: 0.16 });
 }
 
 function goalChime() {
@@ -5267,7 +5305,7 @@ function boot() {
   const nativeShell = !!window.OttiskNative?.isNative;
   if ("serviceWorker" in navigator && !nativeShell) {
     navigator.serviceWorker
-      .register("./sw.js?v=50")
+      .register("./sw.js?v=51")
       .then((reg) => reg.update())
       .catch(() => {});
   }
