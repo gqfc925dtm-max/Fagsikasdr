@@ -4857,6 +4857,7 @@ function boot() {
   };
   const resumeFromBackground = () => {
     state.lastTs = performance.now();
+    if (soundEnabled()) unlockAudio();
     if (state.paused && state.running) {
       state.paused = false;
       state.safeUntil = performance.now() + 1200;
