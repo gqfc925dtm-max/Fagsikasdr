@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=wave54" />
+  <link rel="stylesheet" href="css/style.css?v=donate55" />
   <link rel="preload" href="assets/fish-evil.png?v=5" as="image" />
   <title>ОТТИСК</title>
 </head>
@@ -103,6 +103,13 @@
           <div id="difficulty-list" class="diff-row" role="group"></div>
         </section>
 
+        <div class="menu-support-row">
+          <button id="btn-donate" class="btn-donate" type="button">
+            <span class="btn-donate-main">Донат</span>
+            <span id="donate-thanks" class="btn-donate-sub">поддержать игру</span>
+          </button>
+        </div>
+
         <p class="legal-links menu-legal">
           <a href="./privacy.html">Конфиденциальность</a>
           <span aria-hidden="true">·</span>
@@ -117,6 +124,20 @@
       <div id="weekly-card" class="hidden"></div>
       <div id="skin-unlocks" class="hidden"></div>
       <button id="btn-marks-pack" class="hidden" type="button">+60 следов</button>
+    </div>
+
+    <div id="screen-donate" class="screen hidden">
+      <div class="screen-bg dim" aria-hidden="true"></div>
+      <div class="over-card donate-card">
+        <p class="over-label">Поддержать</p>
+        <p class="brand over-brand">ДОНАТ</p>
+        <p class="hint continue-hint">Игра бесплатная. Донат добровольный — спасибо, если поможешь сделать ОТТИСК лучше.</p>
+        <div id="donate-list" class="donate-list" role="list"></div>
+        <p id="donate-note" class="donate-note">В App Store — покупка внутри игры. На сайте — страница доната.</p>
+        <button id="btn-donate-close" class="btn btn-ghost" type="button">
+          <span class="btn-main">Назад</span>
+        </button>
+      </div>
     </div>
 
     <div id="screen-draw" class="screen hidden">
@@ -209,7 +230,7 @@
   </div>
   <script>
     (async () => {
-      const stamp = "ottisk-force-v54";
+      const stamp = "ottisk-force-v55";
       if (localStorage.getItem(stamp)) return;
       localStorage.setItem(stamp, "1");
       try {
@@ -223,11 +244,11 @@
         }
       } catch (_) {}
       const url = new URL(location.href);
-      url.searchParams.set("v", "54");
+      url.searchParams.set("v", "55");
       location.replace(url.toString());
     })();
   </script>
   <script src="js/native.js" type="module"></script>
-  <script src="js/game.js?v=wave54" type="module"></script>
+  <script src="js/game.js?v=donate55" type="module"></script>
 </body>
 </html>

@@ -769,11 +769,128 @@ body {
   animation: menu-cta 2.4s ease-in-out infinite;
 }
 
+.menu-support-row {
+  display: flex;
+  justify-content: center;
+}
+
+.btn-donate {
+  appearance: none;
+  border: 1px solid color-mix(in srgb, var(--gold) 40%, transparent);
+  background: color-mix(in srgb, var(--gold) 12%, #10283f 88%);
+  color: var(--foam);
+  border-radius: 12px;
+  min-height: 44px;
+  padding: 8px 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.btn-donate:active { transform: scale(0.97); }
+
+.btn-donate-main {
+  font-family: "Syne", sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.btn-donate-sub {
+  font-family: "Instrument Sans", sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--mute);
+}
+
 .menu-legal {
   margin-top: 0;
   justify-content: center;
   opacity: 0.55;
   font-size: 11px;
+}
+
+#screen-donate {
+  justify-content: center;
+  align-items: center;
+  overflow-y: auto;
+  padding:
+    calc(20px + var(--safe-top)) 16px
+    calc(20px + var(--safe-bottom));
+}
+
+.donate-card {
+  width: min(100%, 420px);
+}
+
+.donate-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 14px 0 10px;
+}
+
+.donate-tip {
+  appearance: none;
+  width: 100%;
+  border: 1px solid color-mix(in srgb, var(--foam) 14%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, #10283f 78%, transparent);
+  color: var(--foam);
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.donate-tip:active { transform: scale(0.98); }
+
+.donate-tip.pack {
+  border-style: dashed;
+  opacity: 0.92;
+}
+
+.donate-tip-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.donate-tip-title {
+  font-family: "Syne", sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.donate-tip-sub {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--mute);
+}
+
+.donate-tip-price {
+  flex-shrink: 0;
+  font-family: "Syne", sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--gold);
+}
+
+.donate-note {
+  margin: 0 0 12px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--sand);
 }
 
 @keyframes menu-rise {

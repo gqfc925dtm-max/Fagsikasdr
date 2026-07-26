@@ -15,6 +15,34 @@ const STARTER_MARKS = 15;
 const SHARE_URL = "https://gqfc925dtm-max.github.io/Fagsikasdr/";
 const PRIVACY_URL = `${SHARE_URL}privacy.html`;
 const SUPPORT_URL = `${SHARE_URL}support.html`;
+const DONATE_URL = `${SHARE_URL}donate.html`;
+/** Tip packs: native StoreKit IDs; web opens donate.html. */
+const DONATE_TIPS = [
+  {
+    id: "tip_small",
+    productId: "ottisk_tip_small",
+    title: "Чаевые",
+    sub: "спасибо за след",
+    marks: 30,
+    priceLabel: "99 ₽",
+  },
+  {
+    id: "tip_mid",
+    productId: "ottisk_tip_mid",
+    title: "Сильный след",
+    sub: "поддержка разработки",
+    marks: 90,
+    priceLabel: "249 ₽",
+  },
+  {
+    id: "tip_big",
+    productId: "ottisk_tip_big",
+    title: "Глубина",
+    sub: "большой донат",
+    marks: 220,
+    priceLabel: "499 ₽",
+  },
+];
 const THEME_COUNT = 6;
 const ONBOARD_STEPS = [
   "Удерживай палец — существо живёт только в касании.",
@@ -1875,6 +1903,8 @@ function loadMeta() {
     weekBest: weekFresh ? 0 : Math.max(0, Number(raw?.weekBest || 0)),
     weekRewardTaken: weekFresh ? false : !!raw?.weekRewardTaken,
     iapMarksBought: Math.max(0, Number(raw?.iapMarksBought || 0)),
+    donateCount: Math.max(0, Number(raw?.donateCount || 0)),
+    donateMarks: Math.max(0, Number(raw?.donateMarks || 0)),
     activeHero: HEROES.some((h) => h.id === raw?.activeHero) ? raw.activeHero : "octopus",
     customHero: typeof raw?.customHero === "string" && raw.customHero.startsWith("data:image") ? raw.customHero : "",
     difficulty: DIFFICULTIES.some((d) => d.id === raw?.difficulty) ? raw.difficulty : "normal",
@@ -2310,14 +2340,116 @@ function advanceOnboard() {
   renderDaily();
 }
 
+function isNativeShop() {
+  const native = window.OttiskNative;
+  return !!(native?.isNative && typeof native.purchase === "function");
+}
+
+function updateDonateThanks() {
+  const el = document.getElementById("donate-thanks");
+  if (!el || !state.meta) return;
+  const n = state.meta.donateCount || 0;
+  el.textContent = n > 0 ? `спасибо · ${n}` : "поддержать игру";
+}
+
+function renderDonateOptions() {
+  const list = document.getElementById("donate-list");
+  const note = document.getElementById("donate-note");
+  if (!list) return;
+  list.textContent = "";
+  const native = isNativeShop();
+  if (note) {
+    note.textContent = native
+      ? "Оплата через App Store. В знак благодарности сразу начислим следы."
+      : "На сайте откроется страница доната. В приложении App Store — покупка внутри игры.";
+  }
+  for (const tip of DONATE_TIPS) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "donate-tip";
+    btn.innerHTML = `
+      <span class="donate-tip-copy">
+        <span class="donate-tip-title">${tip.title}</span>
+        <span class="donate-tip-sub">${tip.sub} · +${tip.marks} следов</span>
+      </span>
+      <span class="donate-tip-price">${native ? tip.priceLabel : "открыть"}</span>
+    `;
+    btn.addEventListener("click", () => purchaseDonateTip(tip.id));
+    list.appendChild(btn);
+  }
+  // Keep marks pack as an extra option in the same sheet.
+  const pack = document.createElement("button");
+  pack.type = "button";
+  pack.className = "donate-tip pack";
+  pack.innerHTML = `
+    <span class="donate-tip-copy">
+      <span class="donate-tip-title">Пак следов</span>
+      <span class="donate-tip-sub">+${MARKS_PACK_AMOUNT} следов без доната</span>
+    </span>
+    <span class="donate-tip-price">${native ? "IAP" : "App Store"}</span>
+  `;
+  pack.addEventListener("click", () => purchaseMarksPack());
+  list.appendChild(pack);
+  updateDonateThanks();
+}
+
+function openDonate() {
+  unlockAudio();
+  sfxUiTap(1);
+  renderDonateOptions();
+  document.getElementById("screen-donate")?.classList.remove("hidden");
+  screenStartEl?.classList.add("hidden");
+}
+
+function closeDonate() {
+  document.getElementById("screen-donate")?.classList.add("hidden");
+  if (!state.running) screenStartEl?.classList.remove("hidden");
+  updateDonateThanks();
+}
+
+async function purchaseDonateTip(tipId) {
+  if (!state.meta) return;
+  const tip = DONATE_TIPS.find((t) => t.id === tipId);
+  if (!tip) return;
+  const native = window.OttiskNative;
+  if (isNativeShop()) {
+    showToast("открываем донат…");
+    const result = await native.purchase(tip.productId).catch(() => null);
+    if (result?.ok) {
+      state.meta.donateCount = (state.meta.donateCount || 0) + 1;
+      state.meta.donateMarks = (state.meta.donateMarks || 0) + tip.marks;
+      saveMeta();
+      awardMarks(tip.marks, { metaOnly: true });
+      goalChime();
+      showToast(`спасибо · +${tip.marks} следов`);
+      updateDonateThanks();
+      renderDonateOptions();
+      return;
+    }
+    showToast(result?.message || "донат отменён");
+    return;
+  }
+  // Web: honest external donate page (no fake IAP / free marks).
+  try {
+    const url = new URL(DONATE_URL);
+    url.searchParams.set("tip", tip.id);
+    url.searchParams.set("marks", String(tip.marks));
+    window.open(url.toString(), "_blank", "noopener,noreferrer");
+  } catch (_) {
+    location.href = `./donate.html?tip=${encodeURIComponent(tip.id)}`;
+  }
+  showToast("открыли страницу доната");
+}
+
 async function purchaseMarksPack() {
   if (!state.meta) return;
   const native = window.OttiskNative;
-  if (native?.isNative && typeof native.purchase === "function") {
+  if (isNativeShop()) {
     showToast("открываем покупку…");
     const result = await native.purchase(MARKS_PACK_PRODUCT_ID).catch(() => null);
     if (result?.ok) {
       state.meta.iapMarksBought = (state.meta.iapMarksBought || 0) + 1;
+      saveMeta();
       awardMarks(MARKS_PACK_AMOUNT, { metaOnly: true });
       showToast(`+${MARKS_PACK_AMOUNT} следов`);
       return;
@@ -2325,7 +2457,12 @@ async function purchaseMarksPack() {
     showToast(result?.message || "покупка отменена");
     return;
   }
-  showToast("покупка · в версии App Store");
+  try {
+    window.open(`${DONATE_URL}?tip=marks`, "_blank", "noopener,noreferrer");
+  } catch (_) {
+    location.href = "./donate.html?tip=marks";
+  }
+  showToast("на сайте · или в App Store");
 }
 
 async function maybeAskRate() {
@@ -5664,6 +5801,7 @@ function boot() {
   renderHeroPicker();
   renderGifts();
   updateEconomyLabels();
+  updateDonateThanks();
   resize();
   applyThemeFromScore(false);
   updateScoreUi(false);
@@ -5722,6 +5860,8 @@ function boot() {
   btnMarksPack?.addEventListener("click", () => {
     purchaseMarksPack().catch(() => showToast("покупка недоступна"));
   });
+  document.getElementById("btn-donate")?.addEventListener("click", () => openDonate());
+  document.getElementById("btn-donate-close")?.addEventListener("click", () => closeDonate());
   window.addEventListener("resize", resize);
   const pauseForBackground = () => {
     if (state.touchActive) {
@@ -5763,7 +5903,7 @@ function boot() {
   const nativeShell = !!window.OttiskNative?.isNative;
   if ("serviceWorker" in navigator && !nativeShell) {
     navigator.serviceWorker
-      .register("./sw.js?v=54")
+      .register("./sw.js?v=55")
       .then((reg) => reg.update())
       .catch(() => {});
   }
