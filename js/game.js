@@ -503,6 +503,7 @@ const state = {
   waveIndex: 0,
   heroDashCd: 0,
   heroShield: true,
+  bestAtStart: 0,
   tipFlags: {
     move: false,
     hunter: false,
@@ -1905,6 +1906,9 @@ function loadMeta() {
     iapMarksBought: Math.max(0, Number(raw?.iapMarksBought || 0)),
     donateCount: Math.max(0, Number(raw?.donateCount || 0)),
     donateMarks: Math.max(0, Number(raw?.donateMarks || 0)),
+    seenAbilityTips: Array.isArray(raw?.seenAbilityTips)
+      ? raw.seenAbilityTips.filter((id) => typeof id === "string")
+      : [],
     activeHero: HEROES.some((h) => h.id === raw?.activeHero) ? raw.activeHero : "octopus",
     customHero: typeof raw?.customHero === "string" && raw.customHero.startsWith("data:image") ? raw.customHero : "",
     difficulty: DIFFICULTIES.some((d) => d.id === raw?.difficulty) ? raw.difficulty : "normal",
@@ -2091,6 +2095,7 @@ function renderHeroPicker() {
   if (!heroListEl) return;
   heroListEl.textContent = "";
   const current = activeHeroId();
+  let activeBtn = null;
   for (const hero of HEROES) {
     const btn = document.createElement("button");
     btn.type = "button";
@@ -2102,9 +2107,25 @@ function renderHeroPicker() {
     btn.setAttribute("aria-selected", hero.id === current ? "true" : "false");
     btn.addEventListener("click", () => setActiveHero(hero.id));
     heroListEl.appendChild(btn);
+    if (hero.id === current) activeBtn = btn;
   }
   updateHeroAbilityHint();
   if (btnDrawHero) btnDrawHero.textContent = state.meta?.customHero ? "изменить" : "нарисовать";
+  if (activeBtn) {
+    requestAnimationFrame(() => {
+      activeBtn.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+    });
+  }
+}
+
+function maybeShowHeroAbilityTip() {
+  const hero = activeHero();
+  if (!hero?.tip || !state.meta) return;
+  const seen = state.meta.seenAbilityTips || [];
+  if (seen.includes(hero.id)) return;
+  state.meta.seenAbilityTips = [...seen, hero.id];
+  saveMeta();
+  tipOnce("ability", hero.tip, 1600);
 }
 
 function touchPlayDay() {
@@ -2151,10 +2172,28 @@ function dailyProgressText(daily = currentDailyDef()) {
   return state.meta?.dailyDone ? "выполнено · +15 следов" : daily.label(state);
 }
 
+function renderDailyQuest() {
+  const quest = document.getElementById("daily-quest");
+  if (!quest || !state.meta) return;
+  const daily = currentDailyDef();
+  if (!daily) {
+    quest.textContent = "";
+    return;
+  }
+  if (state.meta.dailyDone) {
+    quest.className = "menu-quest done";
+    quest.textContent = `ежедневка · ${daily.title} · готово`;
+    return;
+  }
+  quest.className = "menu-quest";
+  quest.textContent = `сегодня · ${daily.title} · +15 следов`;
+}
+
 function renderDaily() {
   const daily = currentDailyDef();
   if (!daily) return;
   if (dailyCardEl) dailyCardEl.textContent = `ежедневка · ${daily.title} · ${dailyProgressText(daily)}`;
+  renderDailyQuest();
   renderWeekly();
   renderSettings();
   renderGifts();
@@ -2176,34 +2215,79 @@ function touchVisitClock() {
   saveMeta();
 }
 
-function claimGift(giftId) {
-  if (!state.meta) return;
+function claimGift(giftId, opts = {}) {
+  if (!state.meta) return 0;
   const gift = GIFTS.find((g) => g.id === giftId);
-  if (!gift) return;
+  if (!gift) return 0;
   const now = Date.now();
   if (!giftReady(gift, now)) {
-    const locked = gift.lockedLabel?.(state.meta, now);
-    showToast(locked || "ещё рано");
-    return;
+    if (!opts.silent) {
+      const locked = gift.lockedLabel?.(state.meta, now);
+      showToast(locked || "ещё рано");
+    }
+    return 0;
   }
   const amount = gift.claim(state.meta, now);
   saveMeta();
   awardMarks(amount, { metaOnly: true });
+  if (!opts.silent) {
+    goalChime();
+    buzz([10, 18, 10]);
+    showToast(`${gift.title.toLowerCase()} · +${amount} следов`);
+    renderGifts();
+    updateEconomyLabels();
+  }
+  return amount;
+}
+
+function claimAllReadyGifts() {
+  if (!state.meta) return;
+  const now = Date.now();
+  const ready = GIFTS.filter((gift) => giftReady(gift, now));
+  if (!ready.length) return;
+  let total = 0;
+  for (const gift of ready) total += claimGift(gift.id, { silent: true });
+  if (total <= 0) return;
   goalChime();
   buzz([10, 18, 10]);
-  showToast(`${gift.title.toLowerCase()} · +${amount} следов`);
+  showToast(`подарки · +${total} следов`);
   renderGifts();
   updateEconomyLabels();
+}
+
+function nextGiftWait(now = Date.now()) {
+  if (!state.meta) return null;
+  let best = null;
+  for (const gift of GIFTS) {
+    if (giftReady(gift, now)) continue;
+    if (gift.lockedLabel?.(state.meta, now)) continue;
+    const wait = gift.waitMs?.(state.meta, now) ?? 0;
+    if (wait <= 0) continue;
+    if (!best || wait < best.wait) best = { gift, wait };
+  }
+  return best;
 }
 
 function renderGifts() {
   const list = document.getElementById("gift-list");
   const wrap = document.getElementById("menu-gifts");
+  const nextEl = document.getElementById("gift-next");
   if (!list || !state.meta) return;
   const now = Date.now();
   const readyGifts = GIFTS.filter((gift) => giftReady(gift, now));
   list.textContent = "";
   if (wrap) wrap.classList.toggle("hidden", readyGifts.length === 0);
+  if (readyGifts.length > 1) {
+    const all = document.createElement("button");
+    all.type = "button";
+    all.className = "gift-tile ready gift-all";
+    all.innerHTML = `
+      <span class="gift-tile-title">Забрать все</span>
+      <span class="gift-tile-meta">${readyGifts.length} шт</span>
+    `;
+    all.addEventListener("click", () => claimAllReadyGifts());
+    list.appendChild(all);
+  }
   for (const gift of readyGifts) {
     const btn = document.createElement("button");
     btn.type = "button";
@@ -2216,6 +2300,16 @@ function renderGifts() {
     btn.setAttribute("aria-label", `Забрать подарок ${gift.title} ${amountText}`);
     btn.addEventListener("click", () => claimGift(gift.id));
     list.appendChild(btn);
+  }
+  if (nextEl) {
+    const next = readyGifts.length ? null : nextGiftWait(now);
+    if (next) {
+      nextEl.classList.remove("hidden");
+      nextEl.textContent = `следующий подарок · ${next.gift.title.toLowerCase()} · ${formatWait(next.wait)}`;
+    } else {
+      nextEl.classList.add("hidden");
+      nextEl.textContent = "";
+    }
   }
   updateEconomyLabels();
 }
@@ -2914,6 +3008,7 @@ function finalizeGameOver(reason) {
   state.pendingDeathReason = "";
   state.continueBusy = false;
   state.timeScale = 1;
+  const isNewBest = state.score > (state.bestAtStart || 0);
   if (state.meta) {
     state.meta.runs = Math.max(0, (state.meta.runs || 0) + 1);
     saveMeta();
@@ -2922,6 +3017,16 @@ function finalizeGameOver(reason) {
   evaluateWeekly(state.score);
   finalScoreEl.textContent = String(state.score);
   deathReasonEl.textContent = reason;
+  const wave = waveForScore(state.score);
+  const waveN = Math.max(1, WAVES.indexOf(wave) + 1);
+  const hero = activeHero();
+  const runSummaryEl = document.getElementById("run-summary");
+  if (runSummaryEl) {
+    runSummaryEl.textContent = isNewBest
+      ? `новый рекорд · волна ${waveN} · ${hero.name}`
+      : `волна ${waveN} · ${wave.name} · ${hero.name}`;
+    runSummaryEl.classList.toggle("record", isNewBest);
+  }
   const muts = state.unlockedMuts.filter((id) => id !== "spark");
   mutSummaryEl.textContent = muts.length ? `новых сил: ${muts.length}` : "";
   renderSkinResult();
@@ -2935,6 +3040,10 @@ function finalizeGameOver(reason) {
   screenContinueEl?.classList.add("hidden");
   screenOverEl.classList.remove("hidden");
   clearHold();
+  if (isNewBest) {
+    goalChime();
+    buzz([12, 20, 12]);
+  }
 }
 
 function createLife(x, y, opts = {}) {
@@ -3510,6 +3619,7 @@ function resetRun() {
   state.waveIndex = 0;
   state.heroDashCd = 0;
   state.heroShield = true;
+  state.bestAtStart = Math.max(state.best || 0, state.meta?.best || 0);
   app.classList.remove("ink-dive");
   setDiveMeter(0);
   resetStats();
@@ -3530,6 +3640,11 @@ function resetRun() {
   skinResultEl.textContent = "";
   dailyResultEl.textContent = "";
   if (marksResultEl) marksResultEl.textContent = "";
+  const runSummaryEl = document.getElementById("run-summary");
+  if (runSummaryEl) {
+    runSummaryEl.textContent = "";
+    runSummaryEl.classList.remove("record");
+  }
   screenContinueEl?.classList.add("hidden");
   for (let i = 0; i < 2; i += 1) spawnSpark();
   spawnSpark({ tutorial: true, type: "normal", near: { x: state.width * 0.5, y: state.height * 0.42 } });
@@ -3592,10 +3707,7 @@ function startGame() {
     state.demo = false;
     state.lastTs = performance.now();
     showCoach("УДЕРЖИВАЙ", 1700, true);
-    const hero = activeHero();
-    if (hero?.tip) {
-      setTimeout(() => tipOnce("ability", hero.tip, 1600), 1900);
-    }
+    setTimeout(() => maybeShowHeroAbilityTip(), 1900);
   });
 }
 
@@ -5903,7 +6015,7 @@ function boot() {
   const nativeShell = !!window.OttiskNative?.isNative;
   if ("serviceWorker" in navigator && !nativeShell) {
     navigator.serviceWorker
-      .register("./sw.js?v=55")
+      .register("./sw.js?v=56")
       .then((reg) => reg.update())
       .catch(() => {});
   }

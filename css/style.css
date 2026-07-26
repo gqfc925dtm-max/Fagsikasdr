@@ -560,6 +560,38 @@ body {
   gap: 8px;
 }
 
+.menu-quest {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--foam) 12%, transparent);
+  background: color-mix(in srgb, #0c2034 50%, transparent);
+  font-family: "Instrument Sans", sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--sand);
+  text-align: center;
+}
+
+.menu-quest.done {
+  color: var(--life);
+  border-color: color-mix(in srgb, var(--life) 35%, transparent);
+}
+
+.menu-gift-next {
+  margin: 0;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--mute);
+}
+
+.menu-gift-next.hidden {
+  display: none;
+}
+
 .menu-gifts {
   margin: 0;
   padding: 0;
@@ -567,6 +599,15 @@ body {
 
 .menu-gifts.hidden {
   display: none;
+}
+
+.gift-tile.gift-all {
+  background: color-mix(in srgb, var(--life) 16%, #123048 84%);
+  border-color: color-mix(in srgb, var(--life) 45%, transparent);
+}
+
+.gift-tile.gift-all .gift-tile-meta {
+  color: var(--life);
 }
 
 .gift-rail {
@@ -1551,6 +1592,20 @@ body {
   color: var(--sand);
   font-weight: 600;
   margin-bottom: 4px;
+}
+
+.run-summary {
+  min-height: 1.2em;
+  margin: 2px 0 6px;
+  color: var(--gold);
+  font-family: "Instrument Sans", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.run-summary.record {
+  color: var(--life);
 }
 
 .death-reason {
