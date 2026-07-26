@@ -151,7 +151,7 @@
   </div>
   <script>
     (async () => {
-      const stamp = "ottisk-force-v35";
+      const stamp = "ottisk-force-v36";
       if (localStorage.getItem(stamp)) return;
       localStorage.setItem(stamp, "1");
       try {
@@ -165,11 +165,11 @@
         }
       } catch (_) {}
       const url = new URL(location.href);
-      url.searchParams.set("v", "35");
+      url.searchParams.set("v", "36");
       location.replace(url.toString());
     })();
   </script>
   <script src="js/native.js" type="module"></script>
-  <script src="js/game.js?v=redstar1" type="module"></script>
+  <script src="js/game.js?v=menu1" type="module"></script>
 </body>
 </html>

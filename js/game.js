@@ -2005,6 +2005,11 @@ function sparkProfile(type) {
 
 function rollSparkType() {
   if (inInkDive()) return Math.random() < 0.7 ? "deep" : "rare";
+  if (inOpening()) {
+    const r0 = Math.random();
+    if (r0 < 0.12) return "cool";
+    return "normal";
+  }
   const r = Math.random();
   if (r < 0.1) return "rare";
   if (r < 0.2) return "cool";
@@ -2489,7 +2494,7 @@ function eatSpark(index, spark) {
   state.hunger = clamp(state.hunger + restore, 0, 100);
   updateHungerUi();
   if (spark.type === "bait") {
-    spawnHunter(false);
+    if (!inOpening()) spawnHunter(false);
     buzz([10, 20, 10]);
   } else if (spark.type === "comet") {
     buzz([8, 12, 8]);
@@ -3731,7 +3736,7 @@ function boot() {
   const nativeShell = !!window.OttiskNative?.isNative;
   if ("serviceWorker" in navigator && !nativeShell) {
     navigator.serviceWorker
-      .register("./sw.js?v=35")
+      .register("./sw.js?v=36")
       .then((reg) => reg.update())
       .catch(() => {});
   }
