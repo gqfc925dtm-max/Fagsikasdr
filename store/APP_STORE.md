@@ -67,6 +67,8 @@ npx cap open ios
 - Кнопка `Донат` / `Магазин` → tip packs + пак следов + IAP-герои
 - `OttiskNative.purchase('ottisk_marks_60')` — пак следов
 - `OttiskNative.purchase('ottisk_continue_10rub')` — продолжение · 10 ₽
+- `OttiskNative.purchase('ottisk_starter_pack')` — стартовый пак · 199 ₽ (скат + удильщик + наутилус + 60 следов)
+- `OttiskNative.restorePurchases()` — восстановление Non-Consumable
 - IAP-герои (Non-Consumable):
   - `ottisk_submarine` — корабль · 99 ₽ (пушки · 3 жизни)
   - `ottisk_hero_eel` — угорь · 99 ₽ (разряд)
@@ -74,12 +76,14 @@ npx cap open ios
   - `ottisk_hero_seahorse` — конёк · 129 ₽ (откат)
   - `ottisk_hero_whale` — кит · 149 ₽ (сонар)
 - `ottisk_tip_small` / `ottisk_tip_mid` / `ottisk_tip_big` — донаты с благодарностью в следах
+- После левиафана: волны «кракен» (босс @780) и «титаны» (@900)
 
 ### StoreKit позже
 
 1. App Store Connect → Consumable / Non-Consumable:
    - `ottisk_marks_60` (Consumable)
    - `ottisk_continue_10rub` (Consumable · 10 ₽)
+   - `ottisk_starter_pack` (Non-Consumable · 199 ₽)
    - `ottisk_submarine` (Non-Consumable · 99 ₽)
    - `ottisk_hero_eel` (Non-Consumable · 99 ₽)
    - `ottisk_hero_squid` (Non-Consumable · 99 ₽)
@@ -88,7 +92,7 @@ npx cap open ios
    - `ottisk_tip_small`
    - `ottisk_tip_mid`
    - `ottisk_tip_big`
-2. Подключи плагин покупок в iOS-оболочке
+2. Подключи плагин покупок в iOS-оболочке (`purchase` + `restore` / `restorePurchases`)
 3. Проброс в `Capacitor.Plugins.OttiskIAP`
 
 ## TestFlight

@@ -10,6 +10,9 @@ const Native = {
   async purchase() {
     return { ok: false, message: "покупка · только в App Store" };
   },
+  async restorePurchases() {
+    return { ok: false, message: "восстановление · только в App Store", productIds: [] };
+  },
   async requestReview() {
     return false;
   },
@@ -56,6 +59,10 @@ async function bootNative() {
   };
 
   // Wire a StoreKit plugin here later (e.g. RevenueCat / Native Purchases).
+  // Expected product IDs:
+  //   ottisk_marks_60, ottisk_continue_10rub, ottisk_starter_pack,
+  //   ottisk_submarine, ottisk_hero_eel|squid|seahorse|whale,
+  //   ottisk_tip_small|mid|big
   Native.purchase = async (productId) => {
     if (typeof p.OttiskIAP?.purchase === "function") {
       return p.OttiskIAP.purchase({ productId });
@@ -64,6 +71,20 @@ async function bootNative() {
       ok: false,
       message: "StoreKit ещё не подключён в Xcode",
       productId,
+    };
+  };
+
+  Native.restorePurchases = async () => {
+    if (typeof p.OttiskIAP?.restore === "function") {
+      return p.OttiskIAP.restore();
+    }
+    if (typeof p.OttiskIAP?.restorePurchases === "function") {
+      return p.OttiskIAP.restorePurchases();
+    }
+    return {
+      ok: false,
+      message: "StoreKit restore ещё не подключён",
+      productIds: [],
     };
   };
 
