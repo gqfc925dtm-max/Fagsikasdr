@@ -2680,7 +2680,7 @@ function spawnHunter(slow = false) {
     warn: 1,
     phase: Math.random() * Math.PI * 2,
     nearMissed: false,
-    grace: slow ? 1.4 : 0.85,
+    grace: slow ? 1.6 : state.elapsed < 3 ? 1.2 : 0.85,
     orbit: (state.hunters.length * 2.1) + Math.random() * 1.2,
     orbitR: rand(36, 64),
     orbitSpeed: rand(0.7, 1.25) * (Math.random() < 0.5 ? -1 : 1),
@@ -2807,10 +2807,10 @@ function resetRun() {
   screenContinueEl?.classList.add("hidden");
   for (let i = 0; i < 2; i += 1) spawnSpark();
   spawnSpark({ tutorial: true, type: "normal", near: { x: state.width * 0.5, y: state.height * 0.42 } });
-  // No parade fish in-run: the first real hunter must enter from the edge after opening.
+  // First fish enters from the far edge almost immediately after the run starts.
   state.hunters = [];
   state.slowHunterSeen = false;
-  state.hunterAcc = 0;
+  state.hunterAcc = 1.2;
 }
 
 function resetDemo() {
@@ -3122,21 +3122,18 @@ function hunterReachMul(hunter) {
 
 function updateHunters(dt) {
   const soft = difficultyScale();
-  // During opening: no hunters on the field at all.
-  if (inOpening()) {
-    if (state.running && state.hunters.length) state.hunters = [];
-    return;
-  }
-
   const wave = syncWave(true);
+  // Fish from the start: only one slow hunter early, then ramp with score.
   const early = state.elapsed < OPENING_SEC + 8 || state.score < 12;
-  const maxHunters = early
+  const opening = inOpening();
+  const maxHunters = early || opening
     ? 1
     : Math.min(7, Math.max(1, Math.floor((1 + Math.floor(state.score / 22) + wave.maxBonus) * soft)));
   state.hunterAcc += dt;
   let interval = (Math.max(1.2, 3.8 - state.score * 0.022) * wave.intervalMul) / Math.max(0.55, soft);
-  if (!state.slowHunterSeen) interval = Math.max(interval, 3.4);
-  const firstHunterAt = OPENING_SEC + 2.8;
+  if (opening) interval = Math.max(interval, 2.8);
+  if (!state.slowHunterSeen) interval = Math.max(interval, 1.1);
+  const firstHunterAt = 0.45;
   // Spawn at most one hunter per update to avoid a sudden ambush pack.
   if (state.hunters.length < maxHunters && state.hunterAcc >= interval && state.elapsed > firstHunterAt) {
     state.hunterAcc = 0;
