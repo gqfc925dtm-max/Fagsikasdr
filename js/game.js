@@ -1098,10 +1098,148 @@ function sfxHunterWarn() {
   playNoise({ gain: 0.02, dur: 0.14, filterFreq: 260, endFilter: 120, filterType: "lowpass" });
 }
 
+/** School fish — wet chatter / nibble. */
+function sfxFishCall() {
+  playNoise({ gain: 0.018, dur: 0.08, filterFreq: 1400, endFilter: 500, filterType: "bandpass", filterQ: 1.4 });
+  playOsc({ freq: 320, endFreq: 180, type: "triangle", gain: 0.022, dur: 0.1, filterFreq: 1200 });
+  playOsc({ freq: 480, endFreq: 260, type: "sine", gain: 0.014, dur: 0.08, delay: 0.04 });
+  sfxBubblePop(0.9);
+}
+
+/** Dart — sharp zip. */
+function sfxDartCall() {
+  playNoise({ gain: 0.02, dur: 0.06, filterFreq: 3200, endFilter: 900, filterType: "highpass", filterQ: 0.8 });
+  playOsc({ freq: 880, endFreq: 1480, type: "sawtooth", gain: 0.016, dur: 0.07, filterFreq: 2800, filterQ: 1.6 });
+  playOsc({ freq: 1320, endFreq: 420, type: "triangle", gain: 0.018, dur: 0.09, delay: 0.02, filterFreq: 3400 });
+}
+
+function sfxDartDash() {
+  playNoise({ gain: 0.03, dur: 0.1, filterFreq: 2600, endFilter: 400, filterType: "lowpass" });
+  playOsc({ freq: 1100, endFreq: 220, type: "sawtooth", gain: 0.022, dur: 0.12, filterFreq: 2200 });
+  playOsc({ freq: 1600, endFreq: 380, type: "triangle", gain: 0.014, dur: 0.1, delay: 0.02 });
+}
+
+/** Jelly — gel wobble. */
+function sfxJellyCall() {
+  playOsc({ freq: 180, endFreq: 110, type: "sine", gain: 0.03, dur: 0.2, attack: 0.03, filterFreq: 700 });
+  playOsc({ freq: 260, endFreq: 200, type: "triangle", gain: 0.018, dur: 0.22, delay: 0.04, filterFreq: 900 });
+  playOsc({ freq: 90, endFreq: 140, type: "sine", gain: 0.016, dur: 0.18, delay: 0.08 });
+  playNoise({ gain: 0.012, dur: 0.16, filterFreq: 500, endFilter: 180, filterType: "lowpass" });
+}
+
+/** Eel — electric crackle. */
+function sfxEelCall() {
+  playNoise({ gain: 0.028, dur: 0.1, filterFreq: 2400, endFilter: 800, filterType: "bandpass", filterQ: 2.4 });
+  playOsc({ freq: 720, endFreq: 180, type: "square", gain: 0.012, dur: 0.08, filterFreq: 1600, filterQ: 2 });
+  playOsc({ freq: 240, endFreq: 90, type: "sawtooth", gain: 0.016, dur: 0.12, delay: 0.03, filterFreq: 900 });
+  playNoise({ gain: 0.016, dur: 0.08, delay: 0.05, filterFreq: 3000, endFilter: 600, filterQ: 1.8 });
+}
+
+/** Shark — low growl. */
+function sfxSharkCall() {
+  playOsc({ freq: 70, endFreq: 42, type: "sawtooth", gain: 0.028, dur: 0.26, attack: 0.02, filterFreq: 280, filterQ: 1.2 });
+  playOsc({ freq: 96, endFreq: 55, type: "triangle", gain: 0.022, dur: 0.24, delay: 0.03, filterFreq: 360 });
+  playNoise({ gain: 0.022, dur: 0.2, filterFreq: 220, endFilter: 80, filterType: "lowpass" });
+}
+
+function sfxSharkDash() {
+  playNoise({ gain: 0.034, dur: 0.16, filterFreq: 500, endFilter: 120, filterType: "lowpass" });
+  playOsc({ freq: 110, endFreq: 40, type: "sawtooth", gain: 0.03, dur: 0.18, attack: 0.01, filterFreq: 420 });
+  playOsc({ freq: 160, endFreq: 60, type: "triangle", gain: 0.018, dur: 0.16, delay: 0.04 });
+}
+
+/** Ray — wing sweep. */
+function sfxRayCall() {
+  playNoise({ gain: 0.02, dur: 0.18, filterFreq: 900, endFilter: 220, filterType: "lowpass", filterQ: 0.7 });
+  playOsc({ freq: 220, endFreq: 120, type: "sine", gain: 0.026, dur: 0.22, attack: 0.02, filterFreq: 800 });
+  playOsc({ freq: 340, endFreq: 180, type: "triangle", gain: 0.016, dur: 0.2, delay: 0.05 });
+}
+
+/** Ghost — airy whisper. */
+function sfxGhostCall() {
+  playOsc({ freq: 520, endFreq: 260, type: "sine", gain: 0.018, dur: 0.24, attack: 0.04, filterFreq: 1400 });
+  playOsc({ freq: 780, endFreq: 390, type: "triangle", gain: 0.014, dur: 0.26, delay: 0.05, filterFreq: 1800 });
+  playNoise({ gain: 0.016, dur: 0.22, filterFreq: 1600, endFilter: 400, filterType: "bandpass", filterQ: 0.9 });
+}
+
+function sfxGhostBlink() {
+  playNoise({ gain: 0.018, dur: 0.08, filterFreq: 2000, endFilter: 700, filterType: "bandpass", filterQ: 1.6 });
+  playOsc({ freq: 640, endFreq: 180, type: "sine", gain: 0.016, dur: 0.1, filterFreq: 1600 });
+}
+
+/** Leviathan — deep roar / charge. */
+function sfxBossCall() {
+  playNoise({ gain: 0.04, dur: 0.34, filterFreq: 280, endFilter: 70, filterType: "lowpass", filterQ: 0.7 });
+  playOsc({ freq: 55, endFreq: 32, type: "sawtooth", gain: 0.036, dur: 0.36, attack: 0.03, filterFreq: 220 });
+  playOsc({ freq: 82, endFreq: 48, type: "triangle", gain: 0.028, dur: 0.34, delay: 0.04, filterFreq: 300 });
+  playOsc({ freq: 110, endFreq: 70, type: "sine", gain: 0.018, dur: 0.28, delay: 0.1 });
+}
+
+function sfxBossWarn() {
+  playOsc({ freq: 90, endFreq: 140, type: "sawtooth", gain: 0.026, dur: 0.2, filterFreq: 400, filterQ: 1.5 });
+  playOsc({ freq: 140, endFreq: 70, type: "triangle", gain: 0.02, dur: 0.22, delay: 0.05 });
+  playNoise({ gain: 0.024, dur: 0.2, filterFreq: 320, endFilter: 100, filterType: "lowpass" });
+}
+
+function sfxBossCharge() {
+  playNoise({ gain: 0.045, dur: 0.28, filterFreq: 700, endFilter: 90, filterType: "lowpass" });
+  playOsc({ freq: 160, endFreq: 40, type: "sawtooth", gain: 0.034, dur: 0.3, attack: 0.01, filterFreq: 500 });
+  playOsc({ freq: 220, endFreq: 55, type: "triangle", gain: 0.022, dur: 0.26, delay: 0.05 });
+  playOsc({ freq: 90, endFreq: 30, type: "sine", gain: 0.026, dur: 0.32, delay: 0.02 });
+}
+
 function sfxShadow() {
   playOsc({ freq: 90, endFreq: 45, type: "sine", gain: 0.034, dur: 0.28, attack: 0.03 });
   playOsc({ freq: 135, endFreq: 60, type: "triangle", gain: 0.02, dur: 0.26, delay: 0.05 });
   playNoise({ gain: 0.024, dur: 0.24, filterFreq: 180, endFilter: 70, filterType: "lowpass" });
+}
+
+const predatorSfxGate = Object.create(null);
+
+function playPredatorSfx(species, kind = "call") {
+  const key = `${species || "fish"}:${kind}`;
+  const now = performance.now();
+  const gap = kind === "dash" || kind === "charge" ? 120 : 220;
+  if ((predatorSfxGate[key] || 0) + gap > now) return;
+  predatorSfxGate[key] = now;
+  if (species === "dart") {
+    if (kind === "dash") sfxDartDash();
+    else sfxDartCall();
+    return;
+  }
+  if (species === "jelly") {
+    sfxJellyCall();
+    return;
+  }
+  if (species === "eel") {
+    sfxEelCall();
+    return;
+  }
+  if (species === "shark") {
+    if (kind === "dash") sfxSharkDash();
+    else sfxSharkCall();
+    return;
+  }
+  if (species === "ray") {
+    sfxRayCall();
+    return;
+  }
+  if (species === "ghost") {
+    if (kind === "dash" || kind === "blink") sfxGhostBlink();
+    else sfxGhostCall();
+    return;
+  }
+  if (species === "boss") {
+    if (kind === "charge") sfxBossCharge();
+    else if (kind === "warn") sfxBossWarn();
+    else sfxBossCall();
+    return;
+  }
+  if (species === "shadow") {
+    sfxShadow();
+    return;
+  }
+  sfxFishCall();
 }
 
 function sfxUiTap(step = 0) {
@@ -1528,7 +1666,7 @@ function spawnBoss() {
   };
   state.hunters.push(boss);
   tipOnce("boss", "ЛЕВИАФАН", 1900);
-  sfxHunterWarn();
+  playPredatorSfx("boss", "call");
   sfxWaveShift();
   buzz([16, 22, 16, 22, 16]);
   state.flash = Math.max(state.flash, 0.2);
@@ -3525,9 +3663,11 @@ function spawnHunter(slow = false) {
   };
   applySpeciesToHunter(hunter, wave.species);
   state.hunters.push(hunter);
-  if (state.running && !state.tipFlags.hunter) {
-    tipOnce("hunter", wave.label.replace("ВОЛНА ", "ХИЩНИК · "), 1500);
-    sfxHunterWarn();
+  if (state.running) {
+    playPredatorSfx(hunter.species || wave.species || "fish", "call");
+    if (!state.tipFlags.hunter) {
+      tipOnce("hunter", wave.label.replace("ВОЛНА ", "ХИЩНИК · "), 1500);
+    }
   }
 }
 
@@ -4022,7 +4162,7 @@ function updateBossHunter(hunter, dt, diff) {
       hunter.chargeTx = state.life.x;
       hunter.chargeTy = state.life.y;
       hunter.warn = 1;
-      sfxHunterWarn();
+      playPredatorSfx("boss", "warn");
     }
     return {
       tx: state.life.x + Math.cos(hunter.orbit) * orbitR,
@@ -4038,6 +4178,7 @@ function updateBossHunter(hunter, dt, diff) {
       const ang = Math.atan2(hunter.chargeTy - hunter.y, hunter.chargeTx - hunter.x);
       hunter.vx += Math.cos(ang) * (4.2 * diff.dash);
       hunter.vy += Math.sin(ang) * (4.2 * diff.dash);
+      playPredatorSfx("boss", "charge");
       buzz(10);
     }
     return { tx: hunter.chargeTx, ty: hunter.chargeTy, speedMul: 0.2 };
@@ -4201,6 +4342,7 @@ function updateHunters(dt) {
         const impulse = (species === "shark" ? 2.4 : 3.1) * diff.dash;
         hunter.vx += Math.cos(dashAng) * impulse;
         hunter.vy += Math.sin(dashAng) * impulse;
+        playPredatorSfx(species, "dash");
       }
     }
     // Ghosts short-blink closer instead of a hard dash.
@@ -4212,6 +4354,7 @@ function updateHunters(dt) {
         hunter.y += Math.sin(blinkAng) * (28 * diff.dash);
         hunter.dashCd = rand(1.8, 2.8) / Math.max(0.75, diff.dash);
         hunter.warn = Math.max(hunter.warn, 0.55);
+        playPredatorSfx("ghost", "blink");
       }
     }
 
@@ -6391,7 +6534,7 @@ function boot() {
   const nativeShell = !!window.OttiskNative?.isNative;
   if ("serviceWorker" in navigator && !nativeShell) {
     navigator.serviceWorker
-      .register("./sw.js?v=58")
+      .register("./sw.js?v=59")
       .then((reg) => reg.update())
       .catch(() => {});
   }
