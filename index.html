@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/style.css?v=hero2" />
   <link rel="preload" href="assets/fish-evil.png?v=5" as="image" />
   <title>ОТТИСК</title>
 </head>
@@ -95,7 +95,7 @@
       <div class="screen-bg dim" aria-hidden="true"></div>
       <div class="draw-card">
         <p class="over-label">Свой герой</p>
-        <p class="hint continue-hint">Нарисуй персонажа пальцем. Он станет твоим героем в игре.</p>
+        <p class="hint continue-hint">Рисуй пальцем в квадрате, потом нажми «Сохранить».</p>
         <canvas id="draw-canvas" width="320" height="320" class="draw-canvas" aria-label="Холст для рисования"></canvas>
         <div class="draw-tools" role="group" aria-label="Цвета">
           <button class="draw-color on" type="button" data-color="#fff1e4" aria-label="светлый"></button>
@@ -181,7 +181,7 @@
   </div>
   <script>
     (async () => {
-      const stamp = "ottisk-force-v38";
+      const stamp = "ottisk-force-v39";
       if (localStorage.getItem(stamp)) return;
       localStorage.setItem(stamp, "1");
       try {
@@ -195,11 +195,11 @@
         }
       } catch (_) {}
       const url = new URL(location.href);
-      url.searchParams.set("v", "38");
+      url.searchParams.set("v", "39");
       location.replace(url.toString());
     })();
   </script>
   <script src="js/native.js" type="module"></script>
-  <script src="js/game.js?v=hero1" type="module"></script>
+  <script src="js/game.js?v=hero2" type="module"></script>
 </body>
 </html>

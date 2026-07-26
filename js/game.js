@@ -3629,21 +3629,54 @@ function drawLifeBody(body, alpha = 1) {
 
 const drawTool = {
   drawing: false,
+  dirty: false,
   color: "#fff1e4",
   lastX: 0,
   lastY: 0,
 };
 
+function paintDrawGuide() {
+  if (!drawCtx || !drawCanvasEl) return;
+  const w = drawCanvasEl.width;
+  const h = drawCanvasEl.height;
+  const cx = w * 0.5;
+  const cy = h * 0.48;
+  const r = Math.min(w, h) * 0.28;
+  drawCtx.save();
+  drawCtx.strokeStyle = "rgba(255, 241, 228, 0.22)";
+  drawCtx.lineWidth = 2;
+  drawCtx.setLineDash([8, 8]);
+  drawCtx.beginPath();
+  drawCtx.arc(cx, cy, r, 0, Math.PI * 2);
+  drawCtx.stroke();
+  drawCtx.setLineDash([]);
+  drawCtx.fillStyle = "rgba(255, 241, 228, 0.28)";
+  drawCtx.font = "600 18px Instrument Sans, sans-serif";
+  drawCtx.textAlign = "center";
+  drawCtx.fillText("рисуй здесь", cx, cy + r + 28);
+  drawCtx.restore();
+}
+
 function clearDrawCanvas() {
   if (!drawCtx || !drawCanvasEl) return;
   drawCtx.clearRect(0, 0, drawCanvasEl.width, drawCanvasEl.height);
-  drawCtx.fillStyle = "rgba(10, 24, 48, 0.001)";
+  // Opaque base so strokes are visible; export keeps solid pixels on transparent via destination-over trim later.
+  drawCtx.fillStyle = "rgba(12, 32, 64, 0.01)";
   drawCtx.fillRect(0, 0, drawCanvasEl.width, drawCanvasEl.height);
+  paintDrawGuide();
+  drawTool.dirty = false;
+}
+
+function exportCustomHeroPng() {
+  if (!drawCanvasEl || !drawTool.dirty) return "";
+  return drawCanvasEl.toDataURL("image/png");
 }
 
 function openDrawHero() {
   if (!screenDrawEl || !drawCanvasEl) return;
   screenStartEl?.classList.add("hidden");
+  screenOnboardEl?.classList.add("hidden");
+  screenOverEl?.classList.add("hidden");
   screenDrawEl.classList.remove("hidden");
   clearDrawCanvas();
   drawTool.color = "#fff1e4";
@@ -3660,43 +3693,62 @@ function closeDrawHero(backToStart = true) {
 
 function drawPointerPos(e) {
   const rect = drawCanvasEl.getBoundingClientRect();
-  const scaleX = drawCanvasEl.width / rect.width;
-  const scaleY = drawCanvasEl.height / rect.height;
+  const scaleX = drawCanvasEl.width / Math.max(1, rect.width);
+  const scaleY = drawCanvasEl.height / Math.max(1, rect.height);
   return {
     x: (e.clientX - rect.left) * scaleX,
     y: (e.clientY - rect.top) * scaleY,
   };
 }
 
+function strokeDraw(x0, y0, x1, y1) {
+  if (!drawCtx) return;
+  if (!drawTool.dirty) {
+    // Wipe guide text/circle once the player starts drawing.
+    drawCtx.clearRect(0, 0, drawCanvasEl.width, drawCanvasEl.height);
+    drawTool.dirty = true;
+  }
+  drawCtx.strokeStyle = drawTool.color;
+  drawCtx.fillStyle = drawTool.color;
+  drawCtx.lineWidth = 16;
+  drawCtx.lineCap = "round";
+  drawCtx.lineJoin = "round";
+  drawCtx.beginPath();
+  drawCtx.moveTo(x0, y0);
+  drawCtx.lineTo(x1, y1);
+  drawCtx.stroke();
+  drawCtx.beginPath();
+  drawCtx.arc(x1, y1, 8, 0, Math.PI * 2);
+  drawCtx.fill();
+}
+
 function bindDrawHeroUi() {
   if (!drawCanvasEl || !drawCtx) return;
   document.querySelectorAll(".draw-color").forEach((btn) => {
     btn.style.setProperty("--swatch", btn.dataset.color);
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       drawTool.color = btn.dataset.color || "#fff1e4";
       document.querySelectorAll(".draw-color").forEach((b) => b.classList.toggle("on", b === btn));
     });
   });
   const startDraw = (e) => {
     e.preventDefault();
+    e.stopPropagation();
     drawCanvasEl.setPointerCapture?.(e.pointerId);
     drawTool.drawing = true;
     const p = drawPointerPos(e);
     drawTool.lastX = p.x;
     drawTool.lastY = p.y;
+    strokeDraw(p.x, p.y, p.x, p.y);
   };
   const moveDraw = (e) => {
     if (!drawTool.drawing) return;
     e.preventDefault();
+    e.stopPropagation();
     const p = drawPointerPos(e);
-    drawCtx.strokeStyle = drawTool.color;
-    drawCtx.lineWidth = 14;
-    drawCtx.lineCap = "round";
-    drawCtx.lineJoin = "round";
-    drawCtx.beginPath();
-    drawCtx.moveTo(drawTool.lastX, drawTool.lastY);
-    drawCtx.lineTo(p.x, p.y);
-    drawCtx.stroke();
+    strokeDraw(drawTool.lastX, drawTool.lastY, p.x, p.y);
     drawTool.lastX = p.x;
     drawTool.lastY = p.y;
   };
@@ -3709,11 +3761,22 @@ function bindDrawHeroUi() {
   drawCanvasEl.addEventListener("pointermove", moveDraw, { passive: false });
   drawCanvasEl.addEventListener("pointerup", endDraw, { passive: false });
   drawCanvasEl.addEventListener("pointercancel", endDraw, { passive: false });
-  btnDrawClear?.addEventListener("click", () => clearDrawCanvas());
-  btnDrawCancel?.addEventListener("click", () => closeDrawHero(true));
-  btnDrawSave?.addEventListener("click", () => {
+  btnDrawClear?.addEventListener("click", (e) => {
+    e.preventDefault();
+    clearDrawCanvas();
+  });
+  btnDrawCancel?.addEventListener("click", (e) => {
+    e.preventDefault();
+    closeDrawHero(true);
+  });
+  btnDrawSave?.addEventListener("click", (e) => {
+    e.preventDefault();
     if (!state.meta || !drawCanvasEl) return;
-    const data = drawCanvasEl.toDataURL("image/png");
+    const data = exportCustomHeroPng();
+    if (!data) {
+      showToast("сначала нарисуй героя");
+      return;
+    }
     state.meta.customHero = data;
     state.meta.activeHero = "custom";
     saveMeta();
@@ -3722,7 +3785,11 @@ function bindDrawHeroUi() {
     renderHeroPicker();
     showToast("свой герой готов");
   });
-  btnDrawHero?.addEventListener("click", () => openDrawHero());
+  btnDrawHero?.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    openDrawHero();
+  });
 }
 
 function drawEcho() {
