@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=61" />
+  <link rel="stylesheet" href="css/style.css?v=62" />
   <link rel="preload" href="assets/fish-evil.png?v=5" as="image" />
   <title>ОТТИСК</title>
 </head>
@@ -79,23 +79,12 @@
         <div class="actions menu-play">
           <button id="btn-start" class="btn btn-primary btn-play" type="button">
             <span class="btn-main">Играть</span>
-            <span class="btn-sub">удерживай кнопку</span>
+            <span class="btn-sub">выбери героя</span>
           </button>
-          <div class="hold-meter" aria-hidden="true"><i id="hold-fill"></i></div>
         </div>
       </div>
 
       <div class="menu-more">
-        <section class="menu-heroes" aria-label="Выбор героя">
-          <div class="menu-heroes-head">
-            <span id="hero-ability-hint" class="menu-heroes-hint">рывок</span>
-            <button id="btn-draw-hero" class="menu-link" type="button">нарисовать</button>
-          </div>
-          <div id="hero-list" class="hero-rail" role="listbox" aria-label="Выбор героя"></div>
-        </section>
-
-        <div id="difficulty-list" class="diff-row" role="group" aria-label="Сложность"></div>
-
         <p id="daily-quest" class="menu-note" aria-live="polite"></p>
 
         <section id="menu-gifts" class="menu-gifts hidden" aria-label="Подарки">
@@ -120,6 +109,41 @@
       <div id="weekly-card" class="hidden"></div>
       <div id="skin-unlocks" class="hidden"></div>
       <button id="btn-marks-pack" class="hidden" type="button">+60 следов</button>
+      <i id="hold-fill" class="hidden" aria-hidden="true"></i>
+    </div>
+
+    <div id="screen-hero" class="screen screen-flow hidden">
+      <div class="menu-veil" aria-hidden="true">
+        <div class="menu-veil-light"></div>
+        <div class="menu-veil-depth"></div>
+      </div>
+      <div class="flow-shell">
+        <button id="btn-hero-back" class="flow-back" type="button">назад</button>
+        <p class="flow-kicker">Шаг 1 · герой</p>
+        <canvas id="hero-portrait" class="hero-portrait" width="420" height="420" aria-label="Портрет героя"></canvas>
+        <h2 id="hero-pick-name" class="flow-title">осьминог</h2>
+        <p id="hero-ability-hint" class="flow-sub">рывок</p>
+        <div id="hero-list" class="hero-rail" role="listbox" aria-label="Выбор героя"></div>
+        <button id="btn-draw-hero" class="menu-link flow-draw" type="button">нарисовать своего</button>
+        <button id="btn-hero-next" class="btn btn-primary" type="button">
+          <span class="btn-main">Дальше</span>
+          <span class="btn-sub">сложность</span>
+        </button>
+      </div>
+    </div>
+
+    <div id="screen-diff" class="screen screen-flow hidden">
+      <div class="menu-veil" aria-hidden="true">
+        <div class="menu-veil-light"></div>
+        <div class="menu-veil-depth"></div>
+      </div>
+      <div class="flow-shell">
+        <button id="btn-diff-back" class="flow-back" type="button">назад</button>
+        <p class="flow-kicker">Шаг 2 · сложность</p>
+        <h2 class="flow-title">Как играем?</h2>
+        <p class="flow-sub">Выбор сразу запускает забег</p>
+        <div id="difficulty-list" class="diff-pick" role="group" aria-label="Сложность"></div>
+      </div>
     </div>
 
     <div id="screen-donate" class="screen hidden">
@@ -230,7 +254,7 @@
   </div>
   <script>
     (async () => {
-      const stamp = "ottisk-force-v61";
+      const stamp = "ottisk-force-v62";
       if (localStorage.getItem(stamp)) return;
       localStorage.setItem(stamp, "1");
       try {
@@ -244,11 +268,11 @@
         }
       } catch (_) {}
       const url = new URL(location.href);
-      url.searchParams.set("v", "61");
+      url.searchParams.set("v", "62");
       location.replace(url.toString());
     })();
   </script>
   <script src="js/native.js" type="module"></script>
-  <script src="js/game.js?v=61" type="module"></script>
+  <script src="js/game.js?v=62" type="module"></script>
 </body>
 </html>
