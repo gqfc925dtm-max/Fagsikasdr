@@ -3697,6 +3697,7 @@ function startGame() {
   screenStartEl.classList.add("hidden");
   screenOverEl.classList.add("hidden");
   screenContinueEl?.classList.add("hidden");
+  document.getElementById("screen-donate")?.classList.add("hidden");
   statusEl.classList.remove("hidden");
   app.classList.add("in-run");
   requestAnimationFrame(() => {
@@ -3709,6 +3710,39 @@ function startGame() {
     showCoach("УДЕРЖИВАЙ", 1700, true);
     setTimeout(() => maybeShowHeroAbilityTip(), 1900);
   });
+}
+
+function goToMenu() {
+  unlockAudio();
+  hum(false);
+  clearHold();
+  state.running = false;
+  state.paused = false;
+  state.demo = false;
+  state.touchActive = false;
+  state.pointerId = null;
+  state.life = null;
+  state.echo = null;
+  state.pendingDeathReason = "";
+  state.continueBusy = false;
+  if (inInkDive()) exitInkDive();
+  app.classList.remove("in-run", "ink-dive");
+  setDiveMeter(0);
+  statusEl.classList.add("hidden");
+  screenOverEl.classList.add("hidden");
+  screenContinueEl?.classList.add("hidden");
+  document.getElementById("screen-donate")?.classList.add("hidden");
+  document.getElementById("screen-draw")?.classList.add("hidden");
+  screenOnboardEl?.classList.add("hidden");
+  screenStartEl.classList.remove("hidden");
+  updateBestLabels();
+  updateEconomyLabels();
+  updateDonateThanks();
+  renderDaily();
+  renderHeroPicker();
+  renderGifts();
+  resetDemo();
+  sfxUiTap(0);
 }
 
 function finishRun(reason) {
@@ -5924,6 +5958,10 @@ function boot() {
   bindDrawHeroUi();
   bindHoldButton(btnStart, "start");
   bindHoldButton(btnRetry, "retry");
+  document.getElementById("btn-menu")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    goToMenu();
+  });
   setInterval(() => {
     if (!screenStartEl || screenStartEl.classList.contains("hidden")) return;
     renderGifts();
@@ -6015,7 +6053,7 @@ function boot() {
   const nativeShell = !!window.OttiskNative?.isNative;
   if ("serviceWorker" in navigator && !nativeShell) {
     navigator.serviceWorker
-      .register("./sw.js?v=56")
+      .register("./sw.js?v=57")
       .then((reg) => reg.update())
       .catch(() => {});
   }
