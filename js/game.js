@@ -165,13 +165,13 @@ const HEROES = [
   { id: "jellyfish", name: "медуза", glyph: "Ме", ability: "аура", tip: "АУРА ЗАМЕДЛЯЕТ" },
   { id: "turtle", name: "черепаха", glyph: "Че", ability: "панцирь", tip: "ПАНЦИРЬ ДЕРЖИТ ДОЛЬШЕ" },
   { id: "crab", name: "краб", glyph: "Кр", ability: "щит", tip: "ЩИТ НА 1 УДАР" },
-  { id: "manta", name: "скат", glyph: "Ск", ability: "крыло+", tip: "РЫВОК РВЁТ СТРОЙ", premium: true, cost: 60 },
-  { id: "angler", name: "удильщик", glyph: "Уд", ability: "манок+", tip: "СВЕТ САМ ПЛЫВЁТ К ТЕБЕ", premium: true, cost: 110 },
-  { id: "nautilus", name: "наутилус", glyph: "На", ability: "раковина+", tip: "ДВОЙНАЯ РАКОВИНА", premium: true, cost: 170 },
+  { id: "manta", name: "скат", glyph: "Ск", ability: "крыло-шторм", tip: "РЫВОК РЕЖЕТ И ОСТАВЛЯЕТ СЛЕД", premium: true, cost: 60, blurb: "рывки рвут строй" },
+  { id: "angler", name: "удильщик", glyph: "Уд", ability: "манок света", tip: "ФОНАРЬ ТЯНЕТ СВЕТ И ТОРМОЗИТ", premium: true, cost: 110, blurb: "свет плывёт к тебе" },
+  { id: "nautilus", name: "наутилус", glyph: "На", ability: "2 раковины", tip: "ДВЕ РАКОВИНЫ · ПОТОМ ВОССТАНОВЛЕНИЕ", premium: true, cost: 170, blurb: "двойная броня" },
   {
     id: "sub",
-    name: "корабль",
-    glyph: "Ко",
+    name: "субмарина",
+    glyph: "Су",
     ability: "пушки · 3 жизни",
     tip: "ПУШКИ БЬЮТ ХИЩНИКОВ",
     premium: true,
@@ -184,49 +184,49 @@ const HEROES = [
     id: "eel",
     name: "угорь",
     glyph: "Уг",
-    ability: "разряд",
-    tip: "ДЕРЖИ — БЬЁТ ТОКОМ",
+    ability: "цепная молния",
+    tip: "ДЕРЖИ — МОЛНИЯ УБИВАЕТ ЦЕПОЧКОЙ",
     premium: true,
     iap: true,
     productId: EEL_PRODUCT_ID,
     priceLabel: "99 ₽",
-    blurb: "цепной разряд",
+    blurb: "молния по цепочке",
   },
   {
     id: "squid",
     name: "кальмар",
     glyph: "Ка",
-    ability: "чернила",
-    tip: "УДАР — ЧЕРНИЛЬНОЕ ОБЛАКО",
+    ability: "чернильный туман",
+    tip: "ЧЕРНИЛА СЛЕПЯТ И ПЕРЕЗАРЯЖАЮТСЯ",
     premium: true,
     iap: true,
     productId: SQUID_PRODUCT_ID,
     priceLabel: "99 ₽",
-    blurb: "чернильный щит",
+    blurb: "слепящий туман",
   },
   {
     id: "seahorse",
     name: "конёк",
     glyph: "Кн",
-    ability: "откат",
-    tip: "УДАР — ОТКАТ ВО ВРЕМЕНИ",
+    ability: "откат времени",
+    tip: "ОТКАТ · ВОССТАНАВЛИВАЕТСЯ ЗА СВЕТ",
     premium: true,
     iap: true,
     productId: SEAHORSE_PRODUCT_ID,
     priceLabel: "129 ₽",
-    blurb: "откат на секунду",
+    blurb: "откат и восстановление",
   },
   {
     id: "whale",
     name: "кит",
     glyph: "Ки",
-    ability: "сонар",
-    tip: "СОНАР ОТБРАСЫВАЕТ",
+    ability: "двойной сонар",
+    tip: "СОНАР ОГЛУШАЕТ И БЬЁТ ДВАЖДЫ",
     premium: true,
     iap: true,
     productId: WHALE_PRODUCT_ID,
     priceLabel: "149 ₽",
-    blurb: "волна сонара",
+    blurb: "оглушающий сонар",
   },
   { id: "custom", name: "свой", glyph: "✦", ability: "рывок", tip: "РЕЗКИЙ СВАЙП — РЫВОК" },
 ];
@@ -627,8 +627,17 @@ const state = {
   whaleCd: 0,
   inkCloud: null,
   squidInkReady: true,
+  squidEats: 0,
+  squidInkCd: 0,
   lifeHistory: [],
   seahorseReady: true,
+  seahorseEats: 0,
+  seahorseCd: 0,
+  shellCharges: 0,
+  mantaWake: null,
+  eelBolts: [],
+  sonarRings: [],
+  whalePulse2: 0,
   bestAtStart: 0,
   shopReturn: "home",
   tipFlags: {
@@ -2662,11 +2671,15 @@ function heroHasShield() {
 function heroAuraSlowMul(hunter) {
   if (!heroHasAura() || !state.life || !hunter) return 1;
   const angler = activeHeroId() === "angler";
-  const reach = (angler ? 155 : 118) + Math.sin(state.time * 2.4) * 6;
+  const pulse = 0.5 + 0.5 * Math.sin(state.time * 3.2);
+  const reach = (angler ? 168 : 118) + Math.sin(state.time * 2.4) * 6;
   const d = dist(hunter.x, hunter.y, state.life.x, state.life.y);
   if (d > reach) return 1;
-  const deep = angler ? 0.32 : 0.52;
-  return deep + (angler ? 0.22 : 0.28) * clamp(d / reach, 0, 1);
+  if (angler) {
+    const deep = 0.22 + (1 - pulse) * 0.08;
+    return deep + 0.2 * clamp(d / reach, 0, 1);
+  }
+  return 0.52 + 0.28 * clamp(d / reach, 0, 1);
 }
 
 function tryHeroDash(dx, dy, moved) {
@@ -2677,71 +2690,117 @@ function tryHeroDash(dx, dy, moved) {
   const nx = dx / len;
   const ny = dy / len;
   const manta = activeHeroId() === "manta";
-  const boost = manta ? 98 : 56;
+  const fromX = state.life.x;
+  const fromY = state.life.y;
+  const boost = manta ? 108 : 56;
   state.life.x += nx * boost;
   state.life.y += ny * boost;
   clampLife();
   state.life.aim = Math.atan2(ny, nx);
-  state.heroDashCd = manta ? 1.55 : 2.6;
-  state.safeUntil = performance.now() + (manta ? 620 : 320);
+  state.heroDashCd = manta ? 1.35 : 2.6;
+  state.safeUntil = performance.now() + (manta ? 720 : 320);
   if (manta) {
-    state.timeScale = 0.55;
-    state.slowmoUntil = performance.now() + 280;
+    state.timeScale = 0.5;
+    state.slowmoUntil = performance.now() + 320;
+    state.mantaWake = {
+      x: (fromX + state.life.x) * 0.5,
+      y: (fromY + state.life.y) * 0.5,
+      nx,
+      ny,
+      t: 1.05,
+      halfW: 42,
+      len: boost * 0.92,
+    };
   }
-  const pushR = manta ? 150 : 96;
-  for (const hunter of state.hunters) {
+  const pushR = manta ? 168 : 96;
+  let sliced = 0;
+  let nearMiss = false;
+  for (let hi = state.hunters.length - 1; hi >= 0; hi -= 1) {
+    const hunter = state.hunters[hi];
     if (hunter.boss) continue;
     const d = dist(hunter.x, hunter.y, state.life.x, state.life.y);
+    // path proximity for manta slice
+    let pathD = d;
+    if (manta) {
+      const vx = hunter.x - fromX;
+      const vy = hunter.y - fromY;
+      const proj = clamp((vx * nx + vy * ny) / boost, 0, 1);
+      const px = fromX + nx * boost * proj;
+      const py = fromY + ny * boost * proj;
+      pathD = dist(hunter.x, hunter.y, px, py);
+      if (pathD < 34) nearMiss = true;
+    }
+    if (manta && !hunter.shadow && hunter.r < 24 && pathD < 28) {
+      burst(hunter.x, hunter.y, cssVar("--accent-b", "#7affd4"), 14, 4.5);
+      state.hunters.splice(hi, 1);
+      state.score += 6;
+      state.combo += 1;
+      state.comboClock = 2.4;
+      sliced += 1;
+      floatText(hunter.x, hunter.y - 16, "+6", cssVar("--accent-b", "#7affd4"), 13);
+      continue;
+    }
     if (d > pushR || d < 0.1) continue;
-    const push = ((pushR - d) / pushR) * (manta ? 14 : 7.5);
+    const push = ((pushR - d) / pushR) * (manta ? 16 : 7.5);
     hunter.vx += ((hunter.x - state.life.x) / d) * push;
     hunter.vy += ((hunter.y - state.life.y) / d) * push;
     hunter.warn = Math.max(hunter.warn, 0.7);
-    hunter.grace = Math.max(hunter.grace || 0, manta ? 0.55 : 0.35);
-    if (manta && !hunter.boss && hunter.r < 22 && d < 70) {
-      hunter.x += ((hunter.x - state.life.x) / d) * 40;
-      hunter.y += ((hunter.y - state.life.y) / d) * 40;
+    hunter.grace = Math.max(hunter.grace || 0, manta ? 0.65 : 0.35);
+    if (manta && hunter.r < 22 && d < 80) {
+      hunter.x += ((hunter.x - state.life.x) / d) * 48;
+      hunter.y += ((hunter.y - state.life.y) / d) * 48;
     }
   }
-  for (let i = 0; i < (manta ? 22 : 10); i += 1) {
+  if (manta && nearMiss) state.heroDashCd = Math.max(0.35, state.heroDashCd - 0.55);
+  if (sliced) updateScoreUi(true);
+  for (let i = 0; i < (manta ? 28 : 10); i += 1) {
     pushParticle({
       x: state.life.x - nx * i * 4,
       y: state.life.y - ny * i * 4,
-      vx: -nx * rand(1.2, 3.2),
-      vy: -ny * rand(1.2, 3.2),
+      vx: -nx * rand(1.2, 3.2) + (manta ? -ny * rand(-1.2, 1.2) : 0),
+      vy: -ny * rand(1.2, 3.2) + (manta ? nx * rand(-1.2, 1.2) : 0),
       size: rand(2, 5),
       color: manta ? cssVar("--accent-b", "#7affd4") : cssVar("--life", "#7affd4"),
       kind: "streak",
       decay: rand(0.04, 0.07),
     });
   }
-  floatText(state.life.x, state.life.y - 22, manta ? "крыло+" : "рывок", cssVar("--life", "#7affd4"), 15);
+  floatText(state.life.x, state.life.y - 22, manta ? (sliced ? "шторм" : "крыло") : "рывок", cssVar("--life", "#7affd4"), 15);
   tipOnce("ability", activeHero().tip || "РЫВОК", 1400);
   sfxPulse();
   buzz([8, 14, 8]);
-  state.flash = Math.max(state.flash, manta ? 0.16 : 0.1);
+  state.flash = Math.max(state.flash, manta ? 0.18 : 0.1);
   return true;
 }
 
 function tryCrabShield(hunter) {
-  if (!heroHasShield() || !state.heroShield || !state.life) return false;
-  state.heroShield = false;
+  if (!heroHasShield() || !state.life) return false;
   const nautilus = activeHeroId() === "nautilus";
-  if (nautilus) state.heroShieldCd = 8;
+  if (nautilus) {
+    if ((state.shellCharges || 0) <= 0) return false;
+    state.shellCharges -= 1;
+    if (state.shellCharges <= 0) state.heroShieldCd = 7.2;
+  } else {
+    if (!state.heroShield) return false;
+    state.heroShield = false;
+  }
   buzz([12, 20, 12]);
   sfxPulse();
-  burst(state.life.x, state.life.y, cssVar("--accent-a", "#ff9a62"), nautilus ? 34 : 22, nautilus ? 6.5 : 5.2);
-  floatText(state.life.x, state.life.y - 20, nautilus ? "раковина+" : "щит", cssVar("--accent-a", "#ff9a62"), 16);
-  tipOnce("ability", nautilus ? "РАКОВИНА СЛОМАНА" : "ЩИТ СЛОМАН", 1400);
+  burst(state.life.x, state.life.y, cssVar("--accent-a", "#ff9a62"), nautilus ? 36 : 22, nautilus ? 6.8 : 5.2);
+  const label = nautilus
+    ? (state.shellCharges > 0 ? `раковина · ${state.shellCharges}` : "раковины кончились")
+    : "щит";
+  floatText(state.life.x, state.life.y - 20, label, cssVar("--accent-a", "#ff9a62"), 16);
+  tipOnce("ability", nautilus ? "ДВОЙНАЯ РАКОВИНА" : "ЩИТ СЛОМАН", 1400);
   if (hunter) {
     const ang = Math.atan2(hunter.y - state.life.y, hunter.x - state.life.x) || 0;
-    hunter.vx += Math.cos(ang) * (nautilus ? 15 : 9);
-    hunter.vy += Math.sin(ang) * (nautilus ? 15 : 9);
+    hunter.vx += Math.cos(ang) * (nautilus ? 16 : 9);
+    hunter.vy += Math.sin(ang) * (nautilus ? 16 : 9);
     hunter.warn = 1;
-    hunter.grace = Math.max(hunter.grace || 0, nautilus ? 0.9 : 0.55);
+    hunter.grace = Math.max(hunter.grace || 0, nautilus ? 1.0 : 0.55);
     if (!hunter.boss) placeHunterOnEdge(hunter);
   }
-  state.safeUntil = performance.now() + (nautilus ? 1700 : 900);
+  state.safeUntil = performance.now() + (nautilus ? 1800 : 900);
   return true;
 }
 
@@ -2859,18 +2918,49 @@ function updateShipShots(dt) {
 
 function recordLifeHistory(dt) {
   if (!state.life || activeHeroId() !== "seahorse") {
-    state.lifeHistory = [];
+    if (activeHeroId() !== "seahorse") state.lifeHistory = [];
     return;
   }
   state.lifeHistory.push({ x: state.life.x, y: state.life.y, t: state.elapsed });
-  while (state.lifeHistory.length && state.elapsed - state.lifeHistory[0].t > 1.05) {
+  while (state.lifeHistory.length && state.elapsed - state.lifeHistory[0].t > 1.2) {
     state.lifeHistory.shift();
+  }
+}
+
+function updateMantaWake(dt) {
+  if (!state.mantaWake) return;
+  state.mantaWake.t -= dt;
+  if (state.mantaWake.t <= 0) {
+    state.mantaWake = null;
+    return;
+  }
+  const w = state.mantaWake;
+  for (let hi = state.hunters.length - 1; hi >= 0; hi -= 1) {
+    const h = state.hunters[hi];
+    if (h.boss || h.shadow) continue;
+    const vx = h.x - w.x;
+    const vy = h.y - w.y;
+    const along = vx * w.nx + vy * w.ny;
+    if (along < -w.len * 0.5 || along > w.len * 0.5) continue;
+    const px = w.x + w.nx * along;
+    const py = w.y + w.ny * along;
+    const side = dist(h.x, h.y, px, py);
+    if (side > w.halfW) continue;
+    h.vx += w.nx * 10 * dt + (h.x - px) * 0.08;
+    h.vy += w.ny * 10 * dt + (h.y - py) * 0.08;
+    h.grace = Math.max(h.grace || 0, 0.25);
   }
 }
 
 function fireEelZap(dt) {
   if (activeHeroId() !== "eel" || !state.life || !state.touchActive || state.paused) return;
   state.eelCd = Math.max(0, (state.eelCd || 0) - dt);
+  if (state.eelBolts?.length) {
+    for (let i = state.eelBolts.length - 1; i >= 0; i -= 1) {
+      state.eelBolts[i].t -= dt;
+      if (state.eelBolts[i].t <= 0) state.eelBolts.splice(i, 1);
+    }
+  }
   if (state.eelCd > 0) return;
   let best = null;
   let bestD = Infinity;
@@ -2882,17 +2972,17 @@ function fireEelZap(dt) {
       best = h;
     }
   }
-  if (!best || bestD > 200) return;
-  state.eelCd = 1.05;
+  if (!best || bestD > 220) return;
+  state.eelCd = 0.92;
   const chain = [best];
   let tip = best;
-  for (let n = 0; n < 2; n += 1) {
+  for (let n = 0; n < 3; n += 1) {
     let next = null;
     let nextD = Infinity;
     for (const h of state.hunters) {
-      if (h.shadow || chain.includes(h) || h.boss) continue;
+      if (h.shadow || chain.includes(h)) continue;
       const d = dist(h.x, h.y, tip.x, tip.y);
-      if (d < nextD && d < 120) {
+      if (d < nextD && d < 155) {
         nextD = d;
         next = h;
       }
@@ -2901,79 +2991,79 @@ function fireEelZap(dt) {
     chain.push(next);
     tip = next;
   }
-  for (const h of chain) {
+  state.eelBolts = state.eelBolts || [];
+  let prev = { x: state.life.x, y: state.life.y };
+  for (let ci = 0; ci < chain.length; ci += 1) {
+    const h = chain[ci];
+    state.eelBolts.push({
+      x0: prev.x, y0: prev.y, x1: h.x, y1: h.y, t: 0.22,
+    });
+    prev = h;
     const ang = Math.atan2(h.y - state.life.y, h.x - state.life.x) || 0;
-    h.vx += Math.cos(ang) * (h.boss ? 6 : 13);
-    h.vy += Math.sin(ang) * (h.boss ? 6 : 13);
+    h.vx += Math.cos(ang) * (h.boss ? 7 : 15);
+    h.vy += Math.sin(ang) * (h.boss ? 7 : 15);
     h.warn = 1;
-    h.grace = Math.max(h.grace || 0, 0.45);
-    burst(h.x, h.y, "rgba(160,220,255,0.95)", 10, 3.8);
-    if (!h.boss && !h.shadow && h.r < 24 && Math.random() < 0.42) {
-      burst(h.x, h.y, cssVar("--life", "#7affd4"), 14, 4.5);
+    h.grace = Math.max(h.grace || 0, 0.55);
+    h.stunT = Math.max(h.stunT || 0, h.boss ? 0.45 : 0.85);
+    burst(h.x, h.y, "rgba(160,220,255,0.95)", 12, 4);
+    const kill = !h.boss && !h.shadow && h.r < 26 && (ci === 0 || Math.random() < 0.55);
+    if (kill) {
+      burst(h.x, h.y, cssVar("--life", "#7affd4"), 16, 5);
       const idx = state.hunters.indexOf(h);
       if (idx >= 0) {
         state.hunters.splice(idx, 1);
-        state.score += 4;
+        state.score += 5;
         state.combo += 1;
-        state.comboClock = 2.2;
+        state.comboClock = 2.3;
         updateScoreUi(true);
-        floatText(h.x, h.y - 16, "+4", cssVar("--life", "#7affd4"), 13);
+        floatText(h.x, h.y - 16, "+5", cssVar("--life", "#7affd4"), 13);
       }
-    } else if (!h.boss && h.r < 28) {
+    } else if (!h.boss && h.r < 30) {
       placeHunterOnEdge(h);
     }
   }
-  // lightning bolt visual particles
-  for (const h of chain) {
-    pushParticle({
-      x: state.life.x,
-      y: state.life.y,
-      vx: (h.x - state.life.x) * 0.08,
-      vy: (h.y - state.life.y) * 0.08,
-      size: rand(2, 4),
-      color: "rgba(170,230,255,0.95)",
-      kind: "streak",
-      decay: 0.08,
-    });
-  }
-  floatText(state.life.x, state.life.y - 22, "разряд", cssVar("--life", "#9ee8ff"), 14);
-  tipOnce("ability", "РАЗРЯД", 1200);
+  floatText(state.life.x, state.life.y - 22, "молния", cssVar("--life", "#9ee8ff"), 14);
+  tipOnce("ability", "ЦЕПНАЯ МОЛНИЯ", 1300);
   sfxDartDash();
-  buzz(7);
-  state.flash = Math.max(state.flash, 0.1);
+  buzz(8);
+  state.flash = Math.max(state.flash, 0.14);
 }
 
 function trySquidInk(hunter) {
   if (activeHeroId() !== "squid" || !state.life || !state.squidInkReady) return false;
   state.squidInkReady = false;
+  state.squidEats = 0;
   state.inkCloud = {
     x: state.life.x,
     y: state.life.y,
-    r: 150,
-    t: 3.6,
+    r: 170,
+    t: 4.4,
+    blind: true,
   };
   buzz([12, 18, 12]);
   sfxPulse();
-  burst(state.life.x, state.life.y, "rgba(40,30,70,0.9)", 28, 6);
-  floatText(state.life.x, state.life.y - 22, "чернила", "#c8b8ff", 15);
-  tipOnce("ability", "ЧЕРНИЛЬНОЕ ОБЛАКО", 1400);
+  burst(state.life.x, state.life.y, "rgba(40,30,70,0.95)", 34, 6.5);
+  floatText(state.life.x, state.life.y - 22, "туман", "#c8b8ff", 15);
+  tipOnce("ability", "ЧЕРНИЛЬНЫЙ ТУМАН", 1500);
   if (hunter) {
     const ang = Math.atan2(hunter.y - state.life.y, hunter.x - state.life.x) || 0;
-    hunter.vx += Math.cos(ang) * 12;
-    hunter.vy += Math.sin(ang) * 12;
+    hunter.vx += Math.cos(ang) * 14;
+    hunter.vy += Math.sin(ang) * 14;
     hunter.warn = 1;
-    hunter.grace = Math.max(hunter.grace || 0, 0.7);
+    hunter.grace = Math.max(hunter.grace || 0, 0.85);
+    hunter.stunT = Math.max(hunter.stunT || 0, 1.1);
     if (!hunter.boss) placeHunterOnEdge(hunter);
   }
   for (const h of state.hunters) {
     const d = dist(h.x, h.y, state.life.x, state.life.y);
-    if (d > 160 || d < 0.1) continue;
-    h.vx += ((h.x - state.life.x) / d) * 8;
-    h.vy += ((h.y - state.life.y) / d) * 8;
-    h.grace = Math.max(h.grace || 0, 0.5);
+    if (d > 180 || d < 0.1) continue;
+    h.vx += ((h.x - state.life.x) / d) * 10;
+    h.vy += ((h.y - state.life.y) / d) * 10;
+    h.stunT = Math.max(h.stunT || 0, 0.7);
+    h.grace = Math.max(h.grace || 0, 0.55);
   }
-  state.safeUntil = performance.now() + 1400;
-  state.flash = Math.max(state.flash, 0.14);
+  state.safeUntil = performance.now() + 1700;
+  state.flash = Math.max(state.flash, 0.16);
   return true;
 }
 
@@ -2988,69 +3078,151 @@ function updateInkCloud(dt) {
   for (const h of state.hunters) {
     const d = dist(h.x, h.y, cloud.x, cloud.y);
     if (d > cloud.r) continue;
-    h.vx *= 0.88;
-    h.vy *= 0.88;
-    h.grace = Math.max(h.grace || 0, 0.2);
+    h.vx *= 0.82;
+    h.vy *= 0.82;
+    h.grace = Math.max(h.grace || 0, 0.25);
+    if (cloud.blind) h.stunT = Math.max(h.stunT || 0, 0.2);
   }
 }
 
 function trySeahorseRewind(hunter) {
   if (activeHeroId() !== "seahorse" || !state.life || !state.seahorseReady) return false;
   const hist = state.lifeHistory || [];
-  if (hist.length < 4) return false;
-  const past = hist[0];
+  let past = hist.length >= 3 ? hist[0] : null;
+  if (!past) {
+    const aim = state.life.aim ?? -Math.PI / 2;
+    past = {
+      x: clamp(state.life.x - Math.cos(aim) * 70, 24, state.width - 24),
+      y: clamp(state.life.y - Math.sin(aim) * 70, 40, state.height - 24),
+    };
+  }
   state.seahorseReady = false;
+  state.seahorseEats = 0;
+  const ox = state.life.x;
+  const oy = state.life.y;
   state.life.x = past.x;
   state.life.y = past.y;
   clampLife();
   state.lifeHistory = [];
+  state.hunger = clamp(state.hunger + 18, 0, 100);
+  updateHungerUi();
   buzz([14, 22, 14]);
   sfxPulse();
-  burst(past.x, past.y, cssVar("--gold", "#ffe898"), 24, 5.2);
+  burst(past.x, past.y, cssVar("--gold", "#ffe898"), 26, 5.5);
+  burst(ox, oy, "rgba(255,200,140,0.5)", 14, 3.5);
   floatText(past.x, past.y - 24, "откат", cssVar("--gold", "#ffe898"), 15);
-  tipOnce("ability", "ОТКАТ", 1400);
+  tipOnce("ability", "ОТКАТ ВРЕМЕНИ", 1500);
   for (const h of state.hunters) {
     const d = dist(h.x, h.y, past.x, past.y);
-    if (d > 130 || d < 0.1) continue;
-    h.vx += ((h.x - past.x) / d) * 11;
-    h.vy += ((h.y - past.y) / d) * 11;
+    if (d > 145 || d < 0.1) continue;
+    h.vx += ((h.x - past.x) / d) * 13;
+    h.vy += ((h.y - past.y) / d) * 13;
     h.warn = 1;
-    h.grace = Math.max(h.grace || 0, 0.65);
-    if (!h.boss && h.r < 26) placeHunterOnEdge(h);
+    h.grace = Math.max(h.grace || 0, 0.75);
+    h.stunT = Math.max(h.stunT || 0, 0.6);
+    if (!h.boss && h.r < 28) placeHunterOnEdge(h);
   }
   if (hunter && !hunter.boss) placeHunterOnEdge(hunter);
-  state.safeUntil = performance.now() + 1500;
-  state.flash = Math.max(state.flash, 0.16);
-  state.timeScale = 0.6;
-  state.slowmoUntil = performance.now() + 320;
+  state.safeUntil = performance.now() + 1700;
+  state.flash = Math.max(state.flash, 0.18);
+  state.timeScale = 0.52;
+  state.slowmoUntil = performance.now() + 380;
   return true;
 }
 
 function fireWhaleSonar(dt) {
   if (activeHeroId() !== "whale" || !state.life || !state.touchActive || state.paused) return;
   state.whaleCd = Math.max(0, (state.whaleCd || 0) - dt);
+  if (state.whalePulse2 > 0) {
+    state.whalePulse2 -= dt;
+    if (state.whalePulse2 <= 0) {
+      applyWhalePulse(0.72);
+      state.whalePulse2 = 0;
+    }
+  }
+  if (state.sonarRings?.length) {
+    for (let i = state.sonarRings.length - 1; i >= 0; i -= 1) {
+      const ring = state.sonarRings[i];
+      ring.t += dt;
+      ring.r += dt * 260;
+      if (ring.t > 0.55) state.sonarRings.splice(i, 1);
+    }
+  }
   if (state.whaleCd > 0) return;
-  state.whaleCd = 3.4;
-  const reach = 210;
+  const reach = 230;
+  let nearby = 0;
+  for (const h of state.hunters) {
+    if (dist(h.x, h.y, state.life.x, state.life.y) <= reach) nearby += 1;
+  }
+  if (!nearby) return;
+  state.whaleCd = 3.1;
+  applyWhalePulse(1);
+  state.whalePulse2 = 0.34;
+  state.sonarRings = state.sonarRings || [];
+  state.sonarRings.push({ x: state.life.x, y: state.life.y, r: 20, t: 0 });
+  floatText(state.life.x, state.life.y - 24, "сонар", "#9ed4ff", 15);
+  tipOnce("ability", "ДВОЙНОЙ СОНАР", 1400);
+  sfxPulse();
+  buzz([10, 16, 10]);
+  state.flash = Math.max(state.flash, 0.14);
+}
+
+function applyWhalePulse(power = 1) {
+  if (!state.life) return 0;
+  const reach = 230 * (0.85 + 0.15 * power);
   let hit = 0;
   for (const h of state.hunters) {
     const d = dist(h.x, h.y, state.life.x, state.life.y);
     if (d > reach || d < 0.1) continue;
-    const force = ((reach - d) / reach) * (h.boss ? 8 : 16);
+    const force = ((reach - d) / reach) * (h.boss ? 9 : 18) * power;
     h.vx += ((h.x - state.life.x) / d) * force;
     h.vy += ((h.y - state.life.y) / d) * force;
     h.warn = 1;
-    h.grace = Math.max(h.grace || 0, h.boss ? 0.7 : 0.55);
+    h.grace = Math.max(h.grace || 0, h.boss ? 0.85 : 0.7);
+    h.stunT = Math.max(h.stunT || 0, h.boss ? 0.7 : 1.35);
+    if (h.boss) {
+      h.bossTimer = Math.max(h.bossTimer || 0, 1.1);
+      h.dashT = 0;
+      h.chargeTx = h.x;
+      h.chargeTy = h.y;
+    }
     hit += 1;
   }
-  burst(state.life.x, state.life.y, "rgba(140,200,255,0.55)", 26, 6.5);
-  floatText(state.life.x, state.life.y - 24, "сонар", "#9ed4ff", 15);
-  tipOnce("ability", "СОНАР", 1300);
-  sfxPulse();
-  buzz([10, 16, 10]);
-  state.flash = Math.max(state.flash, 0.12);
-  state.shake = Math.max(state.shake, hit ? 5 : 2);
-  state.safeUntil = Math.max(state.safeUntil || 0, performance.now() + 500);
+  if (hit) {
+    state.score += hit;
+    state.comboClock = Math.max(state.comboClock, 1.6);
+    updateScoreUi(true);
+    floatText(state.life.x, state.life.y - 40, `+${hit}`, "#9ed4ff", 13);
+  }
+  burst(state.life.x, state.life.y, "rgba(140,200,255,0.55)", 28, 7);
+  state.shake = Math.max(state.shake, hit ? 6 : 2);
+  state.safeUntil = Math.max(state.safeUntil || 0, performance.now() + 700);
+  state.sonarRings = state.sonarRings || [];
+  state.sonarRings.push({ x: state.life.x, y: state.life.y, r: 24, t: 0 });
+  return hit;
+}
+
+function notePremiumEat() {
+  if (!state.meta) return;
+  const id = activeHeroId();
+  if (id === "squid" && !state.squidInkReady) {
+    state.squidEats = (state.squidEats || 0) + 1;
+    if (state.squidEats >= 10) {
+      state.squidInkReady = true;
+      state.squidEats = 0;
+      floatText(state.life.x, state.life.y - 28, "чернила готовы", "#c8b8ff", 14);
+      buzz(6);
+    }
+  }
+  if (id === "seahorse" && !state.seahorseReady) {
+    state.seahorseEats = (state.seahorseEats || 0) + 1;
+    if (state.seahorseEats >= 12) {
+      state.seahorseReady = true;
+      state.seahorseEats = 0;
+      floatText(state.life.x, state.life.y - 28, "откат готов", cssVar("--gold", "#ffe898"), 14);
+      buzz(6);
+    }
+  }
 }
 
 function absorbHunterHit(hunter) {
@@ -4623,8 +4795,17 @@ function grantContinue() {
   state.whaleCd = 0;
   state.inkCloud = null;
   state.squidInkReady = true;
+  state.squidEats = 0;
+  state.squidInkCd = 0;
   state.lifeHistory = [];
   state.seahorseReady = true;
+  state.seahorseEats = 0;
+  state.seahorseCd = 0;
+  state.shellCharges = activeHeroId() === "nautilus" ? 2 : 0;
+  state.mantaWake = null;
+  state.eelBolts = [];
+  state.sonarRings = [];
+  state.whalePulse2 = 0;
   state.shipLives = activeHeroId() === "sub" ? SUBMARINE_LIVES : 0;
   state.heroShield = heroHasShield();
   state.heroShieldCd = 0;
@@ -5156,9 +5337,19 @@ function resetRun() {
   state.whaleCd = 0;
   state.inkCloud = null;
   state.squidInkReady = true;
+  state.squidEats = 0;
+  state.squidInkCd = 0;
   state.lifeHistory = [];
   state.seahorseReady = true;
+  state.seahorseEats = 0;
+  state.seahorseCd = 0;
+  state.shellCharges = activeHeroId() === "nautilus" ? 2 : 0;
+  state.mantaWake = null;
+  state.eelBolts = [];
+  state.sonarRings = [];
+  state.whalePulse2 = 0;
   state.shipLives = activeHeroId() === "sub" ? SUBMARINE_LIVES : 0;
+  state.heroShield = activeHeroId() !== "nautilus" || state.shellCharges > 0;
   state.bestAtStart = Math.max(state.best || 0, state.meta?.best || 0);
   app.classList.remove("ink-dive");
   setDiveMeter(0);
@@ -5391,13 +5582,36 @@ function spawnTrailParticles(x0, y0, x1, y1, moved) {
 
 function updateAnglerLure(dt) {
   if (activeHeroId() !== "angler" || !state.life) return;
-  const reach = 178;
+  const reach = 210;
+  let closest = null;
+  let closestD = Infinity;
   for (const spark of state.sparks) {
     const d = dist(spark.x, spark.y, state.life.x, state.life.y);
     if (d > reach || d < 8) continue;
-    const pull = (1 - d / reach) * 52 * dt;
-    spark.vx += ((state.life.x - spark.x) / d) * pull * 0.12;
-    spark.vy += ((state.life.y - spark.y) / d) * pull * 0.12;
+    if (d < closestD) {
+      closestD = d;
+      closest = spark;
+    }
+    const pull = (1 - d / reach) * 78 * dt;
+    spark.vx += ((state.life.x - spark.x) / d) * pull * 0.28;
+    spark.vy += ((state.life.y - spark.y) / d) * pull * 0.28;
+    if (Math.random() < dt * 0.08 && spark.type !== "rare" && spark.type !== "super" && spark.type !== "deep") {
+      spark.type = "rare";
+      spark.pulse = Math.random() * Math.PI * 2;
+      floatText(spark.x, spark.y - 12, "золото", cssVar("--gold", "#ffe898"), 12);
+    }
+  }
+  if (closest && Math.random() < dt * 2.4) {
+    pushParticle({
+      x: closest.x,
+      y: closest.y,
+      vx: (state.life.x - closest.x) * 0.05,
+      vy: (state.life.y - closest.y) * 0.05,
+      size: rand(1.5, 3),
+      color: "rgba(255,220,140,0.85)",
+      kind: "streak",
+      decay: 0.09,
+    });
   }
 }
 
@@ -5593,6 +5807,7 @@ function eatSpark(index, spark) {
   playSparkTone(spark.type);
   eatSparkBlast(spark, openingEat);
   addScore(spark.worth, spark.x, spark.y - 12, { color: spark.color });
+  notePremiumEat();
 }
 
 function placeHunterOnEdge(hunter) {
@@ -5796,6 +6011,10 @@ function updateHunters(dt) {
     }
     const ang = Math.atan2(ty - hunter.y, tx - hunter.x);
     let speed = (0.88 + Math.min(1.55, state.score * 0.0032)) * hunter.anger * wave.speedMul * midgamePace() * diff.speed;
+    if (hunter.stunT > 0) {
+      hunter.stunT = Math.max(0, hunter.stunT - dt);
+      speed *= 0.18;
+    }
     if (hunter.shadow) speed *= 0.88;
     if (hunter.slow) speed *= 0.68;
     if (hasMut("cool") && state.hunger < 50) speed *= 0.85;
@@ -5965,6 +6184,7 @@ function updateRun(dt) {
     fireWhaleSonar(dt);
     recordLifeHistory(dt);
     updateInkCloud(dt);
+    updateMantaWake(dt);
     const prevX = state.life.px ?? state.life.x;
     const prevY = state.life.py ?? state.life.y;
     const moved = dist(state.life.x, state.life.y, prevX, prevY);
@@ -5996,12 +6216,31 @@ function updateRun(dt) {
   const diveMul = inInkDive() ? 0.72 : 1;
   if (state.life) {
     state.heroDashCd = Math.max(0, (state.heroDashCd || 0) - dt);
-    if (!state.heroShield && activeHeroId() === "nautilus") {
+    if (activeHeroId() === "nautilus" && (state.shellCharges || 0) < 2) {
       state.heroShieldCd = Math.max(0, (state.heroShieldCd || 0) - dt);
       if (state.heroShieldCd <= 0) {
+        state.shellCharges = Math.min(2, (state.shellCharges || 0) + 1);
         state.heroShield = true;
-        floatText(state.life.x, state.life.y - 24, "раковина", cssVar("--accent-a", "#ff9a62"), 14);
+        floatText(state.life.x, state.life.y - 24, `раковина · ${state.shellCharges}`, cssVar("--accent-a", "#ff9a62"), 14);
         buzz(6);
+        if (state.shellCharges < 2) state.heroShieldCd = 7.2;
+      }
+    }
+    if (activeHeroId() === "squid" && !state.squidInkReady) {
+      // passive recharge alongside eats
+      state.squidInkCd = (state.squidInkCd || 0) + dt;
+      if (state.squidInkCd >= 16) {
+        state.squidInkReady = true;
+        state.squidInkCd = 0;
+        floatText(state.life.x, state.life.y - 28, "чернила готовы", "#c8b8ff", 14);
+      }
+    }
+    if (activeHeroId() === "seahorse" && !state.seahorseReady) {
+      state.seahorseCd = (state.seahorseCd || 0) + dt;
+      if (state.seahorseCd >= 22) {
+        state.seahorseReady = true;
+        state.seahorseCd = 0;
+        floatText(state.life.x, state.life.y - 28, "откат готов", cssVar("--gold", "#ffe898"), 14);
       }
     }
     state.hunger -= HUNGER_DRAIN_PER_SEC * dt * (hasMut("cool") ? 0.7 : 1) * stillPenalty * calmMul * diveMul * (inOpening() ? 0.72 : 1) * playerDifficulty().hunger * heroHungerMul();
@@ -7288,7 +7527,7 @@ function drawBossHunter(hunter, alpha = 1) {
 function drawHeroAura() {
   if (!state.life || !state.running) return;
   if (heroHasAura()) {
-    const reach = (activeHeroId() === "angler" ? 155 : 118) + Math.sin(state.time * 2.4) * 6;
+    const reach = (activeHeroId() === "angler" ? 168 : 118) + Math.sin(state.time * 2.4) * 6;
     ctx.save();
     ctx.globalAlpha = 0.16 + Math.sin(state.time * 3) * 0.04;
     ctx.strokeStyle = cssVar("--accent-b", "#7affd4");
@@ -7304,15 +7543,18 @@ function drawHeroAura() {
     ctx.arc(state.life.x, state.life.y, reach, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
-  } else if (heroHasShield() && state.heroShield) {
+  } else if (heroHasShield() && (state.heroShield || (activeHeroId() === "nautilus" && (state.shellCharges || 0) > 0))) {
     const pulse = 1 + Math.sin(state.time * 4) * 0.06;
+    const charges = activeHeroId() === "nautilus" ? Math.max(1, state.shellCharges || 0) : 1;
     ctx.save();
     ctx.globalAlpha = 0.45;
     ctx.strokeStyle = cssVar("--accent-a", "#ff9a62");
     ctx.lineWidth = 2.2;
-    ctx.beginPath();
-    ctx.arc(state.life.x, state.life.y, state.life.r * 1.55 * pulse, 0, Math.PI * 2);
-    ctx.stroke();
+    for (let i = 0; i < charges; i += 1) {
+      ctx.beginPath();
+      ctx.arc(state.life.x, state.life.y, state.life.r * (1.45 + i * 0.22) * pulse, 0, Math.PI * 2);
+      ctx.stroke();
+    }
     ctx.restore();
   } else if (heroCanDash() && state.heroDashCd <= 0 && !inOpening()) {
     ctx.save();
@@ -7501,91 +7743,207 @@ function drawCrab(body, alpha = 1) {
   ctx.restore();
 }
 
+
 function drawManta(body, alpha = 1) {
   const ink = lifeInkColor();
   const accent = cssVar("--accent-b", "#7affd4");
+  const foam = cssVar("--foam", "#f3eee8");
   const aim = body.aim ?? -Math.PI / 2;
-  const s = body.r;
-  const wob = body.wobble;
-  const flap = Math.sin(wob * 1.6) * 0.28;
+  const s = body.r * 1.08;
+  const wob = body.wobble || 0;
+  const flap = Math.sin(wob * 1.8) * 0.34;
   ctx.save();
   ctx.translate(body.x, body.y);
   ctx.rotate(aim);
   ctx.globalAlpha = alpha;
-  ctx.fillStyle = mixColor(ink, accent, 0.22);
+  const glow = ctx.createRadialGradient(0, 0, s * 0.2, 0, 0, s * 2.1);
+  glow.addColorStop(0, "rgba(122,255,212,0.28)");
+  glow.addColorStop(1, "transparent");
+  ctx.fillStyle = glow;
   ctx.beginPath();
-  ctx.moveTo(s * 1.05, 0);
-  ctx.quadraticCurveTo(s * 0.2, -s * (1.15 + flap), -s * 0.7, -s * 0.35);
-  ctx.quadraticCurveTo(-s * 1.05, 0, -s * 0.7, s * 0.35);
-  ctx.quadraticCurveTo(s * 0.2, s * (1.15 + flap), s * 1.05, 0);
+  ctx.ellipse(0, 0, s * 2.0, s * 1.35, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = mixColor(ink, "#ffffff", 0.18);
+  const wing = ctx.createLinearGradient(0, -s * 1.4, 0, s * 1.4);
+  wing.addColorStop(0, mixColor(ink, accent, 0.45));
+  wing.addColorStop(0.45, mixColor(ink, "#1a3048", 0.2));
+  wing.addColorStop(1, mixColor(ink, accent, 0.3));
+  ctx.fillStyle = wing;
   ctx.beginPath();
-  ctx.ellipse(s * 0.15, 0, s * 0.42, s * 0.28, 0, 0, Math.PI * 2);
+  ctx.moveTo(s * 1.15, 0);
+  ctx.quadraticCurveTo(s * 0.25, -s * (1.35 + flap), -s * 0.55, -s * 0.55);
+  ctx.quadraticCurveTo(-s * 1.2, -s * 0.1, -s * 1.45, 0);
+  ctx.quadraticCurveTo(-s * 1.2, s * 0.1, -s * 0.55, s * 0.55);
+  ctx.quadraticCurveTo(s * 0.25, s * (1.35 + flap), s * 1.15, 0);
   ctx.fill();
-  drawHeroEyes(s * 0.85, wob, alpha, 0);
+  // belly
+  ctx.fillStyle = mixColor(foam, accent, 0.2);
+  ctx.globalAlpha = alpha * 0.85;
+  ctx.beginPath();
+  ctx.ellipse(s * 0.1, 0, s * 0.55, s * 0.32, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = alpha;
+  // cephalic fins
+  ctx.strokeStyle = mixColor(accent, "#fff", 0.25);
+  ctx.lineWidth = Math.max(1.5, s * 0.08);
+  ctx.beginPath();
+  ctx.moveTo(s * 0.85, -s * 0.18);
+  ctx.quadraticCurveTo(s * 1.25, -s * 0.55, s * 1.45, -s * 0.1);
+  ctx.moveTo(s * 0.85, s * 0.18);
+  ctx.quadraticCurveTo(s * 1.25, s * 0.55, s * 1.45, s * 0.1);
+  ctx.stroke();
+  // spots
+  ctx.fillStyle = "rgba(255,255,255,0.18)";
+  for (let i = 0; i < 6; i += 1) {
+    ctx.beginPath();
+    ctx.arc(-s * 0.1 + (i % 3) * s * 0.28, ((i < 3 ? -1 : 1) * s * 0.28), s * 0.06, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // whip tail
+  ctx.strokeStyle = mixColor(ink, accent, 0.35);
+  ctx.lineWidth = Math.max(1.8, s * 0.1);
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(-s * 1.35, 0);
+  ctx.quadraticCurveTo(-s * 1.9, Math.sin(wob * 3) * s * 0.35, -s * 2.35, Math.sin(wob * 2) * s * 0.15);
+  ctx.stroke();
+  drawHeroEyes(s * 0.75, wob, alpha, -s * 0.05);
   ctx.restore();
 }
 
 function drawAngler(body, alpha = 1) {
   const ink = lifeInkColor();
   const gold = cssVar("--gold", "#ffe898");
+  const deep = "#142238";
   const aim = body.aim ?? -Math.PI / 2;
-  const s = body.r;
-  const wob = body.wobble;
+  const s = body.r * 1.05;
+  const wob = body.wobble || 0;
+  const pulse = 0.55 + 0.45 * Math.sin(wob * 4);
   ctx.save();
   ctx.translate(body.x, body.y);
   ctx.rotate(aim);
   ctx.globalAlpha = alpha;
-  ctx.strokeStyle = mixColor(ink, gold, 0.35);
-  ctx.lineWidth = Math.max(1.6, s * 0.1);
+  // lure glow
+  const lureX = s * 1.42;
+  const lureY = -s * 0.08;
+  const lg = ctx.createRadialGradient(lureX, lureY, 0, lureX, lureY, s * 1.1);
+  lg.addColorStop(0, `rgba(255,230,150,${0.55 * pulse})`);
+  lg.addColorStop(0.45, `rgba(255,180,80,${0.18 * pulse})`);
+  lg.addColorStop(1, "transparent");
+  ctx.fillStyle = lg;
+  ctx.beginPath();
+  ctx.arc(lureX, lureY, s * 1.1, 0, Math.PI * 2);
+  ctx.fill();
+  // body
+  const grad = ctx.createLinearGradient(0, -s, 0, s);
+  grad.addColorStop(0, mixColor(deep, gold, 0.15));
+  grad.addColorStop(1, mixColor(ink, deep, 0.35));
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.moveTo(s * 0.95, 0);
+  ctx.quadraticCurveTo(s * 0.4, -s * 0.85, -s * 0.55, -s * 0.55);
+  ctx.quadraticCurveTo(-s * 1.15, 0, -s * 0.45, s * 0.7);
+  ctx.quadraticCurveTo(s * 0.35, s * 0.85, s * 0.95, 0);
+  ctx.fill();
+  // teeth
+  ctx.fillStyle = "#fff6e0";
+  for (let i = 0; i < 4; i += 1) {
+    const tx = s * (0.35 + i * 0.14);
+    ctx.beginPath();
+    ctx.moveTo(tx, s * 0.18);
+    ctx.lineTo(tx + s * 0.05, s * 0.42);
+    ctx.lineTo(tx + s * 0.1, s * 0.18);
+    ctx.fill();
+  }
+  // dorsal spikes
+  ctx.fillStyle = mixColor(deep, gold, 0.25);
+  for (let i = 0; i < 3; i += 1) {
+    const sx = -s * 0.2 + i * s * 0.28;
+    ctx.beginPath();
+    ctx.moveTo(sx, -s * 0.45);
+    ctx.lineTo(sx + s * 0.1, -s * 0.95);
+    ctx.lineTo(sx + s * 0.2, -s * 0.4);
+    ctx.fill();
+  }
+  // rod
+  ctx.strokeStyle = mixColor(ink, gold, 0.45);
+  ctx.lineWidth = Math.max(2, s * 0.11);
   ctx.lineCap = "round";
   ctx.beginPath();
-  ctx.moveTo(s * 0.55, -s * 0.15);
-  ctx.quadraticCurveTo(s * 1.05, -s * 0.85, s * 1.35, -s * 0.2);
+  ctx.moveTo(s * 0.5, -s * 0.25);
+  ctx.quadraticCurveTo(s * 1.05, -s * 1.05, lureX, lureY);
   ctx.stroke();
   ctx.fillStyle = gold;
   ctx.beginPath();
-  ctx.arc(s * 1.38, -s * 0.12, s * 0.16, 0, Math.PI * 2);
+  ctx.arc(lureX, lureY, s * 0.18 * (0.9 + pulse * 0.2), 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = mixColor(ink, "#1a2848", 0.2);
+  ctx.fillStyle = "rgba(255,255,240,0.9)";
   ctx.beginPath();
-  ctx.ellipse(0, 0, s * 0.9, s * 0.7, 0, 0, Math.PI * 2);
+  ctx.arc(lureX - s * 0.04, lureY - s * 0.04, s * 0.07, 0, Math.PI * 2);
   ctx.fill();
-  drawHeroEyes(s, wob, alpha, -s * 0.05);
+  drawHeroEyes(s * 0.55, wob, alpha, -s * 0.12);
   ctx.restore();
 }
 
 function drawNautilus(body, alpha = 1) {
   const ink = lifeInkColor();
   const accent = cssVar("--accent-a", "#ff9a62");
+  const pearl = "#ffe8d0";
   const aim = body.aim ?? -Math.PI / 2;
-  const s = body.r;
-  const wob = body.wobble;
+  const s = body.r * 1.1;
+  const wob = body.wobble || 0;
   ctx.save();
   ctx.translate(body.x, body.y);
-  ctx.rotate(aim);
+  ctx.rotate(aim + Math.sin(wob * 0.6) * 0.05);
   ctx.globalAlpha = alpha;
-  ctx.fillStyle = mixColor(ink, accent, 0.28);
+  const glow = ctx.createRadialGradient(-s * 0.1, 0, s * 0.2, -s * 0.1, 0, s * 1.7);
+  glow.addColorStop(0, "rgba(255,154,98,0.25)");
+  glow.addColorStop(1, "transparent");
+  ctx.fillStyle = glow;
   ctx.beginPath();
-  ctx.arc(-s * 0.08, 0, s * 0.92, 0, Math.PI * 2);
+  ctx.arc(-s * 0.1, 0, s * 1.7, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = mixColor(ink, "#ffffff", 0.25);
-  ctx.lineWidth = Math.max(1.4, s * 0.08);
+  const shell = ctx.createRadialGradient(-s * 0.2, -s * 0.1, s * 0.1, -s * 0.1, 0, s);
+  shell.addColorStop(0, mixColor(pearl, accent, 0.35));
+  shell.addColorStop(0.55, mixColor(ink, accent, 0.4));
+  shell.addColorStop(1, mixColor(ink, "#3a2018", 0.3));
+  ctx.fillStyle = shell;
   ctx.beginPath();
-  for (let i = 0; i < 3; i += 1) {
-    const r = s * (0.35 + i * 0.2);
-    ctx.moveTo(r, 0);
-    ctx.arc(-s * 0.08, 0, r, 0, Math.PI * 1.4);
+  ctx.arc(-s * 0.08, 0, s * 0.98, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = mixColor(pearl, accent, 0.5);
+  ctx.lineWidth = Math.max(1.6, s * 0.08);
+  ctx.beginPath();
+  for (let i = 0; i < 5; i += 1) {
+    const r = s * (0.28 + i * 0.14);
+    ctx.moveTo(-s * 0.08 + r, 0);
+    ctx.arc(-s * 0.08, 0, r, 0, Math.PI * 1.55);
   }
   ctx.stroke();
-  ctx.fillStyle = mixColor(ink, "#ffffff", 0.16);
+  // rim
+  ctx.strokeStyle = mixColor(accent, "#fff", 0.25);
+  ctx.lineWidth = Math.max(2, s * 0.1);
   ctx.beginPath();
-  ctx.ellipse(s * 0.55, 0, s * 0.32, s * 0.42, 0.2, 0, Math.PI * 2);
+  ctx.arc(-s * 0.08, 0, s * 0.98, 0, Math.PI * 2);
+  ctx.stroke();
+  // tentacles
+  ctx.strokeStyle = mixColor(ink, accent, 0.35);
+  ctx.lineWidth = Math.max(1.8, s * 0.1);
+  ctx.lineCap = "round";
+  for (let i = 0; i < 5; i += 1) {
+    const a = -0.7 + i * 0.35;
+    ctx.beginPath();
+    ctx.moveTo(s * 0.55, Math.sin(a) * s * 0.15);
+    ctx.quadraticCurveTo(s * 1.05, Math.sin(a + wob) * s * 0.55, s * 1.4, Math.sin(a * 1.3 + wob) * s * 0.7);
+    ctx.stroke();
+  }
+  ctx.fillStyle = mixColor(ink, pearl, 0.25);
+  ctx.beginPath();
+  ctx.ellipse(s * 0.55, 0, s * 0.35, s * 0.42, 0.15, 0, Math.PI * 2);
   ctx.fill();
   drawHeroEyes(s * 0.7, wob, alpha, 0);
   ctx.restore();
 }
+
 
 function drawSubmarine(body, alpha = 1) {
   const brass = "#d4a574";
@@ -7716,6 +8074,7 @@ function drawSubmarine(body, alpha = 1) {
   ctx.restore();
 }
 
+
 function drawShipLivesHud() {
   if (activeHeroId() !== "sub" || !state.life || !state.running) return;
   const life = state.life;
@@ -7762,144 +8121,307 @@ function drawShots() {
   }
 }
 
-
 function drawEel(body, alpha = 1) {
   const aim = body.aim ?? -Math.PI / 2;
   const s = body.r;
   const wob = body.wobble || 0;
   const teal = "#7ad7ff";
-  const deep = "#1a4a68";
+  const deep = "#123a58";
+  const gold = cssVar("--gold", "#ffe898");
   ctx.save();
   ctx.translate(body.x, body.y);
   ctx.rotate(aim);
   ctx.globalAlpha = alpha;
-  const glow = ctx.createRadialGradient(0, 0, s * 0.2, 0, 0, s * 1.7);
-  glow.addColorStop(0, "rgba(140,220,255,0.35)");
+  const glow = ctx.createRadialGradient(0, 0, s * 0.2, 0, 0, s * 2);
+  glow.addColorStop(0, `rgba(140,220,255,${0.4 + Math.sin(wob * 5) * 0.1})`);
   glow.addColorStop(1, "transparent");
   ctx.fillStyle = glow;
   ctx.beginPath();
-  ctx.arc(0, 0, s * 1.7, 0, Math.PI * 2);
+  ctx.arc(0, 0, s * 2, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = mixColor(teal, deep, 0.35);
-  ctx.lineWidth = Math.max(3, s * 0.42);
+  // segmented body
+  const pts = [];
+  for (let i = 0; i <= 10; i += 1) {
+    const t = i / 10;
+    const x = -s * 1.35 + t * s * 2.7;
+    const y = Math.sin(wob * 3.2 + t * 4.2) * s * (0.35 + t * 0.15);
+    pts.push([x, y]);
+  }
+  ctx.strokeStyle = mixColor(teal, deep, 0.25);
+  ctx.lineWidth = Math.max(4.5, s * 0.55);
   ctx.lineCap = "round";
+  ctx.lineJoin = "round";
   ctx.beginPath();
-  ctx.moveTo(-s * 1.2, Math.sin(wob * 3) * s * 0.2);
-  ctx.quadraticCurveTo(-s * 0.2, -Math.sin(wob * 2.4) * s * 0.55, s * 0.85, 0);
-  ctx.quadraticCurveTo(s * 1.15, Math.sin(wob * 4) * s * 0.15, s * 1.35, 0);
+  pts.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])));
   ctx.stroke();
-  ctx.fillStyle = teal;
+  // electric bands
+  ctx.strokeStyle = `rgba(255,255,200,${0.35 + Math.sin(wob * 8) * 0.2})`;
+  ctx.lineWidth = Math.max(1.2, s * 0.08);
+  for (let i = 1; i < pts.length - 1; i += 2) {
+    const [x, y] = pts[i];
+    ctx.beginPath();
+    ctx.moveTo(x, y - s * 0.22);
+    ctx.lineTo(x, y + s * 0.22);
+    ctx.stroke();
+  }
+  // head
+  const head = pts[pts.length - 1];
+  const hg = ctx.createRadialGradient(head[0], head[1], 0, head[0], head[1], s * 0.42);
+  hg.addColorStop(0, mixColor(teal, "#fff", 0.35));
+  hg.addColorStop(1, deep);
+  ctx.fillStyle = hg;
   ctx.beginPath();
-  ctx.arc(s * 1.2, 0, s * 0.28, 0, Math.PI * 2);
+  ctx.ellipse(head[0] + s * 0.08, head[1], s * 0.38, s * 0.28, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = "rgba(255,255,240,0.9)";
+  ctx.fillStyle = gold;
+  ctx.globalAlpha = alpha * (0.5 + Math.sin(wob * 6) * 0.3);
   ctx.beginPath();
-  ctx.arc(s * 1.28, -s * 0.06, s * 0.08, 0, Math.PI * 2);
+  ctx.arc(head[0] + s * 0.28, head[1] - s * 0.05, s * 0.08, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = "#fffef8";
+  ctx.beginPath();
+  ctx.arc(head[0] + s * 0.18, head[1] - s * 0.08, s * 0.07, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#102030";
+  ctx.beginPath();
+  ctx.arc(head[0] + s * 0.2, head[1] - s * 0.08, s * 0.03, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 }
 
 function drawSquid(body, alpha = 1) {
   const aim = body.aim ?? -Math.PI / 2;
-  const s = body.r;
+  const s = body.r * 1.05;
   const wob = body.wobble || 0;
-  const ink = "#5a4a8a";
-  const lite = "#c8b8ff";
+  const ink = "#4a3a78";
+  const lite = "#d2c4ff";
+  const ready = state.squidInkReady;
   ctx.save();
   ctx.translate(body.x, body.y);
   ctx.rotate(aim);
   ctx.globalAlpha = alpha;
-  ctx.fillStyle = mixColor(ink, lite, 0.25);
-  ctx.beginPath();
-  ctx.ellipse(s * 0.15, 0, s * 0.85, s * 0.7, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = lite;
-  ctx.beginPath();
-  ctx.ellipse(s * 0.55, -s * 0.12, s * 0.18, s * 0.14, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = mixColor(ink, lite, 0.4);
-  ctx.lineWidth = Math.max(1.6, s * 0.1);
-  for (let i = 0; i < 5; i += 1) {
-    const a = -0.9 + i * 0.45;
+  if (ready) {
+    const g = ctx.createRadialGradient(0, 0, s * 0.2, 0, 0, s * 1.8);
+    g.addColorStop(0, "rgba(180,140,255,0.28)");
+    g.addColorStop(1, "transparent");
+    ctx.fillStyle = g;
     ctx.beginPath();
-    ctx.moveTo(-s * 0.35, Math.sin(a) * s * 0.2);
-    ctx.quadraticCurveTo(
-      -s * 0.9,
-      Math.sin(a + wob) * s * 0.7,
-      -s * 1.35,
-      Math.sin(a * 1.4 + wob) * s * 0.9
-    );
+    ctx.arc(0, 0, s * 1.8, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  const mantle = ctx.createLinearGradient(0, -s, 0, s);
+  mantle.addColorStop(0, mixColor(lite, "#fff", 0.2));
+  mantle.addColorStop(0.5, mixColor(ink, lite, 0.35));
+  mantle.addColorStop(1, ink);
+  ctx.fillStyle = mantle;
+  ctx.beginPath();
+  ctx.ellipse(s * 0.2, 0, s * 0.95, s * 0.72, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // fins
+  ctx.fillStyle = mixColor(ink, lite, 0.4);
+  ctx.beginPath();
+  ctx.ellipse(s * 0.05, -s * 0.7, s * 0.45, s * 0.22, -0.4, 0, Math.PI * 2);
+  ctx.ellipse(s * 0.05, s * 0.7, s * 0.45, s * 0.22, 0.4, 0, Math.PI * 2);
+  ctx.fill();
+  // speckles
+  ctx.fillStyle = "rgba(255,255,255,0.16)";
+  for (let i = 0; i < 8; i += 1) {
+    ctx.beginPath();
+    ctx.arc(s * (0.1 + (i % 4) * 0.2), ((i < 4 ? -1 : 1) * s * 0.22), s * 0.05, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // eyes
+  ctx.fillStyle = "#f4f0ff";
+  ctx.beginPath();
+  ctx.ellipse(s * 0.55, -s * 0.18, s * 0.2, s * 0.16, 0, 0, Math.PI * 2);
+  ctx.ellipse(s * 0.55, s * 0.18, s * 0.2, s * 0.16, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#1a1030";
+  ctx.beginPath();
+  ctx.arc(s * 0.62, -s * 0.18, s * 0.07, 0, Math.PI * 2);
+  ctx.arc(s * 0.62, s * 0.18, s * 0.07, 0, Math.PI * 2);
+  ctx.fill();
+  // tentacles with suckers
+  for (let i = 0; i < 6; i += 1) {
+    const a = -1.0 + i * 0.4;
+    ctx.strokeStyle = mixColor(ink, lite, 0.45);
+    ctx.lineWidth = Math.max(2.2, s * 0.12);
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    const x1 = -s * 0.35;
+    const y1 = Math.sin(a) * s * 0.2;
+    const x2 = -s * 1.45;
+    const y2 = Math.sin(a * 1.4 + wob) * s * 1.05;
+    ctx.moveTo(x1, y1);
+    ctx.quadraticCurveTo(-s * 0.9, Math.sin(a + wob) * s * 0.7, x2, y2);
     ctx.stroke();
+    ctx.fillStyle = "rgba(255,200,220,0.45)";
+    for (let k = 0; k < 3; k += 1) {
+      const t = 0.35 + k * 0.2;
+      const sx = x1 + (x2 - x1) * t;
+      const sy = y1 + (y2 - y1) * t;
+      ctx.beginPath();
+      ctx.arc(sx, sy, s * 0.05, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
   ctx.restore();
 }
 
 function drawSeahorse(body, alpha = 1) {
   const aim = body.aim ?? -Math.PI / 2;
-  const s = body.r;
+  const s = body.r * 1.08;
   const wob = body.wobble || 0;
   const gold = cssVar("--gold", "#ffe898");
-  const coral = "#ff9a7a";
+  const coral = "#ff8b6a";
+  const ready = state.seahorseReady;
   ctx.save();
   ctx.translate(body.x, body.y);
   ctx.rotate(aim);
   ctx.globalAlpha = alpha;
-  ctx.fillStyle = mixColor(coral, gold, 0.25);
+  if (ready) {
+    const g = ctx.createRadialGradient(0, 0, s * 0.2, 0, 0, s * 1.9);
+    g.addColorStop(0, "rgba(255,220,140,0.3)");
+    g.addColorStop(1, "transparent");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(0, 0, s * 1.9, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  const bodyG = ctx.createLinearGradient(0, -s, 0, s);
+  bodyG.addColorStop(0, mixColor(coral, gold, 0.45));
+  bodyG.addColorStop(1, mixColor(coral, "#7a3020", 0.25));
+  ctx.fillStyle = bodyG;
   ctx.beginPath();
-  ctx.moveTo(s * 0.9, -s * 0.1);
-  ctx.quadraticCurveTo(s * 0.2, -s * 1.05, -s * 0.35, -s * 0.55);
-  ctx.quadraticCurveTo(-s * 0.9, 0, -s * 0.2, s * 0.75);
-  ctx.quadraticCurveTo(s * 0.35, s * 0.95, s * 0.55, s * 0.2);
+  ctx.moveTo(s * 0.95, -s * 0.05);
+  ctx.quadraticCurveTo(s * 0.35, -s * 1.15, -s * 0.25, -s * 0.7);
+  ctx.quadraticCurveTo(-s * 0.95, -s * 0.1, -s * 0.35, s * 0.55);
+  ctx.quadraticCurveTo(s * 0.2, s * 1.05, s * 0.65, s * 0.25);
   ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle = gold;
-  ctx.lineWidth = Math.max(1.4, s * 0.08);
+  // armor plates
+  ctx.strokeStyle = mixColor(gold, "#fff", 0.25);
+  ctx.lineWidth = Math.max(1.2, s * 0.07);
+  for (let i = 0; i < 4; i += 1) {
+    ctx.beginPath();
+    ctx.arc(-s * 0.05, s * 0.05, s * (0.35 + i * 0.14), -0.8, 1.2);
+    ctx.stroke();
+  }
+  // crest
+  ctx.fillStyle = gold;
+  for (let i = 0; i < 4; i += 1) {
+    const cx = -s * 0.05 + i * s * 0.18;
+    ctx.beginPath();
+    ctx.moveTo(cx, -s * 0.55);
+    ctx.lineTo(cx + s * 0.08, -s * 1.05);
+    ctx.lineTo(cx + s * 0.16, -s * 0.5);
+    ctx.fill();
+  }
+  // curled tail
+  ctx.strokeStyle = mixColor(coral, gold, 0.4);
+  ctx.lineWidth = Math.max(2.4, s * 0.14);
+  ctx.lineCap = "round";
   ctx.beginPath();
-  ctx.moveTo(-s * 0.1, s * 0.55);
-  ctx.quadraticCurveTo(-s * 0.55, s * 1.1 + Math.sin(wob) * s * 0.1, -s * 0.95, s * 0.7);
+  ctx.moveTo(-s * 0.15, s * 0.55);
+  ctx.quadraticCurveTo(-s * 0.7, s * 1.15 + Math.sin(wob) * s * 0.12, -s * 1.15, s * 0.75);
+  ctx.quadraticCurveTo(-s * 1.35, s * 0.35, -s * 1.05, s * 0.25);
   ctx.stroke();
-  ctx.fillStyle = "#fff6e8";
+  // snout
+  ctx.fillStyle = mixColor(coral, "#fff", 0.2);
   ctx.beginPath();
-  ctx.arc(s * 0.45, -s * 0.35, s * 0.14, 0, Math.PI * 2);
+  ctx.ellipse(s * 0.95, -s * 0.12, s * 0.35, s * 0.12, 0.1, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#fff8ec";
+  ctx.beginPath();
+  ctx.arc(s * 0.45, -s * 0.35, s * 0.15, 0, Math.PI * 2);
   ctx.fill();
   ctx.fillStyle = "#2a1810";
   ctx.beginPath();
   ctx.arc(s * 0.5, -s * 0.35, s * 0.06, 0, Math.PI * 2);
   ctx.fill();
+  // time rings when ready
+  if (ready) {
+    ctx.strokeStyle = `rgba(255,220,140,${0.35 + Math.sin(wob * 3) * 0.15})`;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.arc(0, 0, s * 1.35, 0, Math.PI * 2);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
 function drawWhale(body, alpha = 1) {
   const aim = body.aim ?? -Math.PI / 2;
-  const s = body.r * 1.1;
-  const blue = "#6aa8d8";
-  const deep = "#234868";
+  const s = body.r * 1.15;
+  const wob = body.wobble || 0;
+  const blue = "#6eb4e0";
+  const deep = "#1d3f5c";
+  const ready = (state.whaleCd || 0) <= 0;
   ctx.save();
   ctx.translate(body.x, body.y);
   ctx.rotate(aim);
   ctx.globalAlpha = alpha;
+  const aura = ctx.createRadialGradient(0, 0, s * 0.2, 0, 0, s * 2.1);
+  aura.addColorStop(0, `rgba(140,200,255,${ready ? 0.3 : 0.12})`);
+  aura.addColorStop(1, "transparent");
+  ctx.fillStyle = aura;
+  ctx.beginPath();
+  ctx.arc(0, 0, s * 2.1, 0, Math.PI * 2);
+  ctx.fill();
   const grad = ctx.createLinearGradient(0, -s, 0, s);
-  grad.addColorStop(0, mixColor(blue, "#fff", 0.2));
+  grad.addColorStop(0, mixColor(blue, "#fff", 0.25));
+  grad.addColorStop(0.55, blue);
   grad.addColorStop(1, deep);
   ctx.fillStyle = grad;
   ctx.beginPath();
-  ctx.ellipse(0, 0, s * 1.35, s * 0.78, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, 0, s * 1.4, s * 0.82, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = mixColor(blue, "#fff", 0.35);
+  // belly grooves
+  ctx.strokeStyle = "rgba(255,255,255,0.18)";
+  ctx.lineWidth = 1.2;
+  for (let i = 0; i < 4; i += 1) {
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.3, s * (0.15 + i * 0.12));
+    ctx.quadraticCurveTo(s * 0.4, s * (0.22 + i * 0.12), s * 1.0, s * (0.1 + i * 0.08));
+    ctx.stroke();
+  }
+  // pectoral fin
+  ctx.fillStyle = mixColor(blue, deep, 0.3);
   ctx.beginPath();
-  ctx.moveTo(-s * 1.1, 0);
-  ctx.lineTo(-s * 1.7, -s * 0.45);
-  ctx.lineTo(-s * 1.45, 0);
-  ctx.lineTo(-s * 1.7, s * 0.45);
+  ctx.moveTo(s * 0.1, s * 0.45);
+  ctx.quadraticCurveTo(s * 0.2, s * 1.05, -s * 0.15, s * 1.15);
+  ctx.quadraticCurveTo(-s * 0.05, s * 0.7, s * 0.1, s * 0.45);
+  ctx.fill();
+  // tail
+  const flap = Math.sin(wob * 2.6) * 0.2;
+  ctx.beginPath();
+  ctx.moveTo(-s * 1.15, 0);
+  ctx.lineTo(-s * 1.85, -s * (0.55 + flap));
+  ctx.lineTo(-s * 1.5, 0);
+  ctx.lineTo(-s * 1.85, s * (0.55 + flap));
   ctx.closePath();
   ctx.fill();
-  ctx.fillStyle = "rgba(255,255,255,0.85)";
+  // blowhole bubbles
+  ctx.fillStyle = "rgba(220,240,255,0.55)";
+  for (let i = 0; i < 3; i += 1) {
+    ctx.beginPath();
+    ctx.arc(-s * 0.15 + i * s * 0.08, -s * 0.75 - Math.sin(wob * 3 + i) * s * 0.08, s * 0.07, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // eye
+  ctx.fillStyle = "#f4fbff";
   ctx.beginPath();
-  ctx.arc(s * 0.55, -s * 0.12, s * 0.12, 0, Math.PI * 2);
+  ctx.arc(s * 0.65, -s * 0.15, s * 0.14, 0, Math.PI * 2);
   ctx.fill();
   ctx.fillStyle = deep;
   ctx.beginPath();
-  ctx.arc(s * 0.58, -s * 0.12, s * 0.05, 0, Math.PI * 2);
+  ctx.arc(s * 0.7, -s * 0.15, s * 0.06, 0, Math.PI * 2);
+  ctx.fill();
+  // luminous marks
+  ctx.fillStyle = `rgba(180,230,255,${0.35 + Math.sin(wob * 4) * 0.15})`;
+  ctx.beginPath();
+  ctx.ellipse(s * 0.1, 0, s * 0.35, s * 0.12, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 }
@@ -7907,17 +8429,85 @@ function drawWhale(body, alpha = 1) {
 function drawInkCloudFx() {
   if (!state.inkCloud || !state.running) return;
   const c = state.inkCloud;
-  const a = clamp(c.t / 3.6, 0, 1) * 0.55;
+  const a = clamp(c.t / 4.4, 0, 1) * 0.65;
   ctx.save();
-  const g = ctx.createRadialGradient(c.x, c.y, c.r * 0.15, c.x, c.y, c.r);
-  g.addColorStop(0, `rgba(50,35,90,${0.45 * a})`);
-  g.addColorStop(0.55, `rgba(30,20,60,${0.28 * a})`);
+  const g = ctx.createRadialGradient(c.x, c.y, c.r * 0.12, c.x, c.y, c.r);
+  g.addColorStop(0, `rgba(60,40,100,${0.5 * a})`);
+  g.addColorStop(0.45, `rgba(35,22,70,${0.32 * a})`);
   g.addColorStop(1, "transparent");
   ctx.fillStyle = g;
   ctx.beginPath();
   ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
   ctx.fill();
+  ctx.fillStyle = `rgba(180,150,255,${0.12 * a})`;
+  for (let i = 0; i < 7; i += 1) {
+    const ang = state.time * 0.8 + i * 0.9;
+    const rr = c.r * (0.25 + (i % 3) * 0.18);
+    ctx.beginPath();
+    ctx.arc(c.x + Math.cos(ang) * rr, c.y + Math.sin(ang * 1.1) * rr, 6 + (i % 3) * 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
   ctx.restore();
+}
+
+function drawEelBoltsFx() {
+  if (!state.eelBolts?.length) return;
+  for (const b of state.eelBolts) {
+    const a = clamp(b.t / 0.22, 0, 1);
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.strokeStyle = "rgba(180,235,255,0.95)";
+    ctx.shadowColor = "rgba(120,200,255,0.9)";
+    ctx.shadowBlur = 10;
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.moveTo(b.x0, b.y0);
+    const mx = (b.x0 + b.x1) * 0.5 + (Math.random() - 0.5) * 12;
+    const my = (b.y0 + b.y1) * 0.5 + (Math.random() - 0.5) * 12;
+    ctx.lineTo(mx, my);
+    ctx.lineTo(b.x1, b.y1);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawMantaWakeFx() {
+  if (!state.mantaWake || !state.running) return;
+  const w = state.mantaWake;
+  const a = clamp(w.t / 1.05, 0, 1) * 0.45;
+  ctx.save();
+  ctx.translate(w.x, w.y);
+  ctx.rotate(Math.atan2(w.ny, w.nx));
+  ctx.globalAlpha = a;
+  const g = ctx.createLinearGradient(-w.len * 0.5, 0, w.len * 0.5, 0);
+  g.addColorStop(0, "transparent");
+  g.addColorStop(0.5, "rgba(122,255,212,0.35)");
+  g.addColorStop(1, "transparent");
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, w.len * 0.5, w.halfW, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawSonarRingsFx() {
+  if (!state.sonarRings?.length) return;
+  for (const ring of state.sonarRings) {
+    const a = clamp(1 - ring.t / 0.55, 0, 1) * 0.55;
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.strokeStyle = "rgba(150,210,255,0.9)";
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.arc(ring.x, ring.y, ring.r, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(200,235,255,0.35)";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(ring.x, ring.y, ring.r * 0.72, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
 }
 
 function drawCustomHero(body, alpha = 1) {
@@ -8358,6 +8948,9 @@ function draw() {
   drawEcho();
   drawGuide();
   drawInkCloudFx();
+  drawMantaWakeFx();
+  drawSonarRingsFx();
+  drawEelBoltsFx();
   if (state.life) {
     drawSafeShield();
     drawHeroFrame(state.life);
