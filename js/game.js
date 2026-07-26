@@ -473,34 +473,27 @@ function buzz(pattern = 8) {
 
 function ensureAudio() {
   if (!soundEnabled()) return null;
-  if (state.audio && state.audioBus) {
-    if (state.audio.state === "suspended") state.audio.resume().catch(() => {});
-    return state.audio;
-  }
   const AudioCtx = window.AudioContext || window.webkitAudioContext;
   if (!AudioCtx) return null;
-  const ac = state.audio || new AudioCtx();
-  state.audio = ac;
+  if (!state.audio) state.audio = new AudioCtx();
+  const ac = state.audio;
   if (!state.audioBus) {
     const master = ac.createGain();
-    master.gain.value = 0.9;
-    const filter = ac.createBiquadFilter();
-    filter.type = "lowpass";
-    filter.frequency.value = 5200;
-    filter.Q.value = 0.7;
-    const compressor = ac.createDynamicsCompressor();
-    compressor.threshold.value = -18;
-    compressor.knee.value = 18;
-    compressor.ratio.value = 3.2;
-    compressor.attack.value = 0.003;
-    compressor.release.value = 0.18;
-    master.connect(filter);
-    filter.connect(compressor);
-    compressor.connect(ac.destination);
-    state.audioBus = { master, filter, compressor };
+    master.gain.value = 1.15;
+    // Keep the path short for iOS Safari reliability.
+    master.connect(ac.destination);
+    state.audioBus = { master };
     state.noiseBuffer = null;
+    state.audioUnlocked = false;
   }
-  if (ac.state === "suspended") ac.resume().catch(() => {});
+  if (ac.state === "suspended") {
+    try {
+      const p = ac.resume();
+      if (p && typeof p.catch === "function") p.catch(() => {});
+    } catch (_) {
+      // ignore
+    }
+  }
   return ac;
 }
 
@@ -510,11 +503,40 @@ function audioOut() {
   return { ac, out: state.audioBus.master };
 }
 
+/** Must run inside a user gesture on iPhone or WebAudio stays muted. */
+function unlockAudio() {
+  if (!soundEnabled()) return false;
+  const ac = ensureAudio();
+  if (!ac || !state.audioBus) return false;
+  try {
+    if (ac.state === "suspended") {
+      const p = ac.resume();
+      if (p && typeof p.catch === "function") p.catch(() => {});
+    }
+  } catch (_) {
+    // ignore
+  }
+  if (!state.audioUnlocked) {
+    try {
+      // Silent buffer kick — required so iOS keeps the audio graph alive.
+      const buf = ac.createBuffer(1, 1, ac.sampleRate);
+      const src = ac.createBufferSource();
+      src.buffer = buf;
+      src.connect(state.audioBus.master);
+      src.start(0);
+      state.audioUnlocked = true;
+    } catch (_) {
+      // ignore
+    }
+  }
+  return ac.state === "running" || state.audioUnlocked;
+}
+
 function getNoiseBuffer() {
   const ac = ensureAudio();
   if (!ac) return null;
   if (state.noiseBuffer) return state.noiseBuffer;
-  const len = ac.sampleRate * 1.2;
+  const len = Math.max(1, Math.floor(ac.sampleRate * 0.8));
   const buffer = ac.createBuffer(1, len, ac.sampleRate);
   const data = buffer.getChannelData(0);
   let last = 0;
@@ -530,12 +552,24 @@ function getNoiseBuffer() {
 
 function envGain(ac, out, gain, attack, dur, release = 0.04, delay = 0) {
   const amp = ac.createGain();
-  const at = ac.currentTime + delay;
+  const at = ac.currentTime + Math.max(0, delay);
+  const att = Math.max(0.006, attack);
+  const peak = Math.max(0.001, gain);
+  const end = at + Math.max(att + 0.02, dur + release);
   amp.gain.setValueAtTime(0.0001, at);
-  amp.gain.exponentialRampToValueAtTime(Math.max(0.0002, gain), at + Math.max(0.004, attack));
-  amp.gain.exponentialRampToValueAtTime(0.0001, at + dur + release);
+  amp.gain.linearRampToValueAtTime(peak, at + att);
+  amp.gain.linearRampToValueAtTime(0.0001, end);
   amp.connect(out);
-  return { amp, at, stopAt: at + dur + release + 0.03 };
+  return { amp, at, stopAt: end + 0.03 };
+}
+
+function rampFreq(param, from, to, at, dur) {
+  const a = Math.max(20, from);
+  const b = Math.max(20, to);
+  param.setValueAtTime(a, at);
+  if (Math.abs(a - b) < 1) return;
+  // linearRamp is safer across Safari than exponentialRamp.
+  param.linearRampToValueAtTime(b, at + Math.max(0.01, dur));
 }
 
 function playOsc({
@@ -552,27 +586,32 @@ function playOsc({
   filterQ = 0.8,
   filterType = "lowpass",
 } = {}) {
+  if (!soundEnabled()) return;
+  unlockAudio();
   const bus = audioOut();
   if (!bus) return;
-  const { ac, out } = bus;
-  const { amp, at, stopAt } = envGain(ac, out, gain, attack, dur, release, delay);
-  const osc = ac.createOscillator();
-  osc.type = type;
-  osc.frequency.setValueAtTime(freq, at);
-  if (endFreq != null) osc.frequency.exponentialRampToValueAtTime(Math.max(20, endFreq), at + dur);
-  if (detune) osc.detune.setValueAtTime(detune, at);
-  if (filterFreq > 0) {
-    const filter = ac.createBiquadFilter();
-    filter.type = filterType;
-    filter.frequency.setValueAtTime(filterFreq, at);
-    filter.Q.value = filterQ;
-    osc.connect(filter);
-    filter.connect(amp);
-  } else {
-    osc.connect(amp);
+  try {
+    const { ac, out } = bus;
+    const { amp, at, stopAt } = envGain(ac, out, gain * 1.35, attack, dur, release, delay);
+    const osc = ac.createOscillator();
+    osc.type = type;
+    rampFreq(osc.frequency, freq, endFreq == null ? freq : endFreq, at, dur);
+    if (detune) osc.detune.setValueAtTime(detune, at);
+    if (filterFreq > 0) {
+      const filter = ac.createBiquadFilter();
+      filter.type = filterType;
+      filter.frequency.setValueAtTime(Math.max(40, filterFreq), at);
+      filter.Q.value = filterQ;
+      osc.connect(filter);
+      filter.connect(amp);
+    } else {
+      osc.connect(amp);
+    }
+    osc.start(at);
+    osc.stop(stopAt);
+  } catch (_) {
+    // Never let audio errors kill the game loop.
   }
-  osc.start(at);
-  osc.stop(stopAt);
 }
 
 function playNoise({
@@ -586,23 +625,28 @@ function playNoise({
   filterType = "bandpass",
   filterQ = 1.2,
 } = {}) {
+  if (!soundEnabled()) return;
+  unlockAudio();
   const bus = audioOut();
   if (!bus) return;
   const buffer = getNoiseBuffer();
   if (!buffer) return;
-  const { ac, out } = bus;
-  const { amp, at, stopAt } = envGain(ac, out, gain, attack, dur, release, delay);
-  const src = ac.createBufferSource();
-  src.buffer = buffer;
-  const filter = ac.createBiquadFilter();
-  filter.type = filterType;
-  filter.frequency.setValueAtTime(filterFreq, at);
-  if (endFilter != null) filter.frequency.exponentialRampToValueAtTime(Math.max(40, endFilter), at + dur);
-  filter.Q.value = filterQ;
-  src.connect(filter);
-  filter.connect(amp);
-  src.start(at);
-  src.stop(stopAt);
+  try {
+    const { ac, out } = bus;
+    const { amp, at, stopAt } = envGain(ac, out, gain * 1.25, attack, dur, release, delay);
+    const src = ac.createBufferSource();
+    src.buffer = buffer;
+    const filter = ac.createBiquadFilter();
+    filter.type = filterType;
+    filter.Q.value = filterQ;
+    rampFreq(filter.frequency, filterFreq, endFilter == null ? filterFreq : endFilter, at, dur);
+    src.connect(filter);
+    filter.connect(amp);
+    src.start(at);
+    src.stop(stopAt);
+  } catch (_) {
+    // ignore
+  }
 }
 
 /** Legacy thin beep kept as a tiny wrapper for any leftover call sites. */
@@ -635,6 +679,7 @@ function hum(on) {
     return;
   }
   if (!soundEnabled()) return;
+  unlockAudio();
   const bus = audioOut();
   if (!bus) return;
   if (state.humNode) return;
@@ -2154,7 +2199,7 @@ function bindHoldButton(button, target) {
   button.addEventListener("pointerdown", (e) => {
     e.preventDefault();
     if (state.running) return;
-    ensureAudio();
+    unlockAudio();
     state.hold = { target, pointerId: e.pointerId, progress: 0 };
     setHoldVisual("0%", target);
     sfxUiTap(0);
@@ -2371,7 +2416,7 @@ function requestContinue() {
     refreshContinueUi();
     return;
   }
-  ensureAudio();
+  unlockAudio();
   state.continueBusy = true;
   if (offer.kind === "marks") {
     if (!state.meta || (state.meta.marks || 0) < offer.cost) {
@@ -2847,7 +2892,7 @@ function resetDemo() {
 }
 
 function startGame() {
-  ensureAudio();
+  unlockAudio();
   hum(false);
   touchPlayDay();
   refreshDaily();
@@ -2909,7 +2954,7 @@ function tryCompleteByHunger() {
 function onCanvasDown(e) {
   if (!state.running || state.touchActive) return;
   e.preventDefault();
-  ensureAudio();
+  unlockAudio();
   state.touchActive = true;
   state.pointerId = e.pointerId;
   state.hasTouchedCanvas = true;
@@ -4775,7 +4820,13 @@ function boot() {
   btnSound?.addEventListener("click", () => {
     if (!state.meta) return;
     state.meta.sound = !(state.meta.sound !== false);
-    if (!state.meta.sound) hum(false);
+    if (!state.meta.sound) {
+      hum(false);
+      state.audioUnlocked = false;
+    } else {
+      unlockAudio();
+      sfxUiTap(2);
+    }
     saveMeta();
     renderSettings();
     showToast(state.meta.sound ? "звук вкл" : "звук выкл");
