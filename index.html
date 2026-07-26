@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=wave2" />
+  <link rel="stylesheet" href="css/style.css?v=menu3" />
   <link rel="preload" href="assets/fish-evil.png?v=5" as="image" />
   <title>ОТТИСК</title>
 </head>
@@ -49,47 +49,60 @@
       </div>
     </footer>
 
-    <div id="screen-start" class="screen screen-start-simple">
-      <div class="screen-bg" aria-hidden="true"></div>
-      <div class="brand-block">
-        <p class="brand">ОТТИСК</p>
-        <h1 class="tagline">Удерживай палец — ешь свет, переживай волны хищников.</h1>
-        <div class="meta-panel meta-panel-simple">
-          <div class="meta-row">
-            <span class="meta-label">рекорд</span>
-            <span id="best-start" class="meta-strong">0</span>
-          </div>
-          <div class="hero-pick">
-            <span class="meta-label">герой</span>
-            <div id="hero-list" class="hero-list" role="listbox" aria-label="Выбор героя"></div>
-            <button id="btn-draw-hero" class="set-pill" type="button">нарисовать своего</button>
-          </div>
-          <div class="settings-row" role="group" aria-label="Настройки">
-            <button id="btn-sound" class="set-pill on" type="button" aria-pressed="true">звук</button>
-            <button id="btn-haptics" class="set-pill on" type="button" aria-pressed="true">вибро</button>
-          </div>
+    <div id="screen-start" class="screen screen-menu">
+      <div class="menu-sea" aria-hidden="true">
+        <div class="menu-sea-glow"></div>
+        <div class="menu-sea-caustic"></div>
+        <div class="menu-sea-depth"></div>
+      </div>
+
+      <header class="menu-top">
+        <div class="settings-row menu-settings" role="group" aria-label="Настройки">
+          <button id="btn-sound" class="set-chip on" type="button" aria-pressed="true">звук</button>
+          <button id="btn-haptics" class="set-chip on" type="button" aria-pressed="true">вибро</button>
         </div>
-        <!-- kept for JS economy hooks; hidden on start -->
-        <span id="streak-start" class="hidden">0 дн</span>
-        <span id="marks-start" class="hidden">0</span>
-        <span id="skin-name" class="hidden">чернь</span>
-        <div id="daily-card" class="hidden"></div>
-        <div id="weekly-card" class="hidden"></div>
-        <div id="skin-unlocks" class="hidden"></div>
-        <button id="btn-marks-pack" class="hidden" type="button">+60 следов</button>
+      </header>
+
+      <div class="menu-hero">
+        <p class="brand menu-brand">ОТТИСК</p>
+        <h1 class="menu-line">Удерживай палец. Лови свет.</h1>
       </div>
-      <div class="actions">
-        <button id="btn-start" class="btn btn-primary" type="button">
-          <span class="btn-main">Играть</span>
-          <span class="btn-sub">удерживай кнопку</span>
-        </button>
-        <div class="hold-meter" aria-hidden="true"><i id="hold-fill"></i></div>
+
+      <section class="menu-choose" aria-label="Выбор героя">
+        <div class="menu-choose-head">
+          <span class="meta-label">кто играет</span>
+          <button id="btn-draw-hero" class="menu-draw-link" type="button">нарисовать</button>
+        </div>
+        <div id="hero-list" class="hero-rail" role="listbox" aria-label="Выбор героя"></div>
+      </section>
+
+      <div class="menu-dock">
+        <div class="menu-record">
+          <span class="meta-label">рекорд</span>
+          <span id="best-start" class="menu-record-value">0</span>
+        </div>
+        <div class="actions menu-actions">
+          <button id="btn-start" class="btn btn-primary btn-play" type="button">
+            <span class="btn-main">Играть</span>
+            <span class="btn-sub">удерживай палец</span>
+          </button>
+          <div class="hold-meter" aria-hidden="true"><i id="hold-fill"></i></div>
+        </div>
+        <p class="legal-links menu-legal">
+          <a href="./privacy.html">Конфиденциальность</a>
+          <span aria-hidden="true">·</span>
+          <a href="./support.html">Поддержка</a>
+        </p>
       </div>
-      <p class="legal-links">
-        <a href="./privacy.html">Конфиденциальность</a>
-        <span aria-hidden="true">·</span>
-        <a href="./support.html">Поддержка</a>
-      </p>
+
+      <!-- kept for JS economy hooks; hidden on start -->
+      <span id="streak-start" class="hidden">0 дн</span>
+      <span id="marks-start" class="hidden">0</span>
+      <span id="skin-name" class="hidden">чернь</span>
+      <div id="daily-card" class="hidden"></div>
+      <div id="weekly-card" class="hidden"></div>
+      <div id="skin-unlocks" class="hidden"></div>
+      <button id="btn-marks-pack" class="hidden" type="button">+60 следов</button>
     </div>
 
     <div id="screen-draw" class="screen hidden">
@@ -182,7 +195,7 @@
   </div>
   <script>
     (async () => {
-      const stamp = "ottisk-force-v46";
+      const stamp = "ottisk-force-v47";
       if (localStorage.getItem(stamp)) return;
       localStorage.setItem(stamp, "1");
       try {
@@ -196,11 +209,11 @@
         }
       } catch (_) {}
       const url = new URL(location.href);
-      url.searchParams.set("v", "46");
+      url.searchParams.set("v", "47");
       location.replace(url.toString());
     })();
   </script>
   <script src="js/native.js" type="module"></script>
-  <script src="js/game.js?v=wave2" type="module"></script>
+  <script src="js/game.js?v=menu3" type="module"></script>
 </body>
 </html>

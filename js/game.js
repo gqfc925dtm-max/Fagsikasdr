@@ -113,11 +113,11 @@ const SKINS = [
 ];
 
 const HEROES = [
-  { id: "octopus", name: "осьминог" },
-  { id: "jellyfish", name: "медуза" },
-  { id: "turtle", name: "черепаха" },
-  { id: "crab", name: "краб" },
-  { id: "custom", name: "свой" },
+  { id: "octopus", name: "осьминог", glyph: "Ос" },
+  { id: "jellyfish", name: "медуза", glyph: "Ме" },
+  { id: "turtle", name: "черепаха", glyph: "Че" },
+  { id: "crab", name: "краб", glyph: "Кр" },
+  { id: "custom", name: "свой", glyph: "✦" },
 ];
 
 /** Difficulty waves: each tier swaps predator species + pacing. */
@@ -1712,14 +1712,16 @@ function renderHeroPicker() {
   for (const hero of HEROES) {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = `hero-pill${hero.id === current ? " on" : ""}`;
-    btn.textContent = hero.id === "custom" && !state.meta?.customHero ? "свой · рисуй" : hero.name;
+    btn.className = `hero-tile${hero.id === current ? " on" : ""}`;
+    const label = hero.id === "custom" && !state.meta?.customHero ? "нарисуй" : hero.name;
+    btn.innerHTML = `<span class="hero-glyph" aria-hidden="true">${hero.glyph || "•"}</span><span class="hero-tile-name">${label}</span>`;
     btn.setAttribute("role", "option");
+    btn.setAttribute("aria-label", label);
     btn.setAttribute("aria-selected", hero.id === current ? "true" : "false");
     btn.addEventListener("click", () => setActiveHero(hero.id));
     heroListEl.appendChild(btn);
   }
-  if (btnDrawHero) btnDrawHero.textContent = state.meta?.customHero ? "перерисовать" : "нарисовать своего";
+  if (btnDrawHero) btnDrawHero.textContent = state.meta?.customHero ? "перерисовать" : "нарисовать";
 }
 
 function touchPlayDay() {
