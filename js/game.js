@@ -388,8 +388,7 @@ function inOpening() {
 function pulseUnlock(color = cssVar("--life", "#7affd4"), strength = 0.14) {
   state.flash = Math.max(state.flash, strength);
   burst(state.width * 0.5, state.height * 0.38, color, 20, 4.6);
-  tone(720, 0.08, "triangle", 0.03);
-  tone(940, 0.11, "sine", 0.024, 0.07);
+  mutationDing();
   buzz([8, 18, 8]);
 }
 
@@ -474,30 +473,141 @@ function buzz(pattern = 8) {
 
 function ensureAudio() {
   if (!soundEnabled()) return null;
-  if (state.audio) return state.audio;
+  if (state.audio && state.audioBus) {
+    if (state.audio.state === "suspended") state.audio.resume().catch(() => {});
+    return state.audio;
+  }
   const AudioCtx = window.AudioContext || window.webkitAudioContext;
   if (!AudioCtx) return null;
-  state.audio = new AudioCtx();
-  return state.audio;
+  const ac = state.audio || new AudioCtx();
+  state.audio = ac;
+  if (!state.audioBus) {
+    const master = ac.createGain();
+    master.gain.value = 0.9;
+    const filter = ac.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.value = 5200;
+    filter.Q.value = 0.7;
+    const compressor = ac.createDynamicsCompressor();
+    compressor.threshold.value = -18;
+    compressor.knee.value = 18;
+    compressor.ratio.value = 3.2;
+    compressor.attack.value = 0.003;
+    compressor.release.value = 0.18;
+    master.connect(filter);
+    filter.connect(compressor);
+    compressor.connect(ac.destination);
+    state.audioBus = { master, filter, compressor };
+    state.noiseBuffer = null;
+  }
+  if (ac.state === "suspended") ac.resume().catch(() => {});
+  return ac;
 }
 
-function tone(freq, dur = 0.08, type = "sine", gain = 0.04, delay = 0) {
-  if (!soundEnabled()) return;
+function audioOut() {
   const ac = ensureAudio();
-  if (!ac) return;
-  if (ac.state === "suspended") ac.resume().catch(() => {});
-  const at = ac.currentTime + delay;
-  const osc = ac.createOscillator();
+  if (!ac || !state.audioBus) return null;
+  return { ac, out: state.audioBus.master };
+}
+
+function getNoiseBuffer() {
+  const ac = ensureAudio();
+  if (!ac) return null;
+  if (state.noiseBuffer) return state.noiseBuffer;
+  const len = ac.sampleRate * 1.2;
+  const buffer = ac.createBuffer(1, len, ac.sampleRate);
+  const data = buffer.getChannelData(0);
+  let last = 0;
+  for (let i = 0; i < len; i += 1) {
+    // Soft pink-ish noise for underwater grit.
+    const white = Math.random() * 2 - 1;
+    last = (last + 0.02 * white) / 1.02;
+    data[i] = (white * 0.35 + last * 0.65) * 0.55;
+  }
+  state.noiseBuffer = buffer;
+  return buffer;
+}
+
+function envGain(ac, out, gain, attack, dur, release = 0.04, delay = 0) {
   const amp = ac.createGain();
+  const at = ac.currentTime + delay;
+  amp.gain.setValueAtTime(0.0001, at);
+  amp.gain.exponentialRampToValueAtTime(Math.max(0.0002, gain), at + Math.max(0.004, attack));
+  amp.gain.exponentialRampToValueAtTime(0.0001, at + dur + release);
+  amp.connect(out);
+  return { amp, at, stopAt: at + dur + release + 0.03 };
+}
+
+function playOsc({
+  freq = 440,
+  endFreq = null,
+  type = "sine",
+  gain = 0.03,
+  dur = 0.12,
+  delay = 0,
+  attack = 0.01,
+  release = 0.05,
+  detune = 0,
+  filterFreq = 0,
+  filterQ = 0.8,
+  filterType = "lowpass",
+} = {}) {
+  const bus = audioOut();
+  if (!bus) return;
+  const { ac, out } = bus;
+  const { amp, at, stopAt } = envGain(ac, out, gain, attack, dur, release, delay);
+  const osc = ac.createOscillator();
   osc.type = type;
   osc.frequency.setValueAtTime(freq, at);
-  amp.gain.setValueAtTime(0.0001, at);
-  amp.gain.linearRampToValueAtTime(gain, at + 0.012);
-  amp.gain.exponentialRampToValueAtTime(0.0001, at + dur);
-  osc.connect(amp);
-  amp.connect(ac.destination);
+  if (endFreq != null) osc.frequency.exponentialRampToValueAtTime(Math.max(20, endFreq), at + dur);
+  if (detune) osc.detune.setValueAtTime(detune, at);
+  if (filterFreq > 0) {
+    const filter = ac.createBiquadFilter();
+    filter.type = filterType;
+    filter.frequency.setValueAtTime(filterFreq, at);
+    filter.Q.value = filterQ;
+    osc.connect(filter);
+    filter.connect(amp);
+  } else {
+    osc.connect(amp);
+  }
   osc.start(at);
-  osc.stop(at + dur + 0.02);
+  osc.stop(stopAt);
+}
+
+function playNoise({
+  gain = 0.03,
+  dur = 0.12,
+  delay = 0,
+  attack = 0.005,
+  release = 0.06,
+  filterFreq = 1200,
+  endFilter = null,
+  filterType = "bandpass",
+  filterQ = 1.2,
+} = {}) {
+  const bus = audioOut();
+  if (!bus) return;
+  const buffer = getNoiseBuffer();
+  if (!buffer) return;
+  const { ac, out } = bus;
+  const { amp, at, stopAt } = envGain(ac, out, gain, attack, dur, release, delay);
+  const src = ac.createBufferSource();
+  src.buffer = buffer;
+  const filter = ac.createBiquadFilter();
+  filter.type = filterType;
+  filter.frequency.setValueAtTime(filterFreq, at);
+  if (endFilter != null) filter.frequency.exponentialRampToValueAtTime(Math.max(40, endFilter), at + dur);
+  filter.Q.value = filterQ;
+  src.connect(filter);
+  filter.connect(amp);
+  src.start(at);
+  src.stop(stopAt);
+}
+
+/** Legacy thin beep kept as a tiny wrapper for any leftover call sites. */
+function tone(freq, dur = 0.08, type = "sine", gain = 0.04, delay = 0) {
+  playOsc({ freq, type, gain: gain * 0.85, dur, delay, attack: 0.008, release: 0.04, filterFreq: freq * 3.2 });
 }
 
 function hum(on) {
@@ -507,34 +617,79 @@ function hum(on) {
       return;
     }
     const ac = state.audio;
-    const { g, o1, o2 } = state.humNode;
+    const node = state.humNode;
     const t = ac.currentTime;
-    g.gain.cancelScheduledValues(t);
-    g.gain.setTargetAtTime(0.0001, t, 0.05);
-    o1.stop(t + 0.16);
-    o2.stop(t + 0.16);
+    node.g.gain.cancelScheduledValues(t);
+    node.g.gain.setTargetAtTime(0.0001, t, 0.08);
+    node.noiseGain.gain.setTargetAtTime(0.0001, t, 0.08);
+    try {
+      node.o1.stop(t + 0.22);
+      node.o2.stop(t + 0.22);
+      node.o3.stop(t + 0.22);
+      node.lfo.stop(t + 0.22);
+      node.noise.stop(t + 0.22);
+    } catch (_) {
+      // already stopped
+    }
     state.humNode = null;
     return;
   }
   if (!soundEnabled()) return;
-  const ac = ensureAudio();
-  if (!ac) return;
-  if (ac.state === "suspended") ac.resume().catch(() => {});
+  const bus = audioOut();
+  if (!bus) return;
   if (state.humNode) return;
+  const { ac, out } = bus;
   const o1 = ac.createOscillator();
   const o2 = ac.createOscillator();
+  const o3 = ac.createOscillator();
+  const lfo = ac.createOscillator();
+  const lfoGain = ac.createGain();
   const g = ac.createGain();
+  const filter = ac.createBiquadFilter();
+  const noise = ac.createBufferSource();
+  const noiseFilter = ac.createBiquadFilter();
+  const noiseGain = ac.createGain();
+  const buffer = getNoiseBuffer();
   o1.type = "sine";
   o2.type = "triangle";
-  o1.frequency.value = 62;
-  o2.frequency.value = 93;
+  o3.type = "sine";
+  lfo.type = "sine";
+  o1.frequency.value = 48;
+  o2.frequency.value = 72;
+  o3.frequency.value = 96;
+  lfo.frequency.value = 0.18;
+  lfoGain.gain.value = 7;
+  filter.type = "lowpass";
+  filter.frequency.value = 420;
+  filter.Q.value = 0.9;
   g.gain.value = 0.0001;
-  o1.connect(g);
-  o2.connect(g);
-  g.connect(ac.destination);
+  noiseGain.gain.value = 0.0001;
+  noiseFilter.type = "bandpass";
+  noiseFilter.frequency.value = 280;
+  noiseFilter.Q.value = 0.7;
+  if (buffer) {
+    noise.buffer = buffer;
+    noise.loop = true;
+  }
+  lfo.connect(lfoGain);
+  lfoGain.connect(o1.frequency);
+  lfoGain.connect(o2.frequency);
+  o1.connect(filter);
+  o2.connect(filter);
+  o3.connect(filter);
+  filter.connect(g);
+  g.connect(out);
+  if (buffer) {
+    noise.connect(noiseFilter);
+    noiseFilter.connect(noiseGain);
+    noiseGain.connect(out);
+    noise.start();
+  }
   o1.start();
   o2.start();
-  state.humNode = { o1, o2, g };
+  o3.start();
+  lfo.start();
+  state.humNode = { o1, o2, o3, lfo, g, noise, noiseGain, filter, noiseFilter };
 }
 
 function updateHum() {
@@ -546,46 +701,224 @@ function updateHum() {
     const d = dist(h.x, h.y, state.life.x, state.life.y);
     hunterBoost = Math.max(hunterBoost, clamp(1 - d / 220, 0, 1));
   }
-  const base = 62 + urgency * 68 + hunterBoost * 20;
-  state.humNode.o1.frequency.setTargetAtTime(base, ac.currentTime, 0.08);
-  state.humNode.o2.frequency.setTargetAtTime(base * 1.48, ac.currentTime, 0.08);
-  state.humNode.g.gain.setTargetAtTime(0.006 + urgency * 0.018 + hunterBoost * 0.01, ac.currentTime, 0.09);
+  const base = 46 + urgency * 54 + hunterBoost * 28;
+  const t = ac.currentTime;
+  state.humNode.o1.frequency.setTargetAtTime(base, t, 0.1);
+  state.humNode.o2.frequency.setTargetAtTime(base * 1.5, t, 0.1);
+  state.humNode.o3.frequency.setTargetAtTime(base * 2.02, t, 0.12);
+  state.humNode.filter.frequency.setTargetAtTime(320 + urgency * 520 + hunterBoost * 380, t, 0.12);
+  state.humNode.g.gain.setTargetAtTime(0.01 + urgency * 0.022 + hunterBoost * 0.014, t, 0.1);
+  state.humNode.noiseGain.gain.setTargetAtTime(0.004 + urgency * 0.012 + hunterBoost * 0.01, t, 0.12);
+  state.humNode.noiseFilter.frequency.setTargetAtTime(220 + hunterBoost * 700 + urgency * 260, t, 0.14);
+}
+
+function sfxBubblePop(pitch = 1) {
+  playNoise({
+    gain: 0.028,
+    dur: 0.07,
+    attack: 0.002,
+    release: 0.05,
+    filterFreq: 1800 * pitch,
+    endFilter: 700 * pitch,
+    filterType: "bandpass",
+    filterQ: 2.4,
+  });
+  playOsc({
+    freq: 520 * pitch,
+    endFreq: 180 * pitch,
+    type: "sine",
+    gain: 0.03,
+    dur: 0.09,
+    attack: 0.004,
+    filterFreq: 2400,
+  });
+}
+
+function sfxPlanktonEat(combo = 0) {
+  const pitch = 1 + Math.min(12, combo) * 0.045;
+  sfxBubblePop(pitch);
+  playOsc({
+    freq: 640 * pitch,
+    endFreq: 980 * pitch,
+    type: "triangle",
+    gain: 0.026,
+    dur: 0.1,
+    delay: 0.02,
+    filterFreq: 2800,
+  });
+  playOsc({
+    freq: 1280 * pitch,
+    endFreq: 860 * pitch,
+    type: "sine",
+    gain: 0.014,
+    dur: 0.08,
+    delay: 0.045,
+  });
+}
+
+function sfxRareEat() {
+  playOsc({ freq: 740, endFreq: 1180, type: "triangle", gain: 0.034, dur: 0.12, filterFreq: 3200 });
+  playOsc({ freq: 1180, endFreq: 1560, type: "sine", gain: 0.02, dur: 0.14, delay: 0.05 });
+  playNoise({ gain: 0.02, dur: 0.1, delay: 0.02, filterFreq: 2400, endFilter: 900, filterQ: 1.6 });
+}
+
+function sfxCoolEat() {
+  playOsc({ freq: 520, endFreq: 260, type: "sine", gain: 0.028, dur: 0.16, filterFreq: 1400 });
+  playOsc({ freq: 780, endFreq: 390, type: "triangle", gain: 0.016, dur: 0.18, delay: 0.03 });
+  playNoise({ gain: 0.018, dur: 0.14, filterFreq: 900, endFilter: 280, filterType: "lowpass" });
+}
+
+function sfxBaitEat() {
+  playOsc({ freq: 180, endFreq: 90, type: "sawtooth", gain: 0.018, dur: 0.14, filterFreq: 500, filterQ: 1.4 });
+  playOsc({ freq: 240, endFreq: 120, type: "square", gain: 0.012, dur: 0.12, delay: 0.04, filterFreq: 700 });
+  playNoise({ gain: 0.022, dur: 0.12, filterFreq: 420, endFilter: 160, filterQ: 0.8 });
+}
+
+function sfxCometEat() {
+  playNoise({ gain: 0.03, dur: 0.18, filterFreq: 3200, endFilter: 400, filterType: "lowpass", filterQ: 0.6 });
+  playOsc({ freq: 980, endFreq: 220, type: "sawtooth", gain: 0.02, dur: 0.2, filterFreq: 1800 });
+  playOsc({ freq: 1460, endFreq: 420, type: "triangle", gain: 0.018, dur: 0.16, delay: 0.03 });
+}
+
+function sfxDeepEat() {
+  playOsc({ freq: 140, endFreq: 70, type: "sine", gain: 0.04, dur: 0.28, attack: 0.02, filterFreq: 500 });
+  playOsc({ freq: 210, endFreq: 105, type: "triangle", gain: 0.02, dur: 0.26, delay: 0.04 });
+  playNoise({ gain: 0.02, dur: 0.22, filterFreq: 180, endFilter: 80, filterType: "lowpass" });
+}
+
+function sfxSeedEat() {
+  playOsc({ freq: 660, endFreq: 990, type: "sine", gain: 0.024, dur: 0.12 });
+  playOsc({ freq: 990, endFreq: 1320, type: "triangle", gain: 0.018, dur: 0.14, delay: 0.05 });
+  sfxBubblePop(1.2);
+}
+
+function sfxPulsarEat() {
+  playNoise({ gain: 0.04, dur: 0.22, filterFreq: 2200, endFilter: 300, filterType: "bandpass", filterQ: 0.9 });
+  playOsc({ freq: 180, endFreq: 90, type: "sine", gain: 0.045, dur: 0.28, attack: 0.01 });
+  playOsc({ freq: 540, endFreq: 1080, type: "triangle", gain: 0.03, dur: 0.18, delay: 0.04 });
+  playOsc({ freq: 1080, endFreq: 1620, type: "sine", gain: 0.022, dur: 0.2, delay: 0.1 });
+  playOsc({ freq: 1620, endFreq: 420, type: "triangle", gain: 0.016, dur: 0.22, delay: 0.16 });
 }
 
 function goalChime() {
-  tone(620, 0.08, "triangle", 0.035, 0);
-  tone(830, 0.08, "triangle", 0.03, 0.07);
-  tone(1080, 0.12, "sine", 0.028, 0.14);
+  playOsc({ freq: 523, type: "sine", gain: 0.03, dur: 0.12, filterFreq: 2600 });
+  playOsc({ freq: 659, type: "triangle", gain: 0.026, dur: 0.13, delay: 0.07, filterFreq: 2800 });
+  playOsc({ freq: 784, type: "sine", gain: 0.024, dur: 0.16, delay: 0.14, filterFreq: 3000 });
+  playOsc({ freq: 1046, type: "triangle", gain: 0.016, dur: 0.18, delay: 0.2 });
+  playNoise({ gain: 0.012, dur: 0.12, delay: 0.08, filterFreq: 2800, endFilter: 1200, filterQ: 1.8 });
 }
 
 function mutationDing() {
-  tone(760, 0.08, "triangle", 0.036, 0);
-  tone(1040, 0.12, "sine", 0.03, 0.09);
+  playOsc({ freq: 700, endFreq: 1050, type: "triangle", gain: 0.03, dur: 0.14, filterFreq: 3200 });
+  playOsc({ freq: 1050, endFreq: 1400, type: "sine", gain: 0.022, dur: 0.16, delay: 0.07 });
+  playNoise({ gain: 0.016, dur: 0.12, delay: 0.03, filterFreq: 2400, endFilter: 900 });
+}
+
+function sfxAwaken() {
+  playNoise({ gain: 0.035, dur: 0.28, filterFreq: 600, endFilter: 2200, filterType: "lowpass", filterQ: 0.7 });
+  playOsc({ freq: 110, endFreq: 220, type: "sine", gain: 0.04, dur: 0.3, attack: 0.02 });
+  playOsc({ freq: 220, endFreq: 440, type: "triangle", gain: 0.028, dur: 0.24, delay: 0.06 });
+  playOsc({ freq: 440, endFreq: 880, type: "sine", gain: 0.02, dur: 0.2, delay: 0.14 });
+  playOsc({ freq: 880, endFreq: 1320, type: "triangle", gain: 0.014, dur: 0.16, delay: 0.22 });
+  sfxBubblePop(0.85);
+  sfxBubblePop(1.25);
+}
+
+function sfxPulse() {
+  playNoise({ gain: 0.03, dur: 0.16, filterFreq: 500, endFilter: 140, filterType: "lowpass" });
+  playOsc({ freq: 180, endFreq: 70, type: "sine", gain: 0.034, dur: 0.18, attack: 0.008 });
+  playOsc({ freq: 90, endFreq: 45, type: "triangle", gain: 0.02, dur: 0.2, delay: 0.03 });
+}
+
+function sfxDeath() {
+  playNoise({ gain: 0.05, dur: 0.42, filterFreq: 900, endFilter: 90, filterType: "lowpass", filterQ: 0.6 });
+  playOsc({ freq: 160, endFreq: 48, type: "sawtooth", gain: 0.03, dur: 0.38, attack: 0.01, filterFreq: 700 });
+  playOsc({ freq: 96, endFreq: 36, type: "triangle", gain: 0.034, dur: 0.42, delay: 0.05, filterFreq: 400 });
+  playOsc({ freq: 220, endFreq: 55, type: "sine", gain: 0.02, dur: 0.3, delay: 0.1 });
+}
+
+function sfxNearMiss() {
+  playNoise({ gain: 0.02, dur: 0.08, filterFreq: 2200, endFilter: 700, filterQ: 2 });
+  playOsc({ freq: 980, endFreq: 420, type: "triangle", gain: 0.02, dur: 0.09, filterFreq: 2600 });
+}
+
+function sfxWaveShift() {
+  playNoise({ gain: 0.028, dur: 0.22, filterFreq: 300, endFilter: 1800, filterType: "bandpass", filterQ: 0.9 });
+  playOsc({ freq: 180, endFreq: 360, type: "sine", gain: 0.028, dur: 0.2 });
+  playOsc({ freq: 270, endFreq: 540, type: "triangle", gain: 0.02, dur: 0.22, delay: 0.06 });
+  playOsc({ freq: 540, endFreq: 810, type: "sine", gain: 0.014, dur: 0.18, delay: 0.12 });
+}
+
+function sfxDiveIn() {
+  playNoise({ gain: 0.03, dur: 0.24, filterFreq: 1400, endFilter: 180, filterType: "lowpass" });
+  playOsc({ freq: 240, endFreq: 80, type: "sine", gain: 0.03, dur: 0.26, attack: 0.02 });
+  playOsc({ freq: 160, endFreq: 60, type: "triangle", gain: 0.018, dur: 0.28, delay: 0.05 });
+}
+
+function sfxDiveOut() {
+  playNoise({ gain: 0.022, dur: 0.16, filterFreq: 200, endFilter: 1600, filterType: "lowpass" });
+  playOsc({ freq: 120, endFreq: 320, type: "sine", gain: 0.026, dur: 0.18 });
+  playOsc({ freq: 240, endFreq: 480, type: "triangle", gain: 0.016, dur: 0.16, delay: 0.05 });
+}
+
+function sfxHunterWarn() {
+  playOsc({ freq: 140, endFreq: 90, type: "sawtooth", gain: 0.02, dur: 0.16, filterFreq: 500, filterQ: 1.8 });
+  playNoise({ gain: 0.02, dur: 0.14, filterFreq: 260, endFilter: 120, filterType: "lowpass" });
+}
+
+function sfxShadow() {
+  playOsc({ freq: 90, endFreq: 45, type: "sine", gain: 0.034, dur: 0.28, attack: 0.03 });
+  playOsc({ freq: 135, endFreq: 60, type: "triangle", gain: 0.02, dur: 0.26, delay: 0.05 });
+  playNoise({ gain: 0.024, dur: 0.24, filterFreq: 180, endFilter: 70, filterType: "lowpass" });
+}
+
+function sfxUiTap(step = 0) {
+  playOsc({
+    freq: 520 + step * 70,
+    endFreq: 780 + step * 40,
+    type: "triangle",
+    gain: 0.018,
+    dur: 0.07,
+    filterFreq: 2400,
+  });
+  playNoise({ gain: 0.01, dur: 0.05, filterFreq: 2600, endFilter: 1200, filterQ: 2 });
+}
+
+function sfxContinue() {
+  playOsc({ freq: 330, endFreq: 520, type: "sine", gain: 0.028, dur: 0.14 });
+  playOsc({ freq: 520, endFreq: 780, type: "triangle", gain: 0.02, dur: 0.16, delay: 0.07 });
+  sfxBubblePop(1.1);
+}
+
+function sfxHungerTick(hunger = 20) {
+  const danger = clamp((28 - hunger) / 28, 0, 1);
+  playOsc({
+    freq: 120 + danger * 90,
+    endFreq: 70 + danger * 40,
+    type: "triangle",
+    gain: 0.012 + danger * 0.012,
+    dur: 0.07,
+    filterFreq: 500,
+  });
+  playNoise({
+    gain: 0.01 + danger * 0.012,
+    dur: 0.06,
+    filterFreq: 300 + danger * 400,
+    endFilter: 120,
+    filterType: "bandpass",
+    filterQ: 1.5,
+  });
 }
 
 function playSparkTone(type) {
-  if (type === "super") {
-    tone(520, 0.08, "triangle", 0.036);
-    tone(780, 0.1, "sine", 0.03, 0.05);
-    tone(1180, 0.14, "triangle", 0.028, 0.1);
-  } else if (type === "rare") {
-    tone(980, 0.11, "triangle", 0.04);
-  } else if (type === "cool") {
-    tone(420, 0.1, "sine", 0.026);
-  } else if (type === "bait") {
-    tone(260, 0.08, "square", 0.028);
-    tone(190, 0.1, "triangle", 0.022, 0.07);
-  } else if (type === "comet") {
-    tone(740, 0.08, "triangle", 0.034);
-    tone(1100, 0.12, "sine", 0.03, 0.07);
-  } else if (type === "deep") {
-    tone(260, 0.12, "sine", 0.03);
-    tone(390, 0.14, "triangle", 0.024, 0.08);
-  } else if (type === "seed") {
-    tone(860, 0.09, "sine", 0.028);
-  } else {
-    tone(620 + Math.min(12, state.combo) * 18, 0.055, "sine", 0.028);
-  }
+  if (type === "super") sfxPulsarEat();
+  else if (type === "rare") sfxRareEat();
+  else if (type === "cool") sfxCoolEat();
+  else if (type === "bait") sfxBaitEat();
+  else if (type === "comet") sfxCometEat();
+  else if (type === "deep") sfxDeepEat();
+  else if (type === "seed") sfxSeedEat();
+  else sfxPlanktonEat(state.combo || 0);
 }
 
 function showCombo(text, fever = false) {
@@ -665,8 +998,7 @@ function enterInkDive() {
   app.classList.add("ink-dive");
   pulseUnlock("#8ae0ff", 0.16);
   tipOnce("dive", "ЗДЕСЬ ТИХО", 1600);
-  tone(220, 0.16, "sine", 0.03);
-  tone(140, 0.22, "triangle", 0.024, 0.08);
+  sfxDiveIn();
   buzz([12, 20, 12]);
   state.flash = Math.max(state.flash, 0.16);
   for (let i = 0; i < 5; i += 1) spawnSpark({ edge: true, type: "deep" });
@@ -677,7 +1009,7 @@ function exitInkDive() {
   app.classList.remove("ink-dive");
   if (!state.event) setEventChip("");
   pulseUnlock(cssVar("--life", "#7affd4"), 0.1);
-  tone(480, 0.08, "triangle", 0.026);
+  sfxDiveOut();
 }
 
 function spawnShadowHunter(x, y) {
@@ -697,7 +1029,7 @@ function spawnShadowHunter(x, y) {
     wobble: Math.random() * Math.PI * 2,
   });
   tipOnce("shadow", "СЛЕД ОЖИЛ", 1700);
-  tone(160, 0.14, "sawtooth", 0.028);
+  sfxShadow();
   buzz([16, 24, 16]);
 }
 
@@ -746,7 +1078,7 @@ function updateGlyphs(dt) {
     state.hunger = clamp(state.hunger + 12, 0, 100);
     updateHungerUi();
     floatText(g.x, g.y - 10, g.ch, cssVar("--foam", "#f3eee8"), 20);
-    tone(520 + state.glyphIndex * 40, 0.07, "triangle", 0.03);
+    sfxUiTap(state.glyphIndex);
     tipOnce("word", "БУКВЫ ЖИВЫЕ", 1500);
     if (state.glyphIndex >= SECRET_WORD.length) {
       state.wordDone = true;
@@ -773,14 +1105,14 @@ function updateGlyphs(dt) {
 function attachSymbiote(x, y) {
   state.symbiote = { ang: Math.random() * Math.PI * 2, life: 1 };
   burst(x, y, "#9cf0d0", 16, 4.2);
-  tone(900, 0.08, "sine", 0.03);
+  sfxSeedEat();
 }
 
 function consumeSymbioteShield(hunter) {
   if (!state.symbiote || !state.life) return false;
   state.symbiote = null;
   buzz([10, 18, 10]);
-  tone(240, 0.1, "square", 0.03);
+  sfxPulse();
   burst(state.life.x, state.life.y, "#9cf0d0", 20, 5);
   const ang = Math.atan2(hunter.y - state.life.y, hunter.x - state.life.x);
   hunter.vx += Math.cos(ang) * 8;
@@ -909,8 +1241,7 @@ function syncWave(announce = true) {
     tipOnce(`wave-${wave.id}`, wave.label, 1700);
     showCombo(wave.label, true);
     buzz([12, 18, 12]);
-    tone(360, 0.07, "triangle", 0.03);
-    tone(540, 0.1, "sine", 0.026, 0.06);
+    sfxWaveShift();
     state.flash = Math.max(state.flash, 0.16);
   }
   return wave;
@@ -1417,7 +1748,7 @@ function advanceOnboard() {
   if (state.onboardStep < ONBOARD_STEPS.length - 1) {
     state.onboardStep += 1;
     refreshOnboardUi();
-    tone(520 + state.onboardStep * 80, 0.06, "triangle", 0.024);
+    sfxUiTap(state.onboardStep);
     return;
   }
   if (state.meta) {
@@ -1826,7 +2157,7 @@ function bindHoldButton(button, target) {
     ensureAudio();
     state.hold = { target, pointerId: e.pointerId, progress: 0 };
     setHoldVisual("0%", target);
-    tone(300, 0.05, "sine", 0.024);
+    sfxUiTap(0);
     try {
       button.setPointerCapture(e.pointerId);
     } catch (_) {
@@ -1945,13 +2276,12 @@ function createLife(x, y, opts = {}) {
       burst(x, y, cssVar("--gold", "#ffe898"), 22, 4.6);
       state.flash = Math.max(state.flash, 0.24);
       spawnOpeningRing(x, y);
-      tone(440, 0.12, "sine", 0.042);
-      tone(660, 0.14, "triangle", 0.036, 0.06);
-      tone(880, 0.1, "sine", 0.028, 0.12);
+      sfxAwaken();
       buzz([14, 28, 14]);
       showCoach("ЕШЬ СВЕТ", 1500, true);
     } else {
       burst(x, y, cssVar("--life", "#7affd4"), 12, 3.4);
+      sfxBubblePop(1);
       buzz(5);
     }
   }
@@ -1972,8 +2302,7 @@ function releasePulse(x, y) {
   }
   burst(x, y, cssVar("--foam", "#f3eee8"), 14, 4.2);
   state.flash = Math.max(state.flash, 0.08);
-  tone(300, 0.07, "sine", 0.024);
-  tone(180, 0.1, "triangle", 0.02, 0.05);
+  sfxPulse();
   if (pushed) {
     burst(x, y, cssVar("--foam", "#fffdf8"), 18, 4.8);
     buzz(8);
@@ -2028,8 +2357,7 @@ function grantContinue() {
   state.lastTs = performance.now();
   state.flash = Math.max(state.flash, 0.14);
   burst(state.width * 0.5, state.height * 0.56, cssVar("--life", "#6fd9b0"), 22, 4.8);
-  tone(520, 0.08, "triangle", 0.03);
-  tone(780, 0.12, "sine", 0.026, 0.07);
+  sfxContinue();
   showToast("щит · 3 сек");
   buzz([8, 20, 8]);
   window.OttiskNative?.haptic?.("medium");
@@ -2364,7 +2692,10 @@ function spawnHunter(slow = false) {
   };
   applySpeciesToHunter(hunter, wave.species);
   state.hunters.push(hunter);
-  if (state.running && !state.tipFlags.hunter) tipOnce("hunter", wave.label.replace("ВОЛНА ", "ХИЩНИК · "), 1500);
+  if (state.running && !state.tipFlags.hunter) {
+    tipOnce("hunter", wave.label.replace("ВОЛНА ", "ХИЩНИК · "), 1500);
+    sfxHunterWarn();
+  }
 }
 
 function registerNearMiss(hunter, x, y) {
@@ -2372,7 +2703,7 @@ function registerNearMiss(hunter, x, y) {
   hunter.nearMissed = true;
   state.stats.nearMisses += 1;
   floatText(x, y - 18, "мимо", cssVar("--foam", "#f3eee8"), 14);
-  tone(880, 0.045, "triangle", 0.02);
+  sfxNearMiss();
   buzz(4);
   state.timeScale = 0.42;
   state.slowmoUntil = performance.now() + 160;
@@ -2551,8 +2882,7 @@ function finishRun(reason) {
   app.classList.remove("ink-dive");
   setDiveMeter(0);
   buzz([20, 40, 36]);
-  tone(108, 0.28, "sawtooth", 0.04, 0);
-  tone(82, 0.34, "triangle", 0.028, 0.06);
+  sfxDeath();
   if (state.life) burst(state.life.x, state.life.y, cssVar("--danger", "#e2556d"), 28, 5.2);
   if (state.echo) burst(state.echo.x, state.echo.y, cssVar("--danger", "#e2556d"), 18, 4.2);
   state.life = null;
@@ -2759,8 +3089,7 @@ function eatSpark(index, spark) {
   const openingEat = inOpening() && !state.firstEatDone;
   if (openingEat) {
     state.firstEatDone = true;
-    tone(520, 0.08, "triangle", 0.034);
-    tone(780, 0.11, "sine", 0.028, 0.07);
+    goalChime();
     buzz([10, 18, 10]);
     floatText(spark.x, spark.y - 18, "!", cssVar("--gold", "#ffe898"), 22);
   }
@@ -3044,7 +3373,7 @@ function updateRun(dt) {
     if (state.hungerWarnClock <= 0) {
       state.hungerWarnClock = 0.55;
       buzz(6);
-      tone(140 + (18 - state.hunger) * 4, 0.05, "triangle", 0.018);
+      sfxHungerTick(state.hunger);
     }
   } else {
     state.hungerWarnClock = 0;
