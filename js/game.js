@@ -2116,39 +2116,45 @@ function spawnSpark(opts = {}) {
   });
 }
 
-function spawnHunter(slow = false) {
-  const pad = 26;
-  const side = Math.floor(Math.random() * 4);
-  let x = 0;
-  let y = 0;
-  if (side === 0) {
-    x = rand(0, state.width);
-    y = -pad;
-  } else if (side === 1) {
-    x = state.width + pad;
-    y = rand(0, state.height);
-  } else if (side === 2) {
-    x = rand(0, state.width);
-    y = state.height + pad;
-  } else {
-    x = -pad;
-    y = rand(0, state.height);
+function hunterSpawnPointAwayFromPlayer() {
+  const pad = 72;
+  const candidates = [
+    { x: rand(0, state.width), y: -pad },
+    { x: state.width + pad, y: rand(0, state.height) },
+    { x: rand(0, state.width), y: state.height + pad },
+    { x: -pad, y: rand(0, state.height) },
+  ];
+  if (!state.life) return candidates[Math.floor(Math.random() * candidates.length)];
+  let best = candidates[0];
+  let bestD = -1;
+  for (const c of candidates) {
+    const d = dist(c.x, c.y, state.life.x, state.life.y);
+    if (d > bestD) {
+      bestD = d;
+      best = c;
+    }
   }
+  return best;
+}
+
+function spawnHunter(slow = false) {
+  const point = hunterSpawnPointAwayFromPlayer();
   const soft = difficultyScale();
-  const anger = (slow ? 0.35 : rand(0.72, 1.08) + Math.min(0.52, state.score * 0.006)) * soft;
+  const anger = (slow ? 0.28 : rand(0.62, 0.95) + Math.min(0.4, state.score * 0.005)) * soft;
   state.hunters.push({
-    x,
-    y,
+    x: point.x,
+    y: point.y,
     vx: 0,
     vy: 0,
-    r: rand(17, 23),
+    r: rand(15, 19),
     anger,
     slow,
-    warn: slow ? 1 : 0,
+    warn: 1,
     phase: Math.random() * Math.PI * 2,
     nearMissed: false,
+    grace: slow ? 1.4 : 0.85,
     orbit: (state.hunters.length * 2.1) + Math.random() * 1.2,
-    orbitR: rand(30, 58),
+    orbitR: rand(36, 64),
     orbitSpeed: rand(0.7, 1.25) * (Math.random() < 0.5 ? -1 : 1),
   });
   if (state.running && !state.tipFlags.hunter) tipOnce("hunter", "ХИЩНИК", 1500);
@@ -2520,62 +2526,37 @@ function eatSpark(index, spark) {
 }
 
 function placeHunterOnEdge(hunter) {
-  const pad = 40;
-  const side = Math.floor(Math.random() * 4);
-  if (side === 0) {
-    hunter.x = rand(0, state.width);
-    hunter.y = -pad;
-  } else if (side === 1) {
-    hunter.x = state.width + pad;
-    hunter.y = rand(0, state.height);
-  } else if (side === 2) {
-    hunter.x = rand(0, state.width);
-    hunter.y = state.height + pad;
-  } else {
-    hunter.x = -pad;
-    hunter.y = rand(0, state.height);
-  }
+  const point = hunterSpawnPointAwayFromPlayer();
+  hunter.x = point.x;
+  hunter.y = point.y;
   hunter.vx = 0;
   hunter.vy = 0;
 }
 
 function updateHunters(dt) {
   const soft = difficultyScale();
-  // During opening: no dangerous hunters at all.
+  // During opening: no hunters on the field at all.
   if (inOpening()) {
-    for (let i = state.hunters.length - 1; i >= 0; i -= 1) {
-      const hunter = state.hunters[i];
-      if (hunter.parade || hunter.demo) {
-        hunter.phase += dt * 4;
-        hunter.x += (hunter.vx || 40) * dt;
-        hunter.y += Math.sin(hunter.phase) * 18 * dt;
-        if (hunter.x > state.width + 40) {
-          hunter.x = -40;
-          hunter.y = state.height * (0.2 + Math.random() * 0.3);
-        }
-      } else {
-        // Safety: any non-parade fish during opening is pushed off-screen.
-        placeHunterOnEdge(hunter);
-        hunter.parade = true;
-        hunter.slow = true;
-      }
-    }
+    if (state.hunters.length) state.hunters = state.hunters.filter((h) => h.demo && !state.running);
     return;
   }
 
-  const maxHunters = Math.min(7, Math.max(1, Math.floor((2 + Math.floor(state.score / 18)) * soft)));
+  const early = state.elapsed < OPENING_SEC + 8 || state.score < 12;
+  const maxHunters = early
+    ? 1
+    : Math.min(7, Math.max(1, Math.floor((1 + Math.floor(state.score / 22)) * soft)));
   state.hunterAcc += dt;
-  let interval = Math.max(1.05, 3.4 - state.score * 0.026) / Math.max(0.55, soft);
-  if (!state.slowHunterSeen) interval = Math.max(interval, 2.8 + (1 - soft) * 1.2);
-  const firstHunterAt = OPENING_SEC + 1.6;
-  while (state.hunters.length < maxHunters && state.hunterAcc >= interval) {
-    state.hunterAcc -= interval;
-    if (!state.slowHunterSeen && state.stats.sparkEats > 0 && state.elapsed > firstHunterAt) {
+  let interval = Math.max(1.2, 3.8 - state.score * 0.022) / Math.max(0.55, soft);
+  if (!state.slowHunterSeen) interval = Math.max(interval, 3.4);
+  const firstHunterAt = OPENING_SEC + 2.8;
+  // Spawn at most one hunter per update to avoid a sudden ambush pack.
+  if (state.hunters.length < maxHunters && state.hunterAcc >= interval && state.elapsed > firstHunterAt) {
+    state.hunterAcc = 0;
+    if (!state.slowHunterSeen) {
       spawnHunter(true);
       state.slowHunterSeen = true;
-    } else if (state.elapsed > firstHunterAt + (state.slowHunterSeen ? 0 : 0.8)) {
+    } else {
       spawnHunter(false);
-      if (state.score > 45 && Math.random() < 0.22 * soft && state.hunters.length < maxHunters) spawnHunter(false);
     }
   }
 
@@ -2584,16 +2565,18 @@ function updateHunters(dt) {
     hunter.phase += dt * 5;
     if (hunter.shadow) hunter.wobble = (hunter.wobble || 0) + dt * 5.5;
     hunter.warn = Math.max(0, hunter.warn - dt * 1.45);
+    hunter.grace = Math.max(0, (hunter.grace || 0) - dt);
     if (hunter.parade || hunter.demo) {
-      // Convert showcase fish safely: always re-enter from an edge.
+      // Convert showcase fish safely: always re-enter from a far edge.
       placeHunterOnEdge(hunter);
       hunter.parade = false;
       hunter.demo = false;
       hunter.slow = true;
       hunter.warn = 1;
-      hunter.anger = Math.min(hunter.anger || 0.7, 0.55);
+      hunter.grace = 1.2;
+      hunter.anger = Math.min(hunter.anger || 0.7, 0.5);
       hunter.orbit = (i * 2.15) + Math.random();
-      hunter.orbitR = rand(30, 58);
+      hunter.orbitR = rand(36, 64);
       hunter.orbitSpeed = rand(0.7, 1.2) * (i % 2 === 0 ? -1 : 1);
       hunter.nearMissed = false;
     }
@@ -2647,21 +2630,33 @@ function updateHunters(dt) {
 
     if (state.life) {
       const d = dist(hunter.x, hunter.y, state.life.x, state.life.y);
-      const killR = hunter.r * 0.72 + state.life.r * 0.75;
-      const nearR = killR + 18;
+      // Match kill radius to the visible fish sprite, not just the tiny body radius.
+      const fishReach = hunter.r * 1.55;
+      const killR = fishReach + state.life.r * 0.7;
+      const nearR = killR + 22;
       if (d < nearR && d >= killR) {
         registerNearMiss(hunter, state.life.x, state.life.y);
       } else if (d >= nearR + 24) {
         hunter.nearMissed = false;
       }
       if (d < killR) {
-        // First contact with a fish always ends the run.
+        if (hunter.grace > 0) {
+          // Brand-new fish: push away instead of instantly eating the player on spawn.
+          const pushAng = Math.atan2(hunter.y - state.life.y, hunter.x - state.life.x) || 0;
+          hunter.vx += Math.cos(pushAng) * 2.8;
+          hunter.vy += Math.sin(pushAng) * 2.8;
+          placeHunterOnEdge(hunter);
+          hunter.grace = Math.max(hunter.grace, 0.6);
+          hunter.warn = 1;
+          continue;
+        }
+        // First real contact with a fish ends the run.
         finishRun(hunter.shadow ? "твой старый след догнал тебя" : DEATH.HUNTER);
         return;
       }
     } else if (state.echo && !inInkDive()) {
       const d = dist(hunter.x, hunter.y, state.echo.x, state.echo.y);
-      const killR = hunter.r * 0.72 + state.echo.r * 0.78;
+      const killR = hunter.r * 1.55 + state.echo.r * 0.7;
       if (d < killR + 16 && d >= killR) {
         registerNearMiss(hunter, state.echo.x, state.echo.y);
       }
@@ -3269,8 +3264,8 @@ function drawEvilFish(hunter, alpha = 1, ghost = false) {
   const wobble = Math.sin(hunter.phase || 0) * 0.1;
   if (PHOTOS.fish.ready) {
     const img = PHOTOS.fish.img;
-    const fishW = r * 4.8;
-    const fishH = r * 2.45;
+    const fishW = r * 4.2;
+    const fishH = r * 2.15;
     ctx.save();
     ctx.translate(hunter.x, hunter.y);
     ctx.rotate(angle + wobble);
@@ -3736,7 +3731,7 @@ function boot() {
   const nativeShell = !!window.OttiskNative?.isNative;
   if ("serviceWorker" in navigator && !nativeShell) {
     navigator.serviceWorker
-      .register("./sw.js?v=36")
+      .register("./sw.js?v=37")
       .then((reg) => reg.update())
       .catch(() => {});
   }
