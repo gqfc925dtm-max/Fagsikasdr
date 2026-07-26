@@ -149,7 +149,15 @@ body {
     linear-gradient(180deg, rgba(10, 28, 46, 0.2), rgba(6, 16, 28, 0.92)),
     linear-gradient(90deg, color-mix(in srgb, #1a4a66 35%, transparent), transparent 55%);
   border-top: 1px solid color-mix(in srgb, var(--foam) 12%, transparent);
-  backdrop-filter: blur(10px);
+}
+
+/* Avoid expensive backdrop blur over the live canvas during a run. */
+.in-run .status {
+  background: rgba(6, 16, 28, 0.94);
+}
+
+.screen-bg.dim {
+  backdrop-filter: none;
 }
 
 .status.hidden { display: none !important; }
@@ -659,8 +667,7 @@ body {
   padding: 14px 16px;
   border: 1px solid color-mix(in srgb, var(--foam) 16%, transparent);
   background:
-    linear-gradient(180deg, rgba(18, 48, 72, 0.92), rgba(8, 22, 38, 0.94));
-  backdrop-filter: blur(10px);
+    linear-gradient(180deg, rgba(18, 48, 72, 0.96), rgba(8, 22, 38, 0.98));
   animation: rise-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   pointer-events: auto;
 }
