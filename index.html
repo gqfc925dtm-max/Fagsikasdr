@@ -270,9 +270,8 @@
           </button>
           <button id="btn-retry" class="btn btn-primary" type="button">
             <span class="btn-main">Ещё раз</span>
-            <span class="btn-sub">удерживай кнопку</span>
+            <span class="btn-sub">новый забег</span>
           </button>
-          <div class="hold-meter over"><i id="hold-fill-over"></i></div>
           <button id="btn-menu" class="btn btn-ghost" type="button">
             <span class="btn-main">В меню</span>
           </button>
@@ -284,7 +283,7 @@
   </div>
   <script>
     (async () => {
-      const stamp = "ottisk-force-v65";
+      const stamp = "ottisk-force-v69";
       if (localStorage.getItem(stamp)) return;
       localStorage.setItem(stamp, "1");
       try {
