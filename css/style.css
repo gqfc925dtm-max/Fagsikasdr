@@ -674,7 +674,7 @@ body {
 .hero-glyph {
   width: 40px;
   height: 40px;
-  border-radius: 50%;
+  border-radius: 8px;
   display: grid;
   place-items: center;
   background: color-mix(in srgb, #061420 55%, transparent);
