@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=eat1" />
+  <link rel="stylesheet" href="css/style.css?v=feat52" />
   <link rel="preload" href="assets/fish-evil.png?v=5" as="image" />
   <title>ОТТИСК</title>
 </head>
@@ -195,7 +195,7 @@
           </button>
           <button id="btn-share" class="btn btn-secondary" type="button">
             <span class="btn-main">Поделиться</span>
-            <span class="btn-sub">отправь свой след</span>
+            <span class="btn-sub">Stories · волна и герой</span>
           </button>
           <button id="btn-retry" class="btn btn-primary" type="button">
             <span class="btn-main">Ещё раз</span>
@@ -210,7 +210,7 @@
   </div>
   <script>
     (async () => {
-      const stamp = "ottisk-force-v51";
+      const stamp = "ottisk-force-v52";
       if (localStorage.getItem(stamp)) return;
       localStorage.setItem(stamp, "1");
       try {
@@ -224,11 +224,11 @@
         }
       } catch (_) {}
       const url = new URL(location.href);
-      url.searchParams.set("v", "51");
+      url.searchParams.set("v", "52");
       location.replace(url.toString());
     })();
   </script>
   <script src="js/native.js" type="module"></script>
-  <script src="js/game.js?v=eat1" type="module"></script>
+  <script src="js/game.js?v=feat52" type="module"></script>
 </body>
 </html>
