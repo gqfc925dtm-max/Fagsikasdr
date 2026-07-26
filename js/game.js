@@ -5217,7 +5217,7 @@ function drawEelHunter(hunter, alpha = 1) {
     ctx.fill();
   }
   // sparks
-  ctx.fillStyle = "# hum".includes("x") ? "#e8fff4" : "#e8fff4";
+  ctx.fillStyle = "#e8fff4";
   for (let i = 0; i < 3; i += 1) {
     const sx = r * (0.2 + i * 0.45);
     const sy = Math.sin(weave * 2 + i * 2) * r * 0.55;
@@ -6391,7 +6391,7 @@ function boot() {
   const nativeShell = !!window.OttiskNative?.isNative;
   if ("serviceWorker" in navigator && !nativeShell) {
     navigator.serviceWorker
-      .register("./sw.js?v=57")
+      .register("./sw.js?v=58")
       .then((reg) => reg.update())
       .catch(() => {});
   }
