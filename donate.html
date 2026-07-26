@@ -70,16 +70,28 @@
     .tip strong { font-family: Syne, sans-serif; }
     .price { color: var(--gold); font-family: Syne, sans-serif; font-weight: 800; white-space: nowrap; }
     .muted { color: var(--mute); font-size: 0.88rem; }
+    .phone {
+      font-family: Syne, sans-serif;
+      font-size: 1.45rem;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      margin: 0.35rem 0 0.75rem;
+      color: var(--foam);
+    }
     .actions { display: flex; flex-direction: column; gap: 10px; margin-top: 1.2rem; }
     .btn {
       display: block;
       text-align: center;
       text-decoration: none;
+      border: 0;
       border-radius: 12px;
       padding: 14px 16px;
       font-family: Syne, sans-serif;
       font-weight: 800;
       letter-spacing: 0.02em;
+      cursor: pointer;
+      width: 100%;
+      font-size: 1rem;
     }
     .btn-primary {
       background: color-mix(in srgb, var(--gold) 82%, #fff3d0);
@@ -90,6 +102,7 @@
       color: var(--foam);
       background: transparent;
     }
+    .copied { color: var(--life) !important; }
   </style>
 </head>
 <body>
@@ -125,24 +138,34 @@
     </div>
 
     <div class="card">
-      <h2>Как поддержать</h2>
-      <p>Напиши на почту — пришлём актуальный способ перевода (СБП / карта).</p>
+      <h2>Перевод по СБП</h2>
+      <p class="muted">В любом банке: перевод по номеру телефона → Сбер.</p>
+      <p class="phone" id="phone-display">+7 921 138-02-88</p>
+      <button class="btn btn-primary" id="copy-phone" type="button">Скопировать номер</button>
+      <p class="muted" id="copy-status" style="margin: 0.7rem 0 0;"></p>
+      <p class="muted" style="margin-top: 0.9rem;">Комментарий к переводу можно не писать. Если хочешь — укажи «ОТТИСК».</p>
+    </div>
+
+    <div class="card">
+      <h2>Вопросы</h2>
       <p><a id="mail" href="mailto:amelin070411@icloud.com?subject=ОТТИСК%20донат">amelin070411@icloud.com</a></p>
       <p class="muted">В приложении App Store донат идёт через покупку внутри игры, следы начисляются сразу.</p>
     </div>
 
     <div class="actions">
-      <a class="btn btn-primary" id="mail-btn" href="mailto:amelin070411@icloud.com?subject=ОТТИСК%20донат">Написать про донат</a>
       <a class="btn btn-ghost" href="./index.html">Вернуться в игру</a>
     </div>
   </main>
   <script>
+    const PHONE_DISPLAY = "+7 921 138-02-88";
+    const PHONE_COPY = "89211380288";
+
     const tips = {
-      tip_small: { title: "Чаевые · 99 ₽", sub: "Спасибо за след. Можно просто написать на почту." },
-      tip_mid: { title: "Сильный след · 249 ₽", sub: "Поддержка разработки ОТТИСК." },
-      tip_big: { title: "Глубина · 499 ₽", sub: "Большой донат — огромное спасибо." },
-      marks: { title: "Пак следов", sub: "Покупка следов доступна в версии App Store." },
-      submarine: { title: "Подводный корабль · 99 ₽", sub: "Премиум-герой: пушки и 3 жизни. Покупка доступна в App Store." },
+      tip_small: { title: "Чаевые · 99 ₽", sub: "Переведи 99 ₽ по СБП на номер ниже." },
+      tip_mid: { title: "Сильный след · 249 ₽", sub: "Переведи 249 ₽ по СБП на номер ниже." },
+      tip_big: { title: "Глубина · 499 ₽", sub: "Переведи 499 ₽ по СБП на номер ниже." },
+      marks: { title: "Пак следов", sub: "Покупка следов доступна в версии App Store. На сайте можно поддержать донатом." },
+      submarine: { title: "Подводный корабль · 99 ₽", sub: "Премиум-герой в App Store. На сайте можно поддержать донатом 99 ₽." },
     };
     const params = new URLSearchParams(location.search);
     const tip = tips[params.get("tip")] || null;
@@ -150,10 +173,25 @@
       document.getElementById("picked").textContent = tip.title;
       document.getElementById("picked-sub").textContent = tip.sub;
       const subject = encodeURIComponent(`ОТТИСК донат · ${tip.title}`);
-      const mail = `mailto:amelin070411@icloud.com?subject=${subject}`;
-      document.getElementById("mail").href = mail;
-      document.getElementById("mail-btn").href = mail;
+      document.getElementById("mail").href = `mailto:amelin070411@icloud.com?subject=${subject}`;
     }
+
+    const status = document.getElementById("copy-status");
+    const btn = document.getElementById("copy-phone");
+    btn.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(PHONE_COPY);
+        status.textContent = "Номер скопирован: " + PHONE_DISPLAY;
+        status.classList.add("copied");
+        btn.textContent = "Скопировано";
+        setTimeout(() => {
+          btn.textContent = "Скопировать номер";
+        }, 1600);
+      } catch {
+        status.textContent = "Скопируй вручную: " + PHONE_COPY;
+        status.classList.remove("copied");
+      }
+    });
   </script>
 </body>
 </html>
