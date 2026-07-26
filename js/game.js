@@ -2384,11 +2384,21 @@ function loadMeta() {
     unlockedTrails: Array.isArray(raw?.unlockedTrails)
       ? ["plain", ...raw.unlockedTrails.filter((id) => TRAILS.some((t) => t.id === id && t.cost > 0))]
       : ["plain"],
-    activeTrail: TRAILS.some((t) => t.id === raw?.activeTrail) ? raw.activeTrail : "plain",
+    activeTrail: (() => {
+      const id = TRAILS.some((t) => t.id === raw?.activeTrail) ? raw.activeTrail : "plain";
+      const unlocked = Array.isArray(raw?.unlockedTrails) ? raw.unlockedTrails : [];
+      if (id === "plain" || unlocked.includes(id)) return id;
+      return "plain";
+    })(),
     unlockedFrames: Array.isArray(raw?.unlockedFrames)
       ? ["none", ...raw.unlockedFrames.filter((id) => FRAMES.some((f) => f.id === id && f.cost > 0))]
       : ["none"],
-    activeFrame: FRAMES.some((f) => f.id === raw?.activeFrame) ? raw.activeFrame : "none",
+    activeFrame: (() => {
+      const id = FRAMES.some((f) => f.id === raw?.activeFrame) ? raw.activeFrame : "none";
+      const unlocked = Array.isArray(raw?.unlockedFrames) ? raw.unlockedFrames : [];
+      if (id === "none" || unlocked.includes(id)) return id;
+      return "none";
+    })(),
     difficulty: DIFFICULTIES.some((d) => d.id === raw?.difficulty) ? raw.difficulty : "normal",
     hourlyGiftAt: Math.max(0, Number(raw?.hourlyGiftAt || 0)),
     dailyGiftDay: typeof raw?.dailyGiftDay === "string" ? raw.dailyGiftDay : "",
