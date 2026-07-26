@@ -138,8 +138,8 @@ const WAVES = [
     name: "стрелки",
     species: "dart",
     maxBonus: 1,
-    speedMul: 1.38,
-    intervalMul: 0.82,
+    speedMul: 1.18,
+    intervalMul: 0.9,
     label: "ВОЛНА 2 · СТРЕЛКИ",
   },
   {
@@ -148,8 +148,8 @@ const WAVES = [
     name: "медузы",
     species: "jelly",
     maxBonus: 1,
-    speedMul: 0.72,
-    intervalMul: 0.9,
+    speedMul: 0.66,
+    intervalMul: 0.98,
     label: "ВОЛНА 3 · МЕДУЗЫ",
   },
   {
@@ -157,9 +157,9 @@ const WAVES = [
     at: 80,
     name: "угри",
     species: "eel",
-    maxBonus: 2,
-    speedMul: 1.18,
-    intervalMul: 0.74,
+    maxBonus: 1,
+    speedMul: 1.02,
+    intervalMul: 0.84,
     label: "ВОЛНА 4 · УГРИ",
   },
   {
@@ -168,8 +168,8 @@ const WAVES = [
     name: "акулы",
     species: "shark",
     maxBonus: 2,
-    speedMul: 1.3,
-    intervalMul: 0.66,
+    speedMul: 1.18,
+    intervalMul: 0.72,
     label: "ВОЛНА 5 · АКУЛЫ",
   },
 ];
@@ -1229,6 +1229,17 @@ function difficultyScale() {
   if (best < 30) return 0.68;
   if (best < 60) return 0.82;
   if (best < 100) return 0.92;
+  return 1;
+}
+
+/** Ease the mid-run spike so objects feel a bit slower around 20–110 score. */
+function midgamePace() {
+  const s = state.score || 0;
+  if (s < 18) return 1;
+  if (s < 40) return 0.88;
+  if (s < 70) return 0.82;
+  if (s < 110) return 0.85;
+  if (s < 150) return 0.92;
   return 1;
 }
 
@@ -2637,13 +2648,13 @@ function spawnComet() {
   const fromLeft = Math.random() < 0.5;
   const y = rand(state.height * 0.18, state.height * 0.78);
   const x = fromLeft ? -20 : state.width + 20;
-  const speed = rand(3.2, 4.4);
+  const speed = rand(2.6, 3.6);
   const profile = sparkProfile("comet");
   state.sparks.push({
     x,
     y,
     vx: fromLeft ? speed : -speed,
-    vy: rand(-0.35, 0.35),
+    vy: rand(-0.28, 0.28),
     pulse: Math.random() * Math.PI * 2,
     tutorial: false,
     grace: 0.1,
@@ -2713,7 +2724,7 @@ function spawnHunter(slow = false) {
   const point = hunterSpawnPointAwayFromPlayer();
   const soft = difficultyScale();
   const wave = syncWave(false);
-  const anger = (slow ? 0.28 : rand(0.62, 0.95) + Math.min(0.4, state.score * 0.005)) * soft;
+  const anger = (slow ? 0.26 : rand(0.58, 0.88) + Math.min(0.28, state.score * 0.0035)) * soft;
   const hunter = {
     x: point.x,
     y: point.y,
@@ -3049,8 +3060,9 @@ function updateSparkMotion(spark, dt) {
   }
   spark.vx *= spark.type === "super" ? 0.97 : 0.988;
   spark.vy *= spark.type === "super" ? 0.97 : 0.988;
-  spark.x += spark.vx * dt * 60;
-  spark.y += spark.vy * dt * 60;
+  const sparkPace = 0.9 + midgamePace() * 0.1;
+  spark.x += spark.vx * dt * 60 * sparkPace;
+  spark.y += spark.vy * dt * 60 * sparkPace;
   const margin = spark.r + 8;
   if (spark.x < margin || spark.x > state.width - margin) {
     spark.x = clamp(spark.x, margin, state.width - margin);
@@ -3175,7 +3187,10 @@ function updateHunters(dt) {
     ? 1
     : Math.min(7, Math.max(1, Math.floor((1 + Math.floor(state.score / 22) + wave.maxBonus) * soft)));
   state.hunterAcc += dt;
-  let interval = (Math.max(1.2, 3.8 - state.score * 0.022) * wave.intervalMul) / Math.max(0.55, soft);
+  let interval = (Math.max(1.35, 4.1 - state.score * 0.018) * wave.intervalMul) / Math.max(0.55, soft);
+  interval /= Math.max(0.75, midgamePace());
+  // Mid-game: spawn a bit less often so the field stays readable.
+  if (state.score >= 22 && state.score < 110) interval *= 1.12;
   if (opening) interval = Math.max(interval, 2.8);
   if (!state.slowHunterSeen) interval = Math.max(interval, 1.1);
   const firstHunterAt = 0.45;
@@ -3243,15 +3258,15 @@ function updateHunters(dt) {
       ty = state.echo.y;
     }
     const ang = Math.atan2(ty - hunter.y, tx - hunter.x);
-    let speed = (0.95 + state.score * 0.012) * hunter.anger * wave.speedMul;
-    if (hunter.shadow) speed *= 0.9;
-    if (hunter.slow) speed *= 0.72;
+    let speed = (0.88 + state.score * 0.0085) * hunter.anger * wave.speedMul * midgamePace();
+    if (hunter.shadow) speed *= 0.88;
+    if (hunter.slow) speed *= 0.68;
     if (hasMut("cool") && state.hunger < 50) speed *= 0.85;
     if (activeEventId() === "calm") speed *= 0.62;
-    if (activeEventId() === "raid") speed *= 1.12;
+    if (activeEventId() === "raid") speed *= 1.08;
     if (inInkDive()) speed *= 0.35;
-    if (species === "dart" && hunter.dashT > 0) speed *= 2.35;
-    if (species === "shark" && hunter.dashT > 0) speed *= 2.8;
+    if (species === "dart" && hunter.dashT > 0) speed *= 2.05;
+    if (species === "shark" && hunter.dashT > 0) speed *= 2.4;
 
     // Periodic lunges for dart/shark waves.
     if (state.life && hunter.dashCd <= 0 && hunter.dashT <= 0 && (species === "dart" || species === "shark")) {
