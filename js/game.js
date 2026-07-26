@@ -9,6 +9,9 @@ const MARKS_CONTINUE_COST = 12;
 const MAX_CONTINUES_PER_RUN = 2;
 const MARKS_PACK_AMOUNT = 60;
 const MARKS_PACK_PRODUCT_ID = "ottisk_marks_60";
+const SUBMARINE_PRODUCT_ID = "ottisk_submarine";
+const SUBMARINE_PRICE_LABEL = "99 ₽";
+const SUBMARINE_LIVES = 3;
 const WEEKLY_TARGET = 50;
 const WEEKLY_REWARD = 20;
 const STARTER_MARKS = 15;
@@ -145,9 +148,20 @@ const HEROES = [
   { id: "jellyfish", name: "медуза", glyph: "Ме", ability: "аура", tip: "АУРА ЗАМЕДЛЯЕТ" },
   { id: "turtle", name: "черепаха", glyph: "Че", ability: "панцирь", tip: "ПАНЦИРЬ ДЕРЖИТ ДОЛЬШЕ" },
   { id: "crab", name: "краб", glyph: "Кр", ability: "щит", tip: "ЩИТ НА 1 УДАР" },
-  { id: "manta", name: "скат", glyph: "Ск", ability: "крыло", tip: "ДЛИННЫЙ РЫВОК-КРЫЛО", premium: true, cost: 45 },
-  { id: "angler", name: "удильщик", glyph: "Уд", ability: "манок", tip: "АУРА ТЯНЕТ СВЕТ", premium: true, cost: 80 },
-  { id: "nautilus", name: "наутилус", glyph: "На", ability: "раковина", tip: "ЩИТ ВОССТАНАВЛИВАЕТСЯ", premium: true, cost: 120 },
+  { id: "manta", name: "скат", glyph: "Ск", ability: "крыло+", tip: "РЫВОК РВЁТ СТРОЙ", premium: true, cost: 45 },
+  { id: "angler", name: "удильщик", glyph: "Уд", ability: "манок+", tip: "СВЕТ САМ ПЛЫВЁТ К ТЕБЕ", premium: true, cost: 80 },
+  { id: "nautilus", name: "наутилус", glyph: "На", ability: "раковина+", tip: "ДВОЙНАЯ РАКОВИНА", premium: true, cost: 120 },
+  {
+    id: "sub",
+    name: "корабль",
+    glyph: "Ко",
+    ability: "пушки · 3 жизни",
+    tip: "ПУШКИ БЬЮТ ХИЩНИКОВ",
+    premium: true,
+    iap: true,
+    productId: SUBMARINE_PRODUCT_ID,
+    priceLabel: SUBMARINE_PRICE_LABEL,
+  },
   { id: "custom", name: "свой", glyph: "✦", ability: "рывок", tip: "РЕЗКИЙ СВАЙП — РЫВОК" },
 ];
 
@@ -536,6 +550,9 @@ const state = {
   heroDashCd: 0,
   heroShield: true,
   heroShieldCd: 0,
+  shipLives: 0,
+  shots: [],
+  cannonCd: 0,
   bestAtStart: 0,
   shopReturn: "home",
   tipFlags: {
@@ -2378,7 +2395,10 @@ function loadMeta() {
     activeHero: HEROES.some((h) => h.id === raw?.activeHero) ? raw.activeHero : "octopus",
     customHero: typeof raw?.customHero === "string" && raw.customHero.startsWith("data:image") ? raw.customHero : "",
     unlockedHeroes: Array.isArray(raw?.unlockedHeroes)
-      ? raw.unlockedHeroes.filter((id) => HEROES.some((h) => h.id === id && h.premium))
+      ? raw.unlockedHeroes.filter((id) => HEROES.some((h) => h.id === id && h.premium && !h.iap))
+      : [],
+    iapHeroes: Array.isArray(raw?.iapHeroes)
+      ? raw.iapHeroes.filter((id) => HEROES.some((h) => h.id === id && h.iap))
       : [],
     controlMode: CONTROL_MODES.some((m) => m.id === raw?.controlMode) ? raw.controlMode : "hand",
     unlockedTrails: Array.isArray(raw?.unlockedTrails)
@@ -2439,8 +2459,13 @@ function activeHero() {
 function isHeroOwned(id, meta = state.meta) {
   const hero = HEROES.find((h) => h.id === id);
   if (!hero) return false;
+  if (hero.iap) return (meta?.iapHeroes || []).includes(id);
   if (!hero.premium) return true;
   return (meta?.unlockedHeroes || []).includes(id);
+}
+
+function nextLockedPremiumHero() {
+  return HEROES.find((h) => h.premium && !h.iap && !isHeroOwned(h.id)) || null;
 }
 
 function controlMode() {
@@ -2507,11 +2532,12 @@ function heroHasShield() {
 
 function heroAuraSlowMul(hunter) {
   if (!heroHasAura() || !state.life || !hunter) return 1;
-  const reach = (activeHeroId() === "angler" ? 138 : 118) + Math.sin(state.time * 2.4) * 6;
+  const angler = activeHeroId() === "angler";
+  const reach = (angler ? 155 : 118) + Math.sin(state.time * 2.4) * 6;
   const d = dist(hunter.x, hunter.y, state.life.x, state.life.y);
   if (d > reach) return 1;
-  const deep = activeHeroId() === "angler" ? 0.42 : 0.52;
-  return deep + 0.28 * clamp(d / reach, 0, 1);
+  const deep = angler ? 0.32 : 0.52;
+  return deep + (angler ? 0.22 : 0.28) * clamp(d / reach, 0, 1);
 }
 
 function tryHeroDash(dx, dy, moved) {
@@ -2522,41 +2548,49 @@ function tryHeroDash(dx, dy, moved) {
   const nx = dx / len;
   const ny = dy / len;
   const manta = activeHeroId() === "manta";
-  const boost = manta ? 84 : 56;
+  const boost = manta ? 98 : 56;
   state.life.x += nx * boost;
   state.life.y += ny * boost;
   clampLife();
   state.life.aim = Math.atan2(ny, nx);
-  state.heroDashCd = manta ? 1.85 : 2.6;
-  state.safeUntil = performance.now() + (manta ? 480 : 320);
-  const pushR = manta ? 128 : 96;
+  state.heroDashCd = manta ? 1.55 : 2.6;
+  state.safeUntil = performance.now() + (manta ? 620 : 320);
+  if (manta) {
+    state.timeScale = 0.55;
+    state.slowmoUntil = performance.now() + 280;
+  }
+  const pushR = manta ? 150 : 96;
   for (const hunter of state.hunters) {
     if (hunter.boss) continue;
     const d = dist(hunter.x, hunter.y, state.life.x, state.life.y);
     if (d > pushR || d < 0.1) continue;
-    const push = ((pushR - d) / pushR) * (manta ? 10.5 : 7.5);
+    const push = ((pushR - d) / pushR) * (manta ? 14 : 7.5);
     hunter.vx += ((hunter.x - state.life.x) / d) * push;
     hunter.vy += ((hunter.y - state.life.y) / d) * push;
     hunter.warn = Math.max(hunter.warn, 0.7);
-    hunter.grace = Math.max(hunter.grace || 0, 0.35);
+    hunter.grace = Math.max(hunter.grace || 0, manta ? 0.55 : 0.35);
+    if (manta && !hunter.boss && hunter.r < 22 && d < 70) {
+      hunter.x += ((hunter.x - state.life.x) / d) * 40;
+      hunter.y += ((hunter.y - state.life.y) / d) * 40;
+    }
   }
-  for (let i = 0; i < (manta ? 16 : 10); i += 1) {
+  for (let i = 0; i < (manta ? 22 : 10); i += 1) {
     pushParticle({
       x: state.life.x - nx * i * 4,
       y: state.life.y - ny * i * 4,
-      vx: -nx * rand(1.2, 2.8),
-      vy: -ny * rand(1.2, 2.8),
-      size: rand(2, 4.5),
+      vx: -nx * rand(1.2, 3.2),
+      vy: -ny * rand(1.2, 3.2),
+      size: rand(2, 5),
       color: manta ? cssVar("--accent-b", "#7affd4") : cssVar("--life", "#7affd4"),
       kind: "streak",
       decay: rand(0.04, 0.07),
     });
   }
-  floatText(state.life.x, state.life.y - 22, manta ? "крыло" : "рывок", cssVar("--life", "#7affd4"), 15);
+  floatText(state.life.x, state.life.y - 22, manta ? "крыло+" : "рывок", cssVar("--life", "#7affd4"), 15);
   tipOnce("ability", activeHero().tip || "РЫВОК", 1400);
   sfxPulse();
   buzz([8, 14, 8]);
-  state.flash = Math.max(state.flash, 0.1);
+  state.flash = Math.max(state.flash, manta ? 0.16 : 0.1);
   return true;
 }
 
@@ -2564,22 +2598,133 @@ function tryCrabShield(hunter) {
   if (!heroHasShield() || !state.heroShield || !state.life) return false;
   state.heroShield = false;
   const nautilus = activeHeroId() === "nautilus";
-  if (nautilus) state.heroShieldCd = 12;
+  if (nautilus) state.heroShieldCd = 8;
   buzz([12, 20, 12]);
   sfxPulse();
-  burst(state.life.x, state.life.y, cssVar("--accent-a", "#ff9a62"), nautilus ? 28 : 22, nautilus ? 6 : 5.2);
-  floatText(state.life.x, state.life.y - 20, nautilus ? "раковина" : "щит", cssVar("--accent-a", "#ff9a62"), 16);
+  burst(state.life.x, state.life.y, cssVar("--accent-a", "#ff9a62"), nautilus ? 34 : 22, nautilus ? 6.5 : 5.2);
+  floatText(state.life.x, state.life.y - 20, nautilus ? "раковина+" : "щит", cssVar("--accent-a", "#ff9a62"), 16);
   tipOnce("ability", nautilus ? "РАКОВИНА СЛОМАНА" : "ЩИТ СЛОМАН", 1400);
   if (hunter) {
     const ang = Math.atan2(hunter.y - state.life.y, hunter.x - state.life.x) || 0;
-    hunter.vx += Math.cos(ang) * (nautilus ? 12 : 9);
-    hunter.vy += Math.sin(ang) * (nautilus ? 12 : 9);
+    hunter.vx += Math.cos(ang) * (nautilus ? 15 : 9);
+    hunter.vy += Math.sin(ang) * (nautilus ? 15 : 9);
     hunter.warn = 1;
-    hunter.grace = Math.max(hunter.grace || 0, nautilus ? 0.75 : 0.55);
+    hunter.grace = Math.max(hunter.grace || 0, nautilus ? 0.9 : 0.55);
     if (!hunter.boss) placeHunterOnEdge(hunter);
   }
-  state.safeUntil = performance.now() + (nautilus ? 1400 : 900);
+  state.safeUntil = performance.now() + (nautilus ? 1700 : 900);
   return true;
+}
+
+function tryShipHull(hunter) {
+  if (activeHeroId() !== "sub" || !state.life) return false;
+  if ((state.shipLives || 0) <= 0) return false;
+  state.shipLives -= 1;
+  if (state.shipLives <= 0) return false;
+  buzz([16, 24, 16]);
+  sfxPulse();
+  burst(state.life.x, state.life.y, cssVar("--gold", "#ffe898"), 26, 5.6);
+  floatText(state.life.x, state.life.y - 26, `жизнь · ${state.shipLives}`, cssVar("--gold", "#ffe898"), 16);
+  tipOnce("ability", "КОРПУС ДЕРЖИТ", 1400);
+  if (hunter) {
+    const ang = Math.atan2(hunter.y - state.life.y, hunter.x - state.life.x) || 0;
+    hunter.vx += Math.cos(ang) * 14;
+    hunter.vy += Math.sin(ang) * 14;
+    hunter.warn = 1;
+    hunter.grace = Math.max(hunter.grace || 0, 0.8);
+    if (!hunter.boss && hunter.r < 30) placeHunterOnEdge(hunter);
+  }
+  state.safeUntil = performance.now() + 1600;
+  state.flash = Math.max(state.flash, 0.18);
+  state.shake = Math.max(state.shake, 7);
+  return true;
+}
+
+function fireShipCannons(dt) {
+  if (activeHeroId() !== "sub" || !state.life || !state.touchActive || state.paused) return;
+  state.cannonCd = Math.max(0, (state.cannonCd || 0) - dt);
+  if (state.cannonCd > 0) return;
+  let best = null;
+  let bestD = Infinity;
+  for (const h of state.hunters) {
+    if (h.shadow) continue;
+    const d = dist(h.x, h.y, state.life.x, state.life.y);
+    if (d < bestD) {
+      bestD = d;
+      best = h;
+    }
+  }
+  if (!best || bestD > 430) return;
+  const ang = Math.atan2(best.y - state.life.y, best.x - state.life.x);
+  const muzzle = state.life.r * 1.45;
+  const mkShot = (spread, speed, radius, life) => {
+    const a = ang + spread;
+    state.shots.push({
+      x: state.life.x + Math.cos(a) * muzzle,
+      y: state.life.y + Math.sin(a) * muzzle,
+      vx: Math.cos(a) * speed,
+      vy: Math.sin(a) * speed,
+      life,
+      r: radius,
+    });
+  };
+  mkShot(0, 560, 5.2, 0.9);
+  mkShot(0.16, 520, 4.1, 0.78);
+  mkShot(-0.16, 520, 4.1, 0.78);
+  state.cannonCd = 0.24;
+  sfxDartDash();
+  buzz(5);
+}
+
+function updateShipShots(dt) {
+  if (!state.shots?.length) return;
+  for (let i = state.shots.length - 1; i >= 0; i -= 1) {
+    const s = state.shots[i];
+    s.x += s.vx * dt;
+    s.y += s.vy * dt;
+    s.life -= dt;
+    if (
+      s.life <= 0 ||
+      s.x < -40 ||
+      s.y < -40 ||
+      s.x > state.width + 40 ||
+      s.y > state.height + 40
+    ) {
+      state.shots.splice(i, 1);
+      continue;
+    }
+    let hit = false;
+    for (let j = state.hunters.length - 1; j >= 0; j -= 1) {
+      const h = state.hunters[j];
+      if (dist(h.x, h.y, s.x, s.y) > h.r + s.r) continue;
+      const ang = Math.atan2(h.y - s.y, h.x - s.x) || 0;
+      h.vx += Math.cos(ang) * (h.boss ? 7 : 16);
+      h.vy += Math.sin(ang) * (h.boss ? 7 : 16);
+      h.warn = 1;
+      h.grace = Math.max(h.grace || 0, 0.35);
+      burst(s.x, s.y, "rgba(255,214,140,0.95)", 10, 4.2);
+      state.flash = Math.max(state.flash, 0.06);
+      state.shake = Math.max(state.shake, 3);
+      sfxNearMiss();
+      hit = true;
+      if (!h.boss && !h.shadow && h.r < 28) {
+        burst(h.x, h.y, cssVar("--danger", "#ff6888"), 16, 5);
+        state.hunters.splice(j, 1);
+        state.score += 5;
+        state.combo += 1;
+        state.comboClock = 2.2;
+        updateScoreUi(true);
+        floatText(h.x, h.y - 18, "+5", cssVar("--gold", "#ffe898"), 14);
+      } else if (h.boss) {
+        h.grace = Math.max(h.grace || 0, 0.55);
+        floatText(h.x, h.y - 22, "отпор", cssVar("--gold", "#ffe898"), 13);
+      } else {
+        placeHunterOnEdge(h);
+      }
+      break;
+    }
+    if (hit) state.shots.splice(i, 1);
+  }
 }
 
 function absorbHunterHit(hunter) {
@@ -2594,6 +2739,7 @@ function absorbHunterHit(hunter) {
   }
   if (consumeSymbioteShield(hunter)) return true;
   if (tryCrabShield(hunter)) return true;
+  if (tryShipHull(hunter)) return true;
   return false;
 }
 
@@ -2627,6 +2773,15 @@ function setActiveHero(id) {
     return;
   }
   if (!isHeroOwned(id)) {
+    const hero = HEROES.find((h) => h.id === id);
+    if (hero?.iap) {
+      state.meta.activeHero = id;
+      saveMeta();
+      renderHeroPicker();
+      paintHeroPortrait();
+      purchaseSubmarine().catch(() => {});
+      return;
+    }
     tryUnlockHero(id);
     return;
   }
@@ -2640,7 +2795,7 @@ function setActiveHero(id) {
 function tryUnlockHero(id) {
   if (!state.meta) return false;
   const hero = HEROES.find((h) => h.id === id);
-  if (!hero?.premium || isHeroOwned(id)) return false;
+  if (!hero?.premium || hero.iap || isHeroOwned(id)) return false;
   const cost = Math.max(1, Number(hero.cost) || 0);
   const marks = state.meta.marks || 0;
   if (marks < cost) {
@@ -2664,6 +2819,53 @@ function tryUnlockHero(id) {
   return true;
 }
 
+async function purchaseSubmarine() {
+  if (!state.meta) return false;
+  if (isHeroOwned("sub")) {
+    state.meta.activeHero = "sub";
+    saveMeta();
+    renderHeroPicker();
+    paintHeroPortrait();
+    showToast("корабль уже твой");
+    return true;
+  }
+  const native = window.OttiskNative;
+  if (isNativeShop()) {
+    showToast("открываем покупку · 99 ₽");
+    const result = await native.purchase(SUBMARINE_PRODUCT_ID).catch(() => null);
+    if (result?.ok) {
+      unlockSubmarine(true);
+      return true;
+    }
+    showToast(result?.message || "покупка отменена");
+    return false;
+  }
+  // Web preview: open donate page; for local/demo allow unlock via confirm toast path
+  try {
+    const url = new URL(DONATE_URL);
+    url.searchParams.set("tip", "submarine");
+    url.searchParams.set("product", SUBMARINE_PRODUCT_ID);
+    window.open(url.toString(), "_blank", "noopener,noreferrer");
+  } catch (_) {
+    location.href = `./donate.html?tip=submarine`;
+  }
+  showToast("корабль · 99 ₽ в App Store");
+  return false;
+}
+
+function unlockSubmarine(fromPurchase = false) {
+  if (!state.meta) return;
+  state.meta.iapHeroes = [...new Set([...(state.meta.iapHeroes || []), "sub"])];
+  state.meta.activeHero = "sub";
+  saveMeta();
+  renderHeroPicker();
+  paintHeroPortrait();
+  renderShop();
+  goalChime();
+  buzz([12, 20, 12]);
+  showToast(fromPurchase ? "корабль твой · 3 жизни и пушки" : "корабль открыт");
+}
+
 function updateHeroAbilityHint() {
   const hint = document.getElementById("hero-ability-hint");
   const lock = document.getElementById("hero-lock-hint");
@@ -2681,19 +2883,30 @@ function updateHeroAbilityHint() {
   if (lock) {
     if (hero?.premium && !owned) {
       lock.classList.remove("hidden");
-      const have = state.meta?.marks || 0;
-      const need = Math.max(0, hero.cost - have);
-      lock.textContent = need > 0
-        ? `Закрыт · ${hero.cost} следов · не хватает ${need}`
-        : `Можно открыть · ${hero.cost} следов · тапни героя`;
+      if (hero.iap) {
+        lock.textContent = `Премиум · ${hero.priceLabel || "99 ₽"} · пушки и 3 жизни`;
+      } else {
+        const have = state.meta?.marks || 0;
+        const need = Math.max(0, hero.cost - have);
+        lock.textContent = need > 0
+          ? `Закрыт · ${hero.cost} следов · не хватает ${need}`
+          : `Можно открыть · ${hero.cost} следов · тапни героя`;
+      }
     } else {
       lock.classList.add("hidden");
       lock.textContent = "";
     }
   }
   if (buyBtn) {
-    const show = !!(hero?.premium && !owned && (state.meta?.marks || 0) < hero.cost);
-    buyBtn.classList.toggle("hidden", !show);
+    if (hero?.iap && !owned) {
+      buyBtn.classList.remove("hidden");
+      buyBtn.textContent = `купить корабль · ${hero.priceLabel || "99 ₽"}`;
+    } else if (hero?.premium && !owned && !hero.iap && (state.meta?.marks || 0) < hero.cost) {
+      buyBtn.classList.remove("hidden");
+      buyBtn.textContent = "купить следы";
+    } else {
+      buyBtn.classList.add("hidden");
+    }
   }
 }
 
@@ -2706,20 +2919,32 @@ function renderHeroPicker() {
     const owned = isHeroOwned(hero.id);
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = `hero-tile${hero.id === current ? " on" : ""}${hero.premium && !owned ? " locked" : ""}`;
+    btn.className = `hero-tile${hero.id === current ? " on" : ""}${hero.premium && !owned ? " locked" : ""}${hero.iap ? " iap" : ""}`;
     const label = hero.id === "custom" && !state.meta?.customHero ? "свой" : hero.name;
     const costHtml = hero.premium && !owned
-      ? `<span class="hero-tile-cost">${hero.cost}</span>`
+      ? `<span class="hero-tile-cost">${hero.iap ? (hero.priceLabel || "99 ₽") : hero.cost}</span>`
       : "";
     btn.innerHTML = `<span class="hero-glyph" aria-hidden="true">${hero.glyph || "•"}</span><span class="hero-tile-name">${label}</span>${costHtml}`;
     btn.setAttribute("role", "option");
     const aria = hero.premium && !owned
-      ? `${label}, ${hero.cost} следов`
+      ? (hero.iap ? `${label}, ${hero.priceLabel}` : `${label}, ${hero.cost} следов`)
       : hero.ability ? `${label}, ${hero.ability}` : label;
     btn.setAttribute("aria-label", aria);
     btn.setAttribute("aria-selected", hero.id === current ? "true" : "false");
     btn.addEventListener("click", () => {
-      if (hero.premium && !isHeroOwned(hero.id)) {
+      if (hero.iap && !isHeroOwned(hero.id)) {
+        if (state.meta?.activeHero === hero.id) {
+          purchaseSubmarine().catch(() => {});
+        } else {
+          state.meta.activeHero = hero.id;
+          saveMeta();
+          renderHeroPicker();
+          paintHeroPortrait();
+          showToast(`${hero.name} · ${hero.priceLabel || "99 ₽"}`);
+        }
+        return;
+      }
+      if (hero.premium && !hero.iap && !isHeroOwned(hero.id)) {
         if (state.meta?.activeHero === hero.id) tryUnlockHero(hero.id);
         else {
           state.meta.activeHero = hero.id;
@@ -3117,10 +3342,6 @@ function renderDonateOptions() {
   updateDonateThanks();
 }
 
-function nextLockedPremiumHero() {
-  return HEROES.find((h) => h.premium && !isHeroOwned(h.id)) || null;
-}
-
 function renderShopProgress() {
   const el = document.getElementById("shop-progress");
   if (!el || !state.meta) return;
@@ -3250,13 +3471,28 @@ function renderShop() {
   if (bal) bal.textContent = `${state.meta.marks || 0} следов`;
   const goal = document.getElementById("shop-hero-goal");
   const target = nextLockedPremiumHero();
+  const subOwned = isHeroOwned("sub");
   if (goal) {
-    goal.textContent = target
-      ? `Следующий герой · ${target.name} · ещё ${Math.max(0, target.cost - (state.meta.marks || 0))} следов`
-      : "Все платные герои открыты. Можно взять косметику или поддержать игру.";
+    if (!subOwned) {
+      goal.textContent = `Премиум · подводный корабль · ${SUBMARINE_PRICE_LABEL} · пушки и 3 жизни`;
+    } else if (target) {
+      goal.textContent = `Следующий герой · ${target.name} · ещё ${Math.max(0, target.cost - (state.meta.marks || 0))} следов`;
+    } else {
+      goal.textContent = "Все платные герои открыты. Можно взять косметику или поддержать игру.";
+    }
   }
   const packSub = document.getElementById("shop-pack-sub");
   if (packSub) packSub.textContent = isNativeShop() ? "пак · покупка в App Store" : "пак · страница доната";
+  const subMain = document.getElementById("shop-sub-main");
+  const subSub = document.getElementById("shop-sub-sub");
+  const subBtn = document.getElementById("btn-shop-sub");
+  if (subMain) subMain.textContent = subOwned ? "Подводный корабль · твой" : `Подводный корабль · ${SUBMARINE_PRICE_LABEL}`;
+  if (subSub) {
+    subSub.textContent = subOwned
+      ? "пушки · 3 жизни · выбран"
+      : (isNativeShop() ? "пушки · 3 жизни · покупка в App Store" : "пушки · 3 жизни · App Store / донат");
+  }
+  if (subBtn) subBtn.classList.toggle("owned", subOwned);
   renderShopCosmetics();
   renderDonateOptions();
   updateDonateThanks();
@@ -3916,6 +4152,11 @@ function grantContinue() {
   state.hunger = 68;
   state.hunters = [];
   state.echo = null;
+  state.shots = [];
+  state.cannonCd = 0;
+  state.shipLives = activeHeroId() === "sub" ? SUBMARINE_LIVES : 0;
+  state.heroShield = heroHasShield();
+  state.heroShieldCd = 0;
   state.safeUntil = performance.now() + 2800;
   if (!state.life) createLife(state.width * 0.5, state.height * 0.56);
   else hum(true);
@@ -4399,6 +4640,9 @@ function resetRun() {
   state.heroDashCd = 0;
   state.heroShield = true;
   state.heroShieldCd = 0;
+  state.shots = [];
+  state.cannonCd = 0;
+  state.shipLives = activeHeroId() === "sub" ? SUBMARINE_LIVES : 0;
   state.bestAtStart = Math.max(state.best || 0, state.meta?.best || 0);
   app.classList.remove("ink-dive");
   setDiveMeter(0);
@@ -4631,13 +4875,13 @@ function spawnTrailParticles(x0, y0, x1, y1, moved) {
 
 function updateAnglerLure(dt) {
   if (activeHeroId() !== "angler" || !state.life) return;
-  const reach = 150;
+  const reach = 178;
   for (const spark of state.sparks) {
     const d = dist(spark.x, spark.y, state.life.x, state.life.y);
     if (d > reach || d < 8) continue;
-    const pull = (1 - d / reach) * 28 * dt;
-    spark.vx += ((state.life.x - spark.x) / d) * pull * 0.08;
-    spark.vy += ((state.life.y - spark.y) / d) * pull * 0.08;
+    const pull = (1 - d / reach) * 52 * dt;
+    spark.vx += ((state.life.x - spark.x) / d) * pull * 0.12;
+    spark.vy += ((state.life.y - spark.y) / d) * pull * 0.12;
   }
 }
 
@@ -5199,6 +5443,8 @@ function updateRun(dt) {
     state.holdLifeTime += dt;
     updateJoystickMove(dt);
     updateAnglerLure(dt);
+    fireShipCannons(dt);
+    updateShipShots(dt);
     const prevX = state.life.px ?? state.life.x;
     const prevY = state.life.py ?? state.life.y;
     const moved = dist(state.life.x, state.life.y, prevX, prevY);
@@ -6504,7 +6750,7 @@ function drawBossHunter(hunter, alpha = 1) {
 function drawHeroAura() {
   if (!state.life || !state.running) return;
   if (heroHasAura()) {
-    const reach = (activeHeroId() === "angler" ? 138 : 118) + Math.sin(state.time * 2.4) * 6;
+    const reach = (activeHeroId() === "angler" ? 155 : 118) + Math.sin(state.time * 2.4) * 6;
     ctx.save();
     ctx.globalAlpha = 0.16 + Math.sin(state.time * 3) * 0.04;
     ctx.strokeStyle = cssVar("--accent-b", "#7affd4");
@@ -6803,6 +7049,181 @@ function drawNautilus(body, alpha = 1) {
   ctx.restore();
 }
 
+function drawSubmarine(body, alpha = 1) {
+  const brass = "#d4a574";
+  const brassLite = "#ffe0b0";
+  const hull = "#1a3a52";
+  const hullDeep = "#0c2236";
+  const teal = cssVar("--life", "#7affd4");
+  const gold = cssVar("--gold", "#ffe898");
+  const aim = body.aim ?? -Math.PI / 2;
+  const s = body.r * 1.18;
+  const wob = body.wobble || 0;
+  const prop = Math.sin(wob * 4.2);
+  ctx.save();
+  ctx.translate(body.x, body.y);
+  ctx.rotate(aim);
+  ctx.globalAlpha = alpha;
+
+  // soft glow under hull
+  const glow = ctx.createRadialGradient(0, 0, s * 0.2, 0, 0, s * 1.8);
+  glow.addColorStop(0, "rgba(255, 200, 120, 0.22)");
+  glow.addColorStop(0.55, "rgba(90, 180, 200, 0.1)");
+  glow.addColorStop(1, "transparent");
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, s * 1.7, s * 1.05, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // twin props
+  ctx.fillStyle = brass;
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.ellipse(-s * 1.15, side * s * 0.28, s * 0.18, s * 0.08 + Math.abs(prop) * s * 0.1, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // main hull
+  const bodyGrad = ctx.createLinearGradient(0, -s, 0, s);
+  bodyGrad.addColorStop(0, mixColor(hull, teal, 0.18));
+  bodyGrad.addColorStop(0.45, hull);
+  bodyGrad.addColorStop(1, hullDeep);
+  ctx.fillStyle = bodyGrad;
+  ctx.beginPath();
+  ctx.moveTo(s * 1.35, 0);
+  ctx.quadraticCurveTo(s * 0.9, -s * 0.72, 0, -s * 0.62);
+  ctx.quadraticCurveTo(-s * 0.85, -s * 0.55, -s * 1.05, -s * 0.18);
+  ctx.quadraticCurveTo(-s * 1.18, 0, -s * 1.05, s * 0.18);
+  ctx.quadraticCurveTo(-s * 0.85, s * 0.55, 0, s * 0.62);
+  ctx.quadraticCurveTo(s * 0.9, s * 0.72, s * 1.35, 0);
+  ctx.fill();
+
+  // brass keel stripe
+  ctx.strokeStyle = mixColor(brass, gold, 0.35);
+  ctx.lineWidth = Math.max(1.5, s * 0.08);
+  ctx.beginPath();
+  ctx.moveTo(-s * 0.95, 0);
+  ctx.quadraticCurveTo(0, s * 0.08, s * 1.15, 0);
+  ctx.stroke();
+
+  // conning tower
+  ctx.fillStyle = mixColor(hull, brass, 0.2);
+  ctx.beginPath();
+  ctx.moveTo(-s * 0.15, -s * 0.55);
+  ctx.lineTo(s * 0.35, -s * 0.55);
+  ctx.lineTo(s * 0.28, -s * 1.05);
+  ctx.lineTo(-s * 0.05, -s * 1.05);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = brass;
+  ctx.fillRect(-s * 0.02, -s * 1.28, s * 0.08, s * 0.28);
+  ctx.beginPath();
+  ctx.arc(s * 0.02, -s * 1.32, s * 0.07, 0, Math.PI * 2);
+  ctx.fill();
+
+  // portholes
+  for (let i = 0; i < 3; i += 1) {
+    const px = s * (0.15 + i * 0.32);
+    const py = -s * 0.08;
+    ctx.fillStyle = "rgba(20, 40, 60, 0.9)";
+    ctx.beginPath();
+    ctx.arc(px, py, s * 0.14, 0, Math.PI * 2);
+    ctx.fill();
+    const win = ctx.createRadialGradient(px - s * 0.03, py - s * 0.03, 0, px, py, s * 0.14);
+    win.addColorStop(0, "rgba(180, 240, 255, 0.85)");
+    win.addColorStop(0.55, "rgba(90, 180, 220, 0.45)");
+    win.addColorStop(1, "rgba(30, 60, 90, 0.2)");
+    ctx.fillStyle = win;
+    ctx.beginPath();
+    ctx.arc(px, py, s * 0.11, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = brassLite;
+    ctx.lineWidth = Math.max(1, s * 0.04);
+    ctx.stroke();
+  }
+
+  // twin cannons
+  ctx.fillStyle = mixColor(brass, "#8a6040", 0.25);
+  for (const side of [-1, 1]) {
+    ctx.save();
+    ctx.translate(s * 0.55, side * s * 0.42);
+    ctx.rotate(side * 0.12);
+    ctx.fillRect(0, -s * 0.07, s * 0.7, s * 0.14);
+    ctx.beginPath();
+    ctx.arc(s * 0.7, 0, s * 0.09, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = gold;
+    ctx.globalAlpha = alpha * (0.45 + Math.sin(wob * 6 + side) * 0.2);
+    ctx.beginPath();
+    ctx.arc(s * 0.78, 0, s * 0.05, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // rivets
+  ctx.fillStyle = mixColor(brassLite, "#fff", 0.2);
+  for (let i = 0; i < 5; i += 1) {
+    ctx.beginPath();
+    ctx.arc(-s * 0.55 + i * s * 0.28, s * 0.38, s * 0.035, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // bow lantern
+  ctx.fillStyle = gold;
+  ctx.globalAlpha = alpha * (0.7 + Math.sin(wob * 5) * 0.25);
+  ctx.beginPath();
+  ctx.arc(s * 1.28, -s * 0.12, s * 0.1, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawShipLivesHud() {
+  if (activeHeroId() !== "sub" || !state.life || !state.running) return;
+  const life = state.life;
+  ctx.save();
+  for (let i = 0; i < SUBMARINE_LIVES; i += 1) {
+    const on = i < (state.shipLives || 0);
+    ctx.fillStyle = on ? "rgba(255,210,130,0.95)" : "rgba(70,95,120,0.35)";
+    ctx.strokeStyle = on ? "rgba(255,230,180,0.7)" : "rgba(100,120,140,0.25)";
+    ctx.lineWidth = 1;
+    const x = life.x + life.r * 1.55;
+    const y = life.y - life.r * 1.15 + i * 11;
+    ctx.beginPath();
+    ctx.arc(x, y, 3.6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawShots() {
+  if (!state.shots?.length) return;
+  for (const s of state.shots) {
+    const a = clamp(s.life * 1.5, 0, 1);
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.fillStyle = "rgba(255,220,140,0.95)";
+    ctx.shadowColor = "rgba(255,180,80,0.9)";
+    ctx.shadowBlur = 12;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "rgba(255,255,240,0.9)";
+    ctx.beginPath();
+    ctx.arc(s.x - s.vx * 0.01, s.y - s.vy * 0.01, s.r * 0.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = `rgba(255,200,120,${0.55 * a})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(s.x, s.y);
+    ctx.lineTo(s.x - s.vx * 0.04, s.y - s.vy * 0.04);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
 function drawCustomHero(body, alpha = 1) {
   if (!customHeroImage.ready || !customHeroImage.img) {
     drawInkPolyp(body, alpha);
@@ -6827,6 +7248,7 @@ function drawLifeBody(body, alpha = 1, heroOverride = null) {
   else if (hero === "manta") drawManta(body, alpha);
   else if (hero === "angler") drawAngler(body, alpha);
   else if (hero === "nautilus") drawNautilus(body, alpha);
+  else if (hero === "sub") drawSubmarine(body, alpha);
   else if (hero === "custom") drawCustomHero(body, alpha);
   else drawInkPolyp(body, alpha);
 }
@@ -7236,12 +7658,14 @@ function draw() {
     drawSafeShield();
     drawHeroFrame(state.life);
     drawLifeBody(state.life);
+    drawShipLivesHud();
     drawSymbiote();
   } else if (state.running && !state.hasTouchedCanvas) {
     drawHoldHint();
   } else if (!state.running && state.demo && state.life) {
     drawLifeBody(state.life, 0.86);
   }
+  drawShots();
   drawParticles();
   drawOpeningPulse();
   drawJoystick();
@@ -7334,6 +7758,11 @@ function boot() {
       return;
     }
     if (!isHeroOwned(selected)) {
+      const hero = HEROES.find((h) => h.id === selected);
+      if (hero?.iap) {
+        purchaseSubmarine().catch(() => showToast("покупка недоступна"));
+        return;
+      }
       if (!tryUnlockHero(selected)) return;
     }
     // Ensure active hero is owned selection.
@@ -7417,8 +7846,26 @@ function boot() {
   document.getElementById("btn-shop-pack")?.addEventListener("click", () => {
     purchaseMarksPack().catch(() => showToast("покупка недоступна"));
   });
+  document.getElementById("btn-shop-sub")?.addEventListener("click", () => {
+    if (isHeroOwned("sub")) {
+      state.meta.activeHero = "sub";
+      saveMeta();
+      renderHeroPicker();
+      paintHeroPortrait();
+      showToast("корабль выбран");
+      return;
+    }
+    purchaseSubmarine().catch(() => showToast("покупка недоступна"));
+  });
   document.getElementById("btn-buy-marks")?.addEventListener("click", () => openShop("over"));
-  document.getElementById("btn-buy-marks-hero")?.addEventListener("click", () => openShop("hero"));
+  document.getElementById("btn-buy-marks-hero")?.addEventListener("click", () => {
+    const hero = HEROES.find((h) => h.id === (state.meta?.activeHero || ""));
+    if (hero?.iap && !isHeroOwned(hero.id)) {
+      purchaseSubmarine().catch(() => showToast("покупка недоступна"));
+      return;
+    }
+    openShop("hero");
+  });
   document.getElementById("btn-continue-shop")?.addEventListener("click", () => openShop("continue"));
   window.addEventListener("resize", resize);
   const pauseForBackground = () => {
@@ -7464,7 +7911,7 @@ function boot() {
   const nativeShell = !!window.OttiskNative?.isNative;
   if ("serviceWorker" in navigator && !nativeShell) {
     navigator.serviceWorker
-            .register("./sw.js?v=64")
+            .register("./sw.js?v=65")
       .then((reg) => reg.update())
       .catch(() => {});
   }

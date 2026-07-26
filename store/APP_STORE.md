@@ -66,12 +66,14 @@ npx cap open ios
 - Косметика за следы / рекорд
 - Кнопка `Донат` в меню → tip packs + пак следов
 - `OttiskNative.purchase('ottisk_marks_60')` — пак следов
+- `OttiskNative.purchase('ottisk_submarine')` — подводный корабль · 99 ₽ (пушки · 3 жизни)
 - `ottisk_tip_small` / `ottisk_tip_mid` / `ottisk_tip_big` — донаты с благодарностью в следах
 
 ### StoreKit позже
 
-1. App Store Connect → Consumable:
-   - `ottisk_marks_60`
+1. App Store Connect → Consumable / Non-Consumable:
+   - `ottisk_marks_60` (Consumable)
+   - `ottisk_submarine` (Non-Consumable · 99 ₽) — герой «корабль»
    - `ottisk_tip_small`
    - `ottisk_tip_mid`
    - `ottisk_tip_big`
