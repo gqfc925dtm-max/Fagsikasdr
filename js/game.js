@@ -149,9 +149,9 @@ const HEROES = [
 ];
 
 const DIFFICULTIES = [
-  { id: "easy", name: "лёгкий", speed: 0.78, spawn: 1.28, hunters: 0.72, hunger: 0.82, dash: 0.8 },
-  { id: "normal", name: "обычный", speed: 1, spawn: 1, hunters: 1, hunger: 1, dash: 1 },
-  { id: "hard", name: "сложный", speed: 1.2, spawn: 0.8, hunters: 1.22, hunger: 1.18, dash: 1.18 },
+  { id: "easy", name: "лёгкий", blurb: "спокойнее хищники", speed: 0.78, spawn: 1.28, hunters: 0.72, hunger: 0.82, dash: 0.8 },
+  { id: "normal", name: "обычный", blurb: "как задумано", speed: 1, spawn: 1, hunters: 1, hunger: 1, dash: 1 },
+  { id: "hard", name: "сложный", blurb: "быстрее и злее", speed: 1.2, spawn: 0.8, hunters: 1.22, hunger: 1.18, dash: 1.18 },
 ];
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -323,7 +323,7 @@ const customHeroImage = { img: null, src: "", ready: false };
 const app = document.getElementById("app");
 const stage = document.getElementById("stage");
 const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
+let ctx = canvas.getContext("2d");
 
 const statusEl = document.getElementById("status");
 const scoreEl = document.getElementById("score");
@@ -339,6 +339,13 @@ const diveFillEl = document.getElementById("dive-fill");
 const holdFillEl = document.getElementById("hold-fill");
 const holdFillOverEl = document.getElementById("hold-fill-over");
 const screenStartEl = document.getElementById("screen-start");
+const screenHeroEl = document.getElementById("screen-hero");
+const screenDiffEl = document.getElementById("screen-diff");
+const heroPortraitEl = document.getElementById("hero-portrait");
+const heroPickNameEl = document.getElementById("hero-pick-name");
+const btnHeroBack = document.getElementById("btn-hero-back");
+const btnHeroNext = document.getElementById("btn-hero-next");
+const btnDiffBack = document.getElementById("btn-diff-back");
 const screenDrawEl = document.getElementById("screen-draw");
 const heroListEl = document.getElementById("hero-list");
 const btnDrawHero = document.getElementById("btn-draw-hero");
@@ -906,13 +913,85 @@ function updateHum() {
   state.humNode.noiseFilter.frequency.setTargetAtTime(220 + hunterBoost * 700 + urgency * 260, t, 0.14);
 }
 
+function screenVisible(el) {
+  return !!el && !el.classList.contains("hidden");
+}
+
 function inMainMenu() {
-  return (
-    !state.running &&
-    !!screenStartEl &&
-    !screenStartEl.classList.contains("hidden") &&
-    (!screenOnboardEl || screenOnboardEl.classList.contains("hidden"))
-  );
+  return !state.running && (screenVisible(screenStartEl) || screenVisible(screenHeroEl) || screenVisible(screenDiffEl));
+}
+
+function hideFlowScreens() {
+  screenStartEl?.classList.add("hidden");
+  screenHeroEl?.classList.add("hidden");
+  screenDiffEl?.classList.add("hidden");
+  screenOnboardEl?.classList.add("hidden");
+  document.getElementById("screen-donate")?.classList.add("hidden");
+  screenDrawEl?.classList.add("hidden");
+}
+
+function showHomeMenu() {
+  hideFlowScreens();
+  screenStartEl?.classList.remove("hidden");
+  syncMenuMusic();
+}
+
+function showHeroPick() {
+  hideFlowScreens();
+  screenHeroEl?.classList.remove("hidden");
+  renderHeroPicker();
+  paintHeroPortrait();
+  syncMenuMusic();
+}
+
+function showDiffPick() {
+  hideFlowScreens();
+  screenDiffEl?.classList.remove("hidden");
+  renderDifficultyPicker();
+  syncMenuMusic();
+}
+
+function beginPlayFlow() {
+  unlockAudio();
+  sfxUiTap(1);
+  showHeroPick();
+}
+
+function paintHeroPortrait() {
+  if (!heroPortraitEl || !screenVisible(screenHeroEl)) return;
+  const pctx = heroPortraitEl.getContext("2d");
+  if (!pctx) return;
+  const w = heroPortraitEl.width;
+  const h = heroPortraitEl.height;
+  const t = performance.now() / 1000;
+  pctx.clearRect(0, 0, w, h);
+  const glow = pctx.createRadialGradient(w * 0.5, h * 0.55, 8, w * 0.5, h * 0.55, w * 0.42);
+  glow.addColorStop(0, "rgba(122, 255, 212, 0.16)");
+  glow.addColorStop(0.55, "rgba(90, 170, 200, 0.08)");
+  glow.addColorStop(1, "transparent");
+  pctx.fillStyle = glow;
+  pctx.beginPath();
+  pctx.arc(w * 0.5, h * 0.55, w * 0.42, 0, Math.PI * 2);
+  pctx.fill();
+
+  const prev = ctx;
+  ctx = pctx;
+  try {
+    drawLifeBody(
+      {
+        x: w * 0.5,
+        y: h * 0.54,
+        r: Math.min(w, h) * 0.2,
+        wobble: t * 2.4,
+        aim: -Math.PI / 2 + Math.sin(t * 1.1) * 0.14,
+      },
+      1
+    );
+  } catch (_) {
+    // ignore portrait paint errors
+  } finally {
+    ctx = prev;
+  }
 }
 
 function playMenuNote(ac, dest, freq, gain, dur, when) {
@@ -2419,6 +2498,7 @@ function loadCustomHeroImage(src) {
     customHeroImage.img = img;
     customHeroImage.src = src;
     customHeroImage.ready = true;
+    paintHeroPortrait();
   };
   img.onerror = () => {
     customHeroImage.img = null;
@@ -2437,14 +2517,18 @@ function setActiveHero(id) {
   state.meta.activeHero = id;
   saveMeta();
   renderHeroPicker();
+  paintHeroPortrait();
   showToast(`герой · ${activeHero().name}`);
 }
 
 function updateHeroAbilityHint() {
   const hint = document.getElementById("hero-ability-hint");
-  if (!hint) return;
   const hero = activeHero();
-  hint.textContent = hero?.ability || "";
+  if (hint) hint.textContent = hero?.ability || "";
+  if (heroPickNameEl) {
+    const label = hero?.id === "custom" && !state.meta?.customHero ? "свой" : hero?.name || "";
+    heroPickNameEl.textContent = label;
+  }
 }
 
 function renderHeroPicker() {
@@ -2695,16 +2779,18 @@ function renderSettings() {
   renderDifficultyPicker();
 }
 
-function setDifficulty(id) {
+function setDifficulty(id, opts = {}) {
   if (!state.meta) return;
   if (!DIFFICULTIES.some((d) => d.id === id)) return;
   state.meta.difficulty = id;
   saveMeta();
   renderDifficultyPicker();
   const diff = playerDifficulty();
-  showToast(`сложность · ${diff.name}`);
-  const sub = document.querySelector("#btn-start .btn-sub");
-  if (sub) sub.textContent = "удерживай кнопку";
+  if (!opts.silent) showToast(`сложность · ${diff.name}`);
+  if (opts.start) {
+    sfxUiTap(2);
+    startGame();
+  }
 }
 
 function renderDifficultyPicker() {
@@ -2715,14 +2801,12 @@ function renderDifficultyPicker() {
   for (const diff of DIFFICULTIES) {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = `diff-chip${diff.id === current ? " on" : ""}`;
-    btn.textContent = diff.name;
+    btn.className = `diff-pick-btn${diff.id === current ? " on" : ""}`;
+    btn.innerHTML = `<span class="diff-pick-name">${diff.name}</span><span class="diff-pick-sub">${diff.blurb || ""}</span>`;
     btn.setAttribute("aria-pressed", diff.id === current ? "true" : "false");
-    btn.addEventListener("click", () => setDifficulty(diff.id));
+    btn.addEventListener("click", () => setDifficulty(diff.id, { start: true, silent: true }));
     list.appendChild(btn);
   }
-  const sub = document.querySelector("#btn-start .btn-sub");
-  if (sub) sub.textContent = "удерживай кнопку";
 }
 
 function evaluateWeekly(score) {
@@ -2760,7 +2844,7 @@ function showOnboard() {
   if (!screenOnboardEl) return;
   state.onboardStep = 0;
   refreshOnboardUi();
-  screenStartEl.classList.add("hidden");
+  hideFlowScreens();
   screenOnboardEl.classList.remove("hidden");
   stopMenuMusic();
 }
@@ -2769,8 +2853,8 @@ function refreshOnboardUi() {
   const step = state.onboardStep;
   if (onboardTextEl) onboardTextEl.textContent = ONBOARD_STEPS[step] || ONBOARD_STEPS[0];
   const last = step >= ONBOARD_STEPS.length - 1;
-  if (onboardLabelEl) onboardLabelEl.textContent = last ? "Играть" : "Дальше";
-  if (onboardSubEl) onboardSubEl.textContent = last ? "держи кнопку на старте" : `шаг ${step + 1} из ${ONBOARD_STEPS.length}`;
+  if (onboardLabelEl) onboardLabelEl.textContent = last ? "К игре" : "Дальше";
+  if (onboardSubEl) onboardSubEl.textContent = last ? "дальше выберешь героя" : `шаг ${step + 1} из ${ONBOARD_STEPS.length}`;
 }
 
 function advanceOnboard() {
@@ -2786,10 +2870,9 @@ function advanceOnboard() {
   }
   grantStarterGift();
   screenOnboardEl?.classList.add("hidden");
-  screenStartEl.classList.remove("hidden");
+  showHomeMenu();
   updateEconomyLabels();
   renderDaily();
-  syncMenuMusic();
 }
 
 function isNativeShop() {
@@ -2849,13 +2932,13 @@ function openDonate() {
   unlockAudio();
   sfxUiTap(1);
   renderDonateOptions();
+  hideFlowScreens();
   document.getElementById("screen-donate")?.classList.remove("hidden");
-  screenStartEl?.classList.add("hidden");
 }
 
 function closeDonate() {
   document.getElementById("screen-donate")?.classList.add("hidden");
-  if (!state.running) screenStartEl?.classList.remove("hidden");
+  if (!state.running) showHomeMenu();
   updateDonateThanks();
 }
 
@@ -4057,10 +4140,9 @@ function startGame() {
   refreshDaily();
   renderDaily();
   updateEconomyLabels();
-  screenStartEl.classList.add("hidden");
+  hideFlowScreens();
   screenOverEl.classList.add("hidden");
   screenContinueEl?.classList.add("hidden");
-  document.getElementById("screen-donate")?.classList.add("hidden");
   statusEl.classList.remove("hidden");
   app.classList.add("in-run");
   requestAnimationFrame(() => {
@@ -4094,19 +4176,14 @@ function goToMenu() {
   statusEl.classList.add("hidden");
   screenOverEl.classList.add("hidden");
   screenContinueEl?.classList.add("hidden");
-  document.getElementById("screen-donate")?.classList.add("hidden");
-  document.getElementById("screen-draw")?.classList.add("hidden");
-  screenOnboardEl?.classList.add("hidden");
-  screenStartEl.classList.remove("hidden");
+  showHomeMenu();
   updateBestLabels();
   updateEconomyLabels();
   updateDonateThanks();
   renderDaily();
-  renderHeroPicker();
   renderGifts();
   resetDemo();
   sfxUiTap(0);
-  syncMenuMusic();
 }
 
 function finishRun(reason) {
@@ -6259,8 +6336,7 @@ function exportCustomHeroPng() {
 
 function openDrawHero() {
   if (!screenDrawEl || !drawCanvasEl) return;
-  screenStartEl?.classList.add("hidden");
-  screenOnboardEl?.classList.add("hidden");
+  hideFlowScreens();
   screenOverEl?.classList.add("hidden");
   screenDrawEl.classList.remove("hidden");
   clearDrawCanvas();
@@ -6271,9 +6347,10 @@ function openDrawHero() {
   });
 }
 
-function closeDrawHero(backToStart = true) {
+function closeDrawHero(backToHero = true) {
   screenDrawEl?.classList.add("hidden");
-  if (backToStart) screenStartEl?.classList.remove("hidden");
+  if (backToHero) showHeroPick();
+  else showHomeMenu();
 }
 
 function drawPointerPos(e) {
@@ -6628,8 +6705,12 @@ function frame(ts) {
   }
   if (state.running) {
     updateRun(dt);
-  } else if (!screenStartEl.classList.contains("hidden") && screenOnboardEl?.classList.contains("hidden")) {
+  } else if (
+    screenOnboardEl?.classList.contains("hidden") !== false &&
+    (screenVisible(screenStartEl) || screenVisible(screenHeroEl) || screenVisible(screenDiffEl))
+  ) {
     updateDemo(dt);
+    if (screenVisible(screenHeroEl)) paintHeroPortrait();
   } else {
     updateOver(dt);
   }
@@ -6661,17 +6742,38 @@ function boot() {
   updateWaveUi(false);
   resetDemo();
   bindDrawHeroUi();
-  bindHoldButton(btnStart, "start");
   bindHoldButton(btnRetry, "retry");
-  screenStartEl?.addEventListener(
-    "pointerdown",
-    () => {
-      if (!inMainMenu() || !soundEnabled()) return;
-      unlockAudio();
-      syncMenuMusic();
-    },
-    { passive: true }
-  );
+  btnStart?.addEventListener("click", (e) => {
+    e.preventDefault();
+    beginPlayFlow();
+  });
+  btnHeroBack?.addEventListener("click", (e) => {
+    e.preventDefault();
+    sfxUiTap(0);
+    showHomeMenu();
+  });
+  btnHeroNext?.addEventListener("click", (e) => {
+    e.preventDefault();
+    if (activeHeroId() === "custom" && !state.meta?.customHero) {
+      openDrawHero();
+      return;
+    }
+    sfxUiTap(1);
+    showDiffPick();
+  });
+  btnDiffBack?.addEventListener("click", (e) => {
+    e.preventDefault();
+    sfxUiTap(0);
+    showHeroPick();
+  });
+  const unlockMenuAudio = () => {
+    if (!inMainMenu() || !soundEnabled()) return;
+    unlockAudio();
+    syncMenuMusic();
+  };
+  screenStartEl?.addEventListener("pointerdown", unlockMenuAudio, { passive: true });
+  screenHeroEl?.addEventListener("pointerdown", unlockMenuAudio, { passive: true });
+  screenDiffEl?.addEventListener("pointerdown", unlockMenuAudio, { passive: true });
   document.getElementById("btn-menu")?.addEventListener("click", (e) => {
     e.preventDefault();
     goToMenu();
