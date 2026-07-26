@@ -1973,7 +1973,7 @@ async function shareRun() {
 
 function sparkProfile(type) {
   if (type === "super") {
-    return { type, worth: 10, restore: 48, color: "#ffe566", r: rand(20, 24), super: true };
+    return { type, worth: 10, restore: 48, color: "#ff2f45", r: rand(20, 24), super: true };
   }
   if (type === "rare") {
     return { type, worth: 3, restore: 35, color: "#ffcc44", r: rand(15, 19) };
@@ -2053,7 +2053,7 @@ function maybeSpawnSuperStar() {
   });
   state.superStarSpawned = true;
   tipOnce("super", "СУПЕР ЗВЕЗДА", 1800);
-  floatText(x, y - 28, "СУПЕР", cssVar("--gold", "#ffe898"), 18);
+  floatText(x, y - 28, "СУПЕР", "#ff2f45", 18);
 }
 
 function spawnComet() {
@@ -2625,31 +2625,7 @@ function updateHunters(dt) {
         hunter.nearMissed = false;
       }
       if (d < killR) {
-        if (inInkDive()) {
-          // In the ink they pass through you like smoke.
-          hunter.warn = 0.4;
-          continue;
-        }
-        if (state.safeUntil > performance.now()) {
-          hunter.warn = 1;
-          const push = 2.4;
-          hunter.vx -= Math.cos(ang) * push;
-          hunter.vy -= Math.sin(ang) * push;
-          continue;
-        }
-        if (consumeSymbioteShield(hunter)) continue;
-        if (hasMut("fang") && state.combo >= 4) {
-          state.hunters.splice(i, 1);
-          state.stats.hunterEats += 1;
-          tone(165, 0.09, "square", 0.035);
-          tone(122, 0.1, "sawtooth", 0.028, 0.05);
-          buzz([12, 12, 12]);
-          burst(hunter.x, hunter.y, hunter.shadow ? cssVar("--foam", "#f3eee8") : cssVar("--danger", "#e2556d"), 18, 5);
-          addScore(hunter.shadow ? 5 : 3, hunter.x, hunter.y, {
-            color: hunter.shadow ? cssVar("--foam", "#f3eee8") : cssVar("--danger", "#e2556d"),
-          });
-          continue;
-        }
+        // First contact with a fish always ends the run.
         finishRun(hunter.shadow ? "твой старый след догнал тебя" : DEATH.HUNTER);
         return;
       }
@@ -3219,20 +3195,20 @@ function drawSpark(spark) {
   }
   if (spark.type === "super") {
     const t = (state.time * 1.8) % 1;
-    ctx.globalAlpha = (1 - t) * 0.65;
-    ctx.strokeStyle = "#ffe898";
+    ctx.globalAlpha = (1 - t) * 0.7;
+    ctx.strokeStyle = "#ff2f45";
     ctx.lineWidth = 2.6;
     ctx.beginPath();
     ctx.arc(spark.x, spark.y, r * (1.55 + t * 1.5), 0, Math.PI * 2);
     ctx.stroke();
     ctx.globalAlpha = 0.9;
-    ctx.strokeStyle = "#ffffff";
+    ctx.strokeStyle = "#ff7a88";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.arc(spark.x, spark.y, r * 1.28, 0, Math.PI * 2);
     ctx.stroke();
     ctx.globalAlpha = 0.95;
-    ctx.fillStyle = "#ffe898";
+    ctx.fillStyle = "#ff2f45";
     ctx.font = "800 13px Syne, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "bottom";
@@ -3417,22 +3393,7 @@ function drawEcho() {
 }
 
 function drawSafeShield() {
-  if (!state.life || state.safeUntil <= performance.now()) return;
-  const remain = clamp((state.safeUntil - performance.now()) / 2800, 0, 1);
-  const pulse = 0.35 + Math.sin(state.time * 9) * 0.12;
-  ctx.save();
-  ctx.globalAlpha = pulse * remain;
-  ctx.strokeStyle = cssVar("--life", "#6fd9b0");
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(state.life.x, state.life.y, state.life.r * (1.45 + (1 - remain) * 0.35), 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.globalAlpha = pulse * 0.22 * remain;
-  ctx.fillStyle = cssVar("--life", "#6fd9b0");
-  ctx.beginPath();
-  ctx.arc(state.life.x, state.life.y, state.life.r * 1.2, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
+  // No rings around the octopus.
 }
 
 function drawHungerVignette() {
@@ -3586,22 +3547,7 @@ function drawParticles() {
 }
 
 function drawOpeningPulse() {
-  if (!inOpening() || !state.life) return;
-  const t = (OPENING_SEC - state.elapsed) / OPENING_SEC;
-  const pulse = (state.time * 2.4) % 1;
-  const cx = state.life.x;
-  const cy = state.life.y;
-  const baseR = state.life.r + 18 + (1 - t) * 12;
-  for (let i = 0; i < 2; i += 1) {
-    const phase = (pulse + i * 0.5) % 1;
-    ctx.globalAlpha = (1 - phase) * 0.28 * t;
-    ctx.strokeStyle = i === 0 ? cssVar("--gold", "#ffe898") : cssVar("--life", "#7affd4");
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(cx, cy, baseR + phase * 28, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-  ctx.globalAlpha = 1;
+  // No rotating rings around the octopus.
 }
 
 function draw() {
