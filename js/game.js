@@ -2255,20 +2255,10 @@ function resetRun() {
   screenContinueEl?.classList.add("hidden");
   for (let i = 0; i < 2; i += 1) spawnSpark();
   spawnSpark({ tutorial: true, type: "normal", near: { x: state.width * 0.5, y: state.height * 0.42 } });
-  state.hunters.push({
-    x: -36,
-    y: state.height * 0.22,
-    vx: 70,
-    vy: 10,
-    r: 20,
-    anger: 0.55,
-    slow: true,
-    warn: 1,
-    phase: Math.random() * Math.PI * 2,
-    nearMissed: false,
-    parade: true,
-  });
-  state.slowHunterSeen = true;
+  // No parade fish in-run: the first real hunter must enter from the edge after opening.
+  state.hunters = [];
+  state.slowHunterSeen = false;
+  state.hunterAcc = 0;
 }
 
 function resetDemo() {
@@ -2524,23 +2514,63 @@ function eatSpark(index, spark) {
   addScore(spark.worth, spark.x, spark.y - 12, { color: spark.color });
 }
 
+function placeHunterOnEdge(hunter) {
+  const pad = 40;
+  const side = Math.floor(Math.random() * 4);
+  if (side === 0) {
+    hunter.x = rand(0, state.width);
+    hunter.y = -pad;
+  } else if (side === 1) {
+    hunter.x = state.width + pad;
+    hunter.y = rand(0, state.height);
+  } else if (side === 2) {
+    hunter.x = rand(0, state.width);
+    hunter.y = state.height + pad;
+  } else {
+    hunter.x = -pad;
+    hunter.y = rand(0, state.height);
+  }
+  hunter.vx = 0;
+  hunter.vy = 0;
+}
+
 function updateHunters(dt) {
   const soft = difficultyScale();
-  if (!inOpening()) {
-    const maxHunters = Math.min(7, Math.max(1, Math.floor((2 + Math.floor(state.score / 18)) * soft)));
-    state.hunterAcc += dt;
-    let interval = Math.max(1.05, 3.4 - state.score * 0.026) / Math.max(0.55, soft);
-    if (!state.slowHunterSeen) interval = Math.max(interval, 2.4 + (1 - soft) * 1.2);
-    const firstHunterAt = soft < 0.7 ? OPENING_SEC + 0.4 : OPENING_SEC;
-    while (state.hunters.length < maxHunters && state.hunterAcc >= interval) {
-      state.hunterAcc -= interval;
-      if (!state.slowHunterSeen && state.stats.sparkEats > 0) {
-        spawnHunter(true);
-        state.slowHunterSeen = true;
-      } else if (state.elapsed > firstHunterAt) {
-        spawnHunter(false);
-        if (state.score > 45 && Math.random() < 0.22 * soft && state.hunters.length < maxHunters) spawnHunter(false);
+  // During opening: no dangerous hunters at all.
+  if (inOpening()) {
+    for (let i = state.hunters.length - 1; i >= 0; i -= 1) {
+      const hunter = state.hunters[i];
+      if (hunter.parade || hunter.demo) {
+        hunter.phase += dt * 4;
+        hunter.x += (hunter.vx || 40) * dt;
+        hunter.y += Math.sin(hunter.phase) * 18 * dt;
+        if (hunter.x > state.width + 40) {
+          hunter.x = -40;
+          hunter.y = state.height * (0.2 + Math.random() * 0.3);
+        }
+      } else {
+        // Safety: any non-parade fish during opening is pushed off-screen.
+        placeHunterOnEdge(hunter);
+        hunter.parade = true;
+        hunter.slow = true;
       }
+    }
+    return;
+  }
+
+  const maxHunters = Math.min(7, Math.max(1, Math.floor((2 + Math.floor(state.score / 18)) * soft)));
+  state.hunterAcc += dt;
+  let interval = Math.max(1.05, 3.4 - state.score * 0.026) / Math.max(0.55, soft);
+  if (!state.slowHunterSeen) interval = Math.max(interval, 2.8 + (1 - soft) * 1.2);
+  const firstHunterAt = OPENING_SEC + 1.6;
+  while (state.hunters.length < maxHunters && state.hunterAcc >= interval) {
+    state.hunterAcc -= interval;
+    if (!state.slowHunterSeen && state.stats.sparkEats > 0 && state.elapsed > firstHunterAt) {
+      spawnHunter(true);
+      state.slowHunterSeen = true;
+    } else if (state.elapsed > firstHunterAt + (state.slowHunterSeen ? 0 : 0.8)) {
+      spawnHunter(false);
+      if (state.score > 45 && Math.random() < 0.22 * soft && state.hunters.length < maxHunters) spawnHunter(false);
     }
   }
 
@@ -2549,23 +2579,18 @@ function updateHunters(dt) {
     hunter.phase += dt * 5;
     if (hunter.shadow) hunter.wobble = (hunter.wobble || 0) + dt * 5.5;
     hunter.warn = Math.max(0, hunter.warn - dt * 1.45);
-    if (hunter.parade) {
-      if (!inOpening()) {
-        hunter.parade = false;
-        hunter.slow = false;
-        hunter.warn = 1;
-        hunter.orbit = (i * 2.15) + Math.random();
-        hunter.orbitR = rand(30, 58);
-        hunter.orbitSpeed = rand(0.7, 1.2) * (i % 2 === 0 ? -1 : 1);
-      } else {
-        hunter.x += (hunter.vx || 55) * dt;
-        hunter.y += Math.sin(hunter.phase) * 22 * dt;
-        if (hunter.x > state.width + 50) {
-          hunter.x = -50;
-          hunter.y = state.height * (0.18 + Math.random() * 0.28);
-        }
-        continue;
-      }
+    if (hunter.parade || hunter.demo) {
+      // Convert showcase fish safely: always re-enter from an edge.
+      placeHunterOnEdge(hunter);
+      hunter.parade = false;
+      hunter.demo = false;
+      hunter.slow = true;
+      hunter.warn = 1;
+      hunter.anger = Math.min(hunter.anger || 0.7, 0.55);
+      hunter.orbit = (i * 2.15) + Math.random();
+      hunter.orbitR = rand(30, 58);
+      hunter.orbitSpeed = rand(0.7, 1.2) * (i % 2 === 0 ? -1 : 1);
+      hunter.nearMissed = false;
     }
     let tx = state.width * 0.5;
     let ty = state.height * 0.5;
