@@ -5,16 +5,18 @@ const OPENING_SEC = 10;
 const HUNGER_DRAIN_PER_SEC = 100 / 12;
 const ECHO_FADE_SEC = 2.35;
 const FREE_CONTINUES_PER_RUN = 1;
-const MARKS_CONTINUE_COST = 12;
+const MARKS_CONTINUE_COST = 15;
 const MAX_CONTINUES_PER_RUN = 2;
 const MARKS_PACK_AMOUNT = 60;
 const MARKS_PACK_PRODUCT_ID = "ottisk_marks_60";
 const SUBMARINE_PRODUCT_ID = "ottisk_submarine";
 const SUBMARINE_PRICE_LABEL = "99 ₽";
 const SUBMARINE_LIVES = 3;
-const WEEKLY_TARGET = 50;
-const WEEKLY_REWARD = 20;
+const WEEKLY_TARGET = 80;
+const WEEKLY_REWARD = 25;
 const STARTER_MARKS = 15;
+const DAILY_QUEST_REWARD = 10;
+const GLYPH_WORD_REWARD = 10;
 const SHARE_URL = "https://gqfc925dtm-max.github.io/Fagsikasdr/";
 const PRIVACY_URL = `${SHARE_URL}privacy.html`;
 const SUPPORT_URL = `${SHARE_URL}support.html`;
@@ -61,6 +63,10 @@ const SCORE_MILESTONES = [
   { at: 150, marks: 10, text: "глубокий след" },
   { at: 200, marks: 12, text: "легенда света" },
   { at: 300, marks: 15, text: "без конца" },
+  { at: 450, marks: 16, text: "дальше бездны" },
+  { at: 600, marks: 20, text: "мастер касания" },
+  { at: 800, marks: 25, text: "живой миф" },
+  { at: 1000, marks: 30, text: "вечный след" },
 ];
 const DEATH = {
   HUNTER: "охотник поймал оттиск",
@@ -139,8 +145,13 @@ const SKINS = [
   { id: "frost", name: "иней", at: 100, color: "#b8dcff" },
   { id: "void", name: "пусто", at: 160, color: "#e0b8ff" },
   { id: "pulse", name: "пульс", at: 220, color: "#ff8ab4" },
-  { id: "solar", name: "солнце", at: 9999, cost: 40, color: "#ffe08a", premium: true },
-  { id: "noir", name: "нуар", at: 9999, cost: 70, color: "#8ab4ff", premium: true },
+  { id: "coral", name: "коралл", at: 320, color: "#ff7a8a" },
+  { id: "reef", name: "риф", at: 460, color: "#6a8cff" },
+  { id: "aurora", name: "заря", at: 650, color: "#a8ffce" },
+  { id: "myth", name: "миф", at: 900, color: "#ffd0a0" },
+  { id: "solar", name: "солнце", at: 9999, cost: 75, color: "#ffe08a", premium: true },
+  { id: "noir", name: "нуар", at: 9999, cost: 115, color: "#8ab4ff", premium: true },
+  { id: "pearl", name: "жемчуг", at: 9999, cost: 180, color: "#f5f0ff", premium: true },
 ];
 
 const HEROES = [
@@ -148,9 +159,9 @@ const HEROES = [
   { id: "jellyfish", name: "медуза", glyph: "Ме", ability: "аура", tip: "АУРА ЗАМЕДЛЯЕТ" },
   { id: "turtle", name: "черепаха", glyph: "Че", ability: "панцирь", tip: "ПАНЦИРЬ ДЕРЖИТ ДОЛЬШЕ" },
   { id: "crab", name: "краб", glyph: "Кр", ability: "щит", tip: "ЩИТ НА 1 УДАР" },
-  { id: "manta", name: "скат", glyph: "Ск", ability: "крыло+", tip: "РЫВОК РВЁТ СТРОЙ", premium: true, cost: 45 },
-  { id: "angler", name: "удильщик", glyph: "Уд", ability: "манок+", tip: "СВЕТ САМ ПЛЫВЁТ К ТЕБЕ", premium: true, cost: 80 },
-  { id: "nautilus", name: "наутилус", glyph: "На", ability: "раковина+", tip: "ДВОЙНАЯ РАКОВИНА", premium: true, cost: 120 },
+  { id: "manta", name: "скат", glyph: "Ск", ability: "крыло+", tip: "РЫВОК РВЁТ СТРОЙ", premium: true, cost: 60 },
+  { id: "angler", name: "удильщик", glyph: "Уд", ability: "манок+", tip: "СВЕТ САМ ПЛЫВЁТ К ТЕБЕ", premium: true, cost: 110 },
+  { id: "nautilus", name: "наутилус", glyph: "На", ability: "раковина+", tip: "ДВОЙНАЯ РАКОВИНА", premium: true, cost: 170 },
   {
     id: "sub",
     name: "корабль",
@@ -167,15 +178,17 @@ const HEROES = [
 
 const TRAILS = [
   { id: "plain", name: "чистый", sub: "без эффекта", cost: 0 },
-  { id: "gold", name: "золотой", sub: "тёплый след", cost: 35, color: "#ffe08a" },
-  { id: "foam", name: "пена", sub: "светлая лента", cost: 55, color: "#d8f6ff" },
-  { id: "ember", name: "жар", sub: "огненные искры", cost: 75, color: "#ff9a62" },
+  { id: "gold", name: "золотой", sub: "тёплый след", cost: 45, color: "#ffe08a" },
+  { id: "foam", name: "пена", sub: "светлая лента", cost: 75, color: "#d8f6ff" },
+  { id: "ember", name: "жар", sub: "огненные искры", cost: 110, color: "#ff9a62" },
+  { id: "veil", name: "вуаль", sub: "глубокий шлейф", cost: 160, color: "#7aa0ff" },
 ];
 
 const FRAMES = [
   { id: "none", name: "без рамки", sub: "по умолчанию", cost: 0 },
-  { id: "ring", name: "кольцо", sub: "мягкий ореол", cost: 40 },
-  { id: "hex", name: "грань", sub: "геометрия вокруг", cost: 65 },
+  { id: "ring", name: "кольцо", sub: "мягкий ореол", cost: 60 },
+  { id: "hex", name: "грань", sub: "геометрия вокруг", cost: 95 },
+  { id: "crown", name: "корона", sub: "статус поддержки", cost: 150 },
 ];
 
 const CONTROL_MODES = [
@@ -198,36 +211,36 @@ const GIFTS = [
     id: "hourly",
     kicker: "каждый час",
     title: "Часовой",
-    amount: 8,
+    amount: 4,
     ready: (meta, now) => now >= (meta.hourlyGiftAt || 0),
     waitMs: (meta, now) => Math.max(0, (meta.hourlyGiftAt || 0) - now),
     claim: (meta, now) => {
       meta.hourlyGiftAt = now + HOUR_MS;
-      return 8;
+      return 4;
     },
   },
   {
     id: "daily",
     kicker: "раз в день",
     title: "Дневной",
-    amount: 22,
+    amount: 12,
     ready: (meta) => meta.dailyGiftDay !== localDayKey(),
     waitMs: () => msUntilNextLocalDay(),
     claim: (meta) => {
       meta.dailyGiftDay = localDayKey();
-      return 22;
+      return 12;
     },
   },
   {
     id: "weekly",
     kicker: "раз в неделю",
     title: "Недельный",
-    amount: 60,
+    amount: 30,
     ready: (meta) => meta.weeklyGiftWeek !== weekKey(),
     waitMs: () => msUntilNextWeek(),
     claim: (meta) => {
       meta.weeklyGiftWeek = weekKey();
-      return 60;
+      return 30;
     },
   },
   {
@@ -239,21 +252,21 @@ const GIFTS = [
     waitMs: (meta) => ((meta.streak || 0) >= 2 ? msUntilNextLocalDay() : 0),
     claim: (meta) => {
       meta.streakGiftDay = localDayKey();
-      return 6 + Math.min(14, Math.max(0, (meta.streak || 0) - 1) * 3);
+      return 4 + Math.min(10, Math.max(0, (meta.streak || 0) - 1) * 2);
     },
-    amountLabel: (meta) => `+${6 + Math.min(14, Math.max(0, (meta.streak || 0) - 1) * 3)}`,
+    amountLabel: (meta) => `+${4 + Math.min(10, Math.max(0, (meta.streak || 0) - 1) * 2)}`,
     lockedLabel: (meta) => ((meta.streak || 0) < 2 ? "нужно 2 дня" : ""),
   },
   {
     id: "return",
     kicker: "возвращение",
     title: "С возвращением",
-    amount: 16,
+    amount: 12,
     ready: (meta) => meta.returnAvailableDay === localDayKey() && meta.returnGiftAt !== localDayKey(),
     waitMs: () => msUntilNextLocalDay(),
     claim: (meta) => {
       meta.returnGiftAt = localDayKey();
-      return 16;
+      return 12;
     },
     lockedLabel: () => "зайди завтра",
   },
@@ -1657,6 +1670,11 @@ function activeEventId() {
 function startRunEvent(def) {
   state.event = { id: def.id, title: def.title, t: def.dur };
   pulseUnlock(cssVar("--gold", "#ffe898"), 0.12);
+  tipOnce(`event_${def.id}`, def.title.toUpperCase(), 1600, {
+    persist: true,
+    first: `Событие: ${def.title}`,
+    firstMs: 2200,
+  });
   if (def.id === "raid") {
     spawnHunter(false);
     spawnHunter(false);
@@ -1712,7 +1730,10 @@ function enterInkDive() {
   setDiveMeter(0);
   app.classList.add("ink-dive");
   pulseUnlock("#8ae0ff", 0.16);
-  tipOnce("dive", "ЗДЕСЬ ТИХО", 1600);
+  tipOnce("dive", "ЗДЕСЬ ТИХО", 1600, {
+    persist: true,
+    first: "Стоишь на месте — нырок в тишину. Хищники слабее.",
+  });
   sfxDiveIn();
   buzz([12, 20, 12]);
   state.flash = Math.max(state.flash, 0.16);
@@ -1743,7 +1764,10 @@ function spawnShadowHunter(x, y) {
     shadow: true,
     wobble: Math.random() * Math.PI * 2,
   });
-  tipOnce("shadow", "СЛЕД ОЖИЛ", 1700);
+  tipOnce("shadow", "СЛЕД ОЖИЛ", 1700, {
+    persist: true,
+    first: "Старый след ожил и охотится. Не отпускай палец рядом.",
+  });
   sfxShadow();
   buzz([16, 24, 16]);
 }
@@ -1794,12 +1818,15 @@ function updateGlyphs(dt) {
     updateHungerUi();
     floatText(g.x, g.y - 10, g.ch, cssVar("--foam", "#f3eee8"), 20);
     sfxUiTap(state.glyphIndex);
-    tipOnce("word", "БУКВЫ ЖИВЫЕ", 1500);
+    tipOnce("word", "БУКВЫ ЖИВЫЕ", 1500, {
+      persist: true,
+      first: "Живые буквы. Собери слово — бонус следов.",
+    });
     if (state.glyphIndex >= SECRET_WORD.length) {
       state.wordDone = true;
       pulseUnlock(cssVar("--life", "#7affd4"), 0.18);
       goalChime();
-      awardMarks(12, {
+      awardMarks(GLYPH_WORD_REWARD, {
         x: state.width * 0.5,
         y: state.height * 0.2,
         color: cssVar("--life", "#6fd9b0"),
@@ -1887,9 +1914,17 @@ function showCoach(text, ms = 1600, force = false) {
   showCoach.timer = setTimeout(() => coachEl.classList.remove("show"), ms);
 }
 
-function tipOnce(key, text, ms = 1700) {
+function tipOnce(key, text, ms = 1700, opts = {}) {
   if (state.tipFlags[key]) return;
   state.tipFlags[key] = true;
+  if (opts.persist && state.meta) {
+    const seen = state.meta.seenRunTips || [];
+    if (seen.includes(key)) return;
+    state.meta.seenRunTips = [...seen, key];
+    saveMeta();
+    showCoach(opts.first || text, opts.firstMs || Math.max(ms, 2400), true);
+    return;
+  }
   showCoach(text, ms, true);
 }
 
@@ -2010,7 +2045,10 @@ function spawnBoss() {
     phaseAlpha: 1,
   };
   state.hunters.push(boss);
-  tipOnce("boss", "ЛЕВИАФАН", 1900);
+  tipOnce("boss", "ЛЕВИАФАН", 1900, {
+    persist: true,
+    first: "Левиафан. Кружи вокруг и лови окна атаки.",
+  });
   playPredatorSfx("boss", "call");
   sfxWaveShift();
   buzz([16, 22, 16, 22, 16]);
@@ -2391,6 +2429,9 @@ function loadMeta() {
     donateMarks: Math.max(0, Number(raw?.donateMarks || 0)),
     seenAbilityTips: Array.isArray(raw?.seenAbilityTips)
       ? raw.seenAbilityTips.filter((id) => typeof id === "string")
+      : [],
+    seenRunTips: Array.isArray(raw?.seenRunTips)
+      ? raw.seenRunTips.filter((id) => typeof id === "string")
       : [],
     activeHero: HEROES.some((h) => h.id === raw?.activeHero) ? raw.activeHero : "octopus",
     customHero: typeof raw?.customHero === "string" && raw.customHero.startsWith("data:image") ? raw.customHero : "",
@@ -3021,7 +3062,7 @@ function updateEconomyLabels() {
 
 function dailyProgressText(daily = currentDailyDef()) {
   if (!daily) return "";
-  return state.meta?.dailyDone ? "выполнено · +15 следов" : daily.label(state);
+  return state.meta?.dailyDone ? `выполнено · +${DAILY_QUEST_REWARD} следов` : daily.label(state);
 }
 
 function renderDailyQuest() {
@@ -3038,7 +3079,7 @@ function renderDailyQuest() {
     return;
   }
   quest.className = "menu-note";
-  quest.textContent = `Сегодня · ${daily.title} · +15 следов`;
+  quest.textContent = `Сегодня · ${daily.title} · +${DAILY_QUEST_REWARD} следов`;
 }
 
 function renderDaily() {
@@ -3382,6 +3423,10 @@ function isFrameOwned(id) {
 
 function buyCosmetic(kind, id) {
   if (!state.meta) return;
+  if (kind === "skin") {
+    buyShopSkin(id);
+    return;
+  }
   const list = kind === "trail" ? TRAILS : FRAMES;
   const item = list.find((x) => x.id === id);
   if (!item) return;
@@ -3414,23 +3459,69 @@ function buyCosmetic(kind, id) {
   showToast(`куплен · ${item.name}`);
 }
 
+function buyShopSkin(id) {
+  if (!state.meta) return;
+  const item = skinById(id);
+  if (!item) return;
+  if (isSkinOwned(id)) {
+    state.meta.activeSkin = id;
+    saveMeta();
+    renderShop();
+    renderSkinMeta();
+    showToast(`${item.name} · выбран`);
+    return;
+  }
+  if (!item.premium) {
+    showToast(`откроется при рекорде ${item.at}`);
+    return;
+  }
+  const cost = Math.max(1, Number(item.cost) || 0);
+  if ((state.meta.marks || 0) < cost) {
+    showToast(`нужно ${cost} следов`);
+    return;
+  }
+  state.meta.marks = Math.max(0, (state.meta.marks || 0) - cost);
+  state.meta.premiumUnlocked = [...new Set([...(state.meta.premiumUnlocked || []), id])];
+  state.meta.activeSkin = id;
+  saveMeta();
+  updateEconomyLabels();
+  renderShop();
+  renderSkinMeta();
+  goalChime();
+  showToast(`куплен · ${item.name}`);
+}
+
 function renderShopCosmetics() {
   const list = document.getElementById("shop-cosmetics");
   if (!list || !state.meta) return;
   list.textContent = "";
-  const addItem = (kind, item) => {
-    const owned = kind === "trail" ? isTrailOwned(item.id) : isFrameOwned(item.id);
-    const active = kind === "trail" ? activeTrail().id === item.id : activeFrame().id === item.id;
+  const addItem = (kind, item, sub, metaLabel, locked = false) => {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = `shop-item${active ? " on" : ""}`;
-    const meta = owned ? (active ? "выбран" : "выбрать") : `${item.cost}`;
-    btn.innerHTML = `<span><span class="shop-item-title">${item.name}</span><span class="shop-item-sub">${item.sub}</span></span><span class="shop-item-meta">${meta}</span>`;
-    btn.addEventListener("click", () => buyCosmetic(kind, item.id));
+    const active =
+      (kind === "trail" && activeTrail().id === item.id) ||
+      (kind === "frame" && activeFrame().id === item.id) ||
+      (kind === "skin" && activeSkin().id === item.id);
+    btn.className = `shop-item${active ? " on" : ""}${locked ? " locked" : ""}`;
+    btn.innerHTML = `<span><span class="shop-item-title">${item.name}</span><span class="shop-item-sub">${sub}</span></span><span class="shop-item-meta">${metaLabel}</span>`;
+    if (!locked) btn.addEventListener("click", () => buyCosmetic(kind, item.id));
     list.appendChild(btn);
   };
-  for (const item of TRAILS) addItem("trail", item);
-  for (const item of FRAMES) addItem("frame", item);
+  for (const item of SKINS.filter((s) => s.premium)) {
+    const owned = isSkinOwned(item.id);
+    const active = activeSkin().id === item.id;
+    addItem("skin", item, "премиум-окрас", owned ? (active ? "выбран" : "выбрать") : `${item.cost}`);
+  }
+  for (const item of TRAILS) {
+    const owned = isTrailOwned(item.id);
+    const active = activeTrail().id === item.id;
+    addItem("trail", item, item.sub, owned ? (active ? "выбран" : "выбрать") : `${item.cost}`);
+  }
+  for (const item of FRAMES) {
+    const owned = isFrameOwned(item.id);
+    const active = activeFrame().id === item.id;
+    addItem("frame", item, item.sub, owned ? (active ? "выбран" : "выбрать") : `${item.cost}`);
+  }
 }
 
 function openShop(returnTo = "home") {
@@ -3626,7 +3717,7 @@ function evaluateDaily() {
     return false;
   }
   state.meta.dailyDone = true;
-  awardMarks(15, {
+  awardMarks(DAILY_QUEST_REWARD, {
     x: state.life?.x ?? state.width * 0.5,
     y: state.life?.y ?? state.height * 0.22,
     color: cssVar("--life", "#6fd9b0"),
@@ -3781,7 +3872,7 @@ function renderDailyResult() {
   const daily = currentDailyDef();
   if (!dailyResultEl || !daily) return;
   if (state.meta?.dailyDone) {
-    dailyResultEl.textContent = `ежедневка: ${daily.title} · +15 следов`;
+    dailyResultEl.textContent = `ежедневка: ${daily.title} · +${DAILY_QUEST_REWARD} следов`;
   } else {
     dailyResultEl.textContent = `ежедневка: ${daily.title} · ${daily.label(state)}`;
   }
@@ -3920,14 +4011,14 @@ function nearestSpark(x, y) {
 }
 
 function setHoldVisual(pct, target) {
-  holdFillEl.style.width = target === "start" ? pct : "0%";
-  holdFillOverEl.style.width = target === "retry" ? pct : "0%";
+  if (holdFillEl) holdFillEl.style.width = target === "start" ? pct : "0%";
+  if (holdFillOverEl) holdFillOverEl.style.width = target === "retry" ? pct : "0%";
 }
 
 function clearHold() {
   state.hold = null;
-  holdFillEl.style.width = "0%";
-  holdFillOverEl.style.width = "0%";
+  if (holdFillEl) holdFillEl.style.width = "0%";
+  if (holdFillOverEl) holdFillOverEl.style.width = "0%";
 }
 
 function bindHoldButton(button, target) {
@@ -4137,7 +4228,12 @@ function releaseLife() {
   state.holdLifeTime = 0;
   state.stick = null;
   hum(false);
-  if (state.running) tipOnce("echo", "СЛЕД УЯЗВИМ", 1400);
+  if (state.running) {
+    tipOnce("echo", "СЛЕД УЯЗВИМ", 1400, {
+      persist: true,
+      first: "Отпустил палец — след уязвим. Держи, чтобы жить.",
+    });
+  }
 }
 
 function grantContinue() {
@@ -5706,6 +5802,24 @@ function drawHeroFrame(body) {
       else ctx.lineTo(x, y);
     }
     ctx.closePath();
+    ctx.stroke();
+  } else if (frame.id === "crown") {
+    const r = body.r * 1.85;
+    ctx.strokeStyle = mixColor(cssVar("--gold", "#ffe898"), "#fff6d8", 0.35);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i < 5; i += 1) {
+      const a = -Math.PI / 2 + (Math.PI * 2 * i) / 5 + state.time * 0.25;
+      const spike = i % 2 === 0 ? r : r * 0.72;
+      const x = Math.cos(a) * spike;
+      const y = Math.sin(a) * spike;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, 0, body.r * 1.35, 0, Math.PI * 2);
     ctx.stroke();
   }
   ctx.restore();
@@ -7494,12 +7608,15 @@ function drawHungerVignette() {
 function drawPauseHint() {
   if (!state.paused || !state.running) return;
   ctx.save();
-  ctx.fillStyle = "rgba(12,10,14,0.34)";
+  ctx.fillStyle = "rgba(12,10,14,0.42)";
   ctx.fillRect(0, 0, state.width, state.height);
-  ctx.fillStyle = "rgba(243,238,232,0.82)";
-  ctx.font = "700 14px Instrument Sans, sans-serif";
+  ctx.fillStyle = "rgba(243,238,232,0.9)";
+  ctx.font = "800 18px Syne, sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText("пауза", state.width * 0.5, state.height * 0.48);
+  ctx.fillText("пауза", state.width * 0.5, state.height * 0.46);
+  ctx.fillStyle = "rgba(243,238,232,0.62)";
+  ctx.font = "600 13px Instrument Sans, sans-serif";
+  ctx.fillText("коснись экрана, чтобы продолжить", state.width * 0.5, state.height * 0.52);
   ctx.restore();
 }
 
@@ -7740,7 +7857,13 @@ function boot() {
   updateWaveUi(false);
   resetDemo();
   bindDrawHeroUi();
-  bindHoldButton(btnRetry, "retry");
+  btnRetry?.addEventListener("click", (e) => {
+    e.preventDefault();
+    if (state.running) return;
+    unlockAudio();
+    sfxUiTap(1);
+    startGame();
+  });
   btnStart?.addEventListener("click", (e) => {
     e.preventDefault();
     beginPlayFlow();
@@ -7888,8 +8011,9 @@ function boot() {
     if (!screenStartEl?.classList.contains("hidden")) renderGifts();
     if (state.paused && state.running) {
       state.paused = false;
-      state.safeUntil = performance.now() + 1200;
-      showToast("удерживай снова");
+      state.safeUntil = performance.now() + 1400;
+      showToast("коснись экрана");
+      showCoach("Удерживай палец, чтобы снова ожить", 2000, true);
     } else {
       syncMenuMusic();
     }
@@ -7898,6 +8022,8 @@ function boot() {
     if (document.hidden) pauseForBackground();
     else resumeFromBackground();
   });
+  window.addEventListener("pagehide", pauseForBackground);
+  window.addEventListener("pageshow", resumeFromBackground);
   document.addEventListener("ottisk-app-state", (event) => {
     if (event.detail?.isActive) resumeFromBackground();
     else pauseForBackground();
