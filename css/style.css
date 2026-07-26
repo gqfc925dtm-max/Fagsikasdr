@@ -382,6 +382,91 @@ body {
   display: none;
 }
 
+.hero-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 34ch;
+}
+
+.hero-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.hero-pill {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel) 70%, transparent);
+  color: var(--mute);
+  font-family: "Syne", sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 7px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.hero-pill.on {
+  color: var(--foam);
+  border-color: color-mix(in srgb, var(--gold) 55%, transparent);
+  background: color-mix(in srgb, var(--gold) 18%, transparent);
+}
+
+.hero-pill:disabled {
+  opacity: 0.4;
+}
+
+.draw-card {
+  position: relative;
+  z-index: 1;
+  width: min(92vw, 380px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 16px 20px;
+}
+
+.draw-canvas {
+  width: 100%;
+  aspect-ratio: 1;
+  touch-action: none;
+  border: 1px solid color-mix(in srgb, var(--foam) 18%, transparent);
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(255,255,255,0.08), transparent 55%),
+    #0a1830;
+}
+
+.draw-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.draw-color {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  background: var(--swatch, #fff);
+  cursor: pointer;
+}
+
+.draw-color.on {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.25);
+}
+
+.draw-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .meta-row {
   display: flex;
   align-items: baseline;

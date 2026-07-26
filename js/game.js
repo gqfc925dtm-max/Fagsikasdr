@@ -112,6 +112,16 @@ const SKINS = [
   { id: "noir", name: "нуар", at: 9999, cost: 70, color: "#8ab4ff", premium: true },
 ];
 
+const HEROES = [
+  { id: "octopus", name: "осьминог" },
+  { id: "jellyfish", name: "медуза" },
+  { id: "turtle", name: "черепаха" },
+  { id: "crab", name: "краб" },
+  { id: "custom", name: "свой" },
+];
+
+const customHeroImage = { img: null, src: "", ready: false };
+
 const app = document.getElementById("app");
 const stage = document.getElementById("stage");
 const canvas = document.getElementById("game");
@@ -131,7 +141,15 @@ const diveFillEl = document.getElementById("dive-fill");
 const holdFillEl = document.getElementById("hold-fill");
 const holdFillOverEl = document.getElementById("hold-fill-over");
 const screenStartEl = document.getElementById("screen-start");
+const screenDrawEl = document.getElementById("screen-draw");
+const heroListEl = document.getElementById("hero-list");
+const btnDrawHero = document.getElementById("btn-draw-hero");
+const drawCanvasEl = document.getElementById("draw-canvas");
+const btnDrawClear = document.getElementById("btn-draw-clear");
+const btnDrawCancel = document.getElementById("btn-draw-cancel");
+const btnDrawSave = document.getElementById("btn-draw-save");
 const screenOverEl = document.getElementById("screen-over");
+const drawCtx = drawCanvasEl?.getContext?.("2d") || null;
 const bestStartEl = document.getElementById("best-start");
 const bestOverEl = document.getElementById("best-over");
 const finalScoreEl = document.getElementById("final-score");
@@ -1075,6 +1093,8 @@ function loadMeta() {
     weekBest: weekFresh ? 0 : Math.max(0, Number(raw?.weekBest || 0)),
     weekRewardTaken: weekFresh ? false : !!raw?.weekRewardTaken,
     iapMarksBought: Math.max(0, Number(raw?.iapMarksBought || 0)),
+    activeHero: HEROES.some((h) => h.id === raw?.activeHero) ? raw.activeHero : "octopus",
+    customHero: typeof raw?.customHero === "string" && raw.customHero.startsWith("data:image") ? raw.customHero : "",
   };
 }
 
@@ -1090,6 +1110,67 @@ function skinById(id) {
 
 function activeSkin() {
   return skinById(state.meta?.activeSkin || "ink");
+}
+
+function activeHeroId() {
+  const id = state.meta?.activeHero || "octopus";
+  if (id === "custom" && !state.meta?.customHero) return "octopus";
+  return HEROES.some((h) => h.id === id) ? id : "octopus";
+}
+
+function activeHero() {
+  return HEROES.find((h) => h.id === activeHeroId()) || HEROES[0];
+}
+
+function loadCustomHeroImage(src) {
+  if (!src) {
+    customHeroImage.img = null;
+    customHeroImage.src = "";
+    customHeroImage.ready = false;
+    return;
+  }
+  if (customHeroImage.src === src && customHeroImage.ready) return;
+  const img = new Image();
+  img.onload = () => {
+    customHeroImage.img = img;
+    customHeroImage.src = src;
+    customHeroImage.ready = true;
+  };
+  img.onerror = () => {
+    customHeroImage.img = null;
+    customHeroImage.src = "";
+    customHeroImage.ready = false;
+  };
+  img.src = src;
+}
+
+function setActiveHero(id) {
+  if (!state.meta) return;
+  if (id === "custom" && !state.meta.customHero) {
+    openDrawHero();
+    return;
+  }
+  state.meta.activeHero = id;
+  saveMeta();
+  renderHeroPicker();
+  showToast(`герой · ${activeHero().name}`);
+}
+
+function renderHeroPicker() {
+  if (!heroListEl) return;
+  heroListEl.textContent = "";
+  const current = activeHeroId();
+  for (const hero of HEROES) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `hero-pill${hero.id === current ? " on" : ""}`;
+    btn.textContent = hero.id === "custom" && !state.meta?.customHero ? "свой · рисуй" : hero.name;
+    btn.setAttribute("role", "option");
+    btn.setAttribute("aria-selected", hero.id === current ? "true" : "false");
+    btn.addEventListener("click", () => setActiveHero(hero.id));
+    heroListEl.appendChild(btn);
+  }
+  if (btnDrawHero) btnDrawHero.textContent = state.meta?.customHero ? "перерисовать" : "нарисовать своего";
 }
 
 function touchPlayDay() {
@@ -3382,8 +3463,266 @@ function drawHunter(hunter) {
   }
 }
 
+function drawHeroEyes(s, wob, alpha, eyeY = 0) {
+  const blink = Math.sin(wob * 0.32) > 0.93 ? 0.2 : 1;
+  for (const side of [-1, 1]) {
+    const ex = s * 0.28;
+    const ey = side * s * 0.22 + eyeY;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = "#fffdf8";
+    ctx.beginPath();
+    ctx.ellipse(ex, ey, s * 0.16, s * 0.2 * blink, side * 0.1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#120818";
+    ctx.beginPath();
+    ctx.arc(ex + s * 0.04, ey, s * 0.07 * blink, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(ex + s * 0.07, ey - s * 0.04, s * 0.03, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawJellyfish(body, alpha = 1) {
+  const ink = lifeInkColor();
+  const accentB = cssVar("--accent-b", "#7affd4");
+  const aim = body.aim ?? -Math.PI / 2;
+  const s = body.r;
+  const wob = body.wobble;
+  ctx.save();
+  ctx.translate(body.x, body.y);
+  ctx.rotate(aim);
+  ctx.lineCap = "round";
+  for (let i = 0; i < 7; i += 1) {
+    const spread = (i - 3) * 0.22;
+    const len = s * (1.35 + Math.sin(wob + i) * 0.2);
+    ctx.globalAlpha = alpha * (0.35 + (i % 3) * 0.1);
+    ctx.strokeStyle = mixColor(ink, accentB, 0.35);
+    ctx.lineWidth = Math.max(1.4, s * 0.08);
+    ctx.beginPath();
+    ctx.moveTo(s * 0.05, spread * s * 0.35);
+    ctx.quadraticCurveTo(-s * 0.35, spread * s * 0.9, -len, spread * s * 1.1 + Math.sin(wob * 1.4 + i) * s * 0.2);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = alpha;
+  const bell = ctx.createRadialGradient(s * 0.1, 0, s * 0.1, 0, 0, s);
+  bell.addColorStop(0, mixColor(ink, "#ffffff", 0.45));
+  bell.addColorStop(0.55, mixColor(ink, accentB, 0.2));
+  bell.addColorStop(1, mixColor(ink, "#1a2848", 0.25));
+  ctx.fillStyle = bell;
+  ctx.beginPath();
+  ctx.ellipse(s * 0.08, 0, s * 0.85, s * 0.7, 0, 0, Math.PI * 2);
+  ctx.fill();
+  drawHeroEyes(s, wob, alpha, -s * 0.05);
+  ctx.restore();
+}
+
+function drawTurtle(body, alpha = 1) {
+  const ink = lifeInkColor();
+  const accent = cssVar("--accent-a", "#ff9a62");
+  const aim = body.aim ?? -Math.PI / 2;
+  const s = body.r;
+  const wob = body.wobble;
+  ctx.save();
+  ctx.translate(body.x, body.y);
+  ctx.rotate(aim);
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = mixColor(ink, accent, 0.2);
+  for (const [fx, fy, fr] of [
+    [s * 0.85, 0, s * 0.28],
+    [-s * 0.55, -s * 0.45, s * 0.22],
+    [-s * 0.55, s * 0.45, s * 0.22],
+    [-s * 0.95, 0, s * 0.2],
+  ]) {
+    ctx.beginPath();
+    ctx.ellipse(fx, fy + Math.sin(wob + fx) * s * 0.03, fr, fr * 0.72, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.fillStyle = mixColor(ink, "#2a4030", 0.35);
+  ctx.beginPath();
+  ctx.ellipse(0, 0, s * 0.95, s * 0.72, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = mixColor(ink, "#102018", 0.4);
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(-s * 0.35, 0);
+  ctx.lineTo(s * 0.35, 0);
+  ctx.moveTo(0, -s * 0.35);
+  ctx.lineTo(0, s * 0.35);
+  ctx.stroke();
+  ctx.fillStyle = mixColor(ink, accent, 0.15);
+  ctx.beginPath();
+  ctx.ellipse(s * 0.72, 0, s * 0.34, s * 0.28, 0, 0, Math.PI * 2);
+  ctx.fill();
+  drawHeroEyes(s * 0.85, wob, alpha, 0);
+  ctx.restore();
+}
+
+function drawCrab(body, alpha = 1) {
+  const ink = lifeInkColor();
+  const accent = cssVar("--accent-a", "#ff9a62");
+  const aim = body.aim ?? -Math.PI / 2;
+  const s = body.r;
+  const wob = body.wobble;
+  ctx.save();
+  ctx.translate(body.x, body.y);
+  ctx.rotate(aim);
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = mixColor(ink, accent, 0.25);
+  ctx.lineWidth = Math.max(2, s * 0.12);
+  ctx.lineCap = "round";
+  for (const side of [-1, 1]) {
+    const clawX = s * 0.7;
+    const clawY = side * s * 0.55;
+    ctx.beginPath();
+    ctx.moveTo(s * 0.2, side * s * 0.2);
+    ctx.quadraticCurveTo(s * 0.55, clawY, clawX, clawY);
+    ctx.stroke();
+    ctx.fillStyle = mixColor(ink, accent, 0.2);
+    ctx.beginPath();
+    ctx.ellipse(clawX + s * 0.08, clawY, s * 0.22, s * 0.14, side * 0.4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  for (let i = 0; i < 3; i += 1) {
+    for (const side of [-1, 1]) {
+      const lx = -s * (0.1 + i * 0.18);
+      const ly = side * s * (0.45 + i * 0.05);
+      ctx.beginPath();
+      ctx.moveTo(lx + s * 0.2, side * s * 0.1);
+      ctx.lineTo(lx - s * 0.15, ly + Math.sin(wob + i) * s * 0.08);
+      ctx.stroke();
+    }
+  }
+  ctx.fillStyle = mixColor(ink, accent, 0.18);
+  ctx.beginPath();
+  ctx.ellipse(0, 0, s * 0.78, s * 0.58, 0, 0, Math.PI * 2);
+  ctx.fill();
+  drawHeroEyes(s, wob, alpha, -s * 0.05);
+  ctx.restore();
+}
+
+function drawCustomHero(body, alpha = 1) {
+  if (!customHeroImage.ready || !customHeroImage.img) {
+    drawInkPolyp(body, alpha);
+    return;
+  }
+  const aim = body.aim ?? -Math.PI / 2;
+  const s = body.r;
+  const size = s * 2.5;
+  ctx.save();
+  ctx.translate(body.x, body.y);
+  ctx.rotate(aim + Math.PI / 2);
+  ctx.globalAlpha = alpha;
+  ctx.drawImage(customHeroImage.img, -size * 0.5, -size * 0.5, size, size);
+  ctx.restore();
+}
+
 function drawLifeBody(body, alpha = 1) {
-  drawInkPolyp(body, alpha);
+  const hero = activeHeroId();
+  if (hero === "jellyfish") drawJellyfish(body, alpha);
+  else if (hero === "turtle") drawTurtle(body, alpha);
+  else if (hero === "crab") drawCrab(body, alpha);
+  else if (hero === "custom") drawCustomHero(body, alpha);
+  else drawInkPolyp(body, alpha);
+}
+
+const drawTool = {
+  drawing: false,
+  color: "#fff1e4",
+  lastX: 0,
+  lastY: 0,
+};
+
+function clearDrawCanvas() {
+  if (!drawCtx || !drawCanvasEl) return;
+  drawCtx.clearRect(0, 0, drawCanvasEl.width, drawCanvasEl.height);
+  drawCtx.fillStyle = "rgba(10, 24, 48, 0.001)";
+  drawCtx.fillRect(0, 0, drawCanvasEl.width, drawCanvasEl.height);
+}
+
+function openDrawHero() {
+  if (!screenDrawEl || !drawCanvasEl) return;
+  screenStartEl?.classList.add("hidden");
+  screenDrawEl.classList.remove("hidden");
+  clearDrawCanvas();
+  drawTool.color = "#fff1e4";
+  document.querySelectorAll(".draw-color").forEach((btn) => {
+    btn.classList.toggle("on", btn.dataset.color === drawTool.color);
+    btn.style.setProperty("--swatch", btn.dataset.color);
+  });
+}
+
+function closeDrawHero(backToStart = true) {
+  screenDrawEl?.classList.add("hidden");
+  if (backToStart) screenStartEl?.classList.remove("hidden");
+}
+
+function drawPointerPos(e) {
+  const rect = drawCanvasEl.getBoundingClientRect();
+  const scaleX = drawCanvasEl.width / rect.width;
+  const scaleY = drawCanvasEl.height / rect.height;
+  return {
+    x: (e.clientX - rect.left) * scaleX,
+    y: (e.clientY - rect.top) * scaleY,
+  };
+}
+
+function bindDrawHeroUi() {
+  if (!drawCanvasEl || !drawCtx) return;
+  document.querySelectorAll(".draw-color").forEach((btn) => {
+    btn.style.setProperty("--swatch", btn.dataset.color);
+    btn.addEventListener("click", () => {
+      drawTool.color = btn.dataset.color || "#fff1e4";
+      document.querySelectorAll(".draw-color").forEach((b) => b.classList.toggle("on", b === btn));
+    });
+  });
+  const startDraw = (e) => {
+    e.preventDefault();
+    drawCanvasEl.setPointerCapture?.(e.pointerId);
+    drawTool.drawing = true;
+    const p = drawPointerPos(e);
+    drawTool.lastX = p.x;
+    drawTool.lastY = p.y;
+  };
+  const moveDraw = (e) => {
+    if (!drawTool.drawing) return;
+    e.preventDefault();
+    const p = drawPointerPos(e);
+    drawCtx.strokeStyle = drawTool.color;
+    drawCtx.lineWidth = 14;
+    drawCtx.lineCap = "round";
+    drawCtx.lineJoin = "round";
+    drawCtx.beginPath();
+    drawCtx.moveTo(drawTool.lastX, drawTool.lastY);
+    drawCtx.lineTo(p.x, p.y);
+    drawCtx.stroke();
+    drawTool.lastX = p.x;
+    drawTool.lastY = p.y;
+  };
+  const endDraw = (e) => {
+    if (!drawTool.drawing) return;
+    e.preventDefault();
+    drawTool.drawing = false;
+  };
+  drawCanvasEl.addEventListener("pointerdown", startDraw, { passive: false });
+  drawCanvasEl.addEventListener("pointermove", moveDraw, { passive: false });
+  drawCanvasEl.addEventListener("pointerup", endDraw, { passive: false });
+  drawCanvasEl.addEventListener("pointercancel", endDraw, { passive: false });
+  btnDrawClear?.addEventListener("click", () => clearDrawCanvas());
+  btnDrawCancel?.addEventListener("click", () => closeDrawHero(true));
+  btnDrawSave?.addEventListener("click", () => {
+    if (!state.meta || !drawCanvasEl) return;
+    const data = drawCanvasEl.toDataURL("image/png");
+    state.meta.customHero = data;
+    state.meta.activeHero = "custom";
+    saveMeta();
+    loadCustomHeroImage(data);
+    closeDrawHero(true);
+    renderHeroPicker();
+    showToast("свой герой готов");
+  });
+  btnDrawHero?.addEventListener("click", () => openDrawHero());
 }
 
 function drawEcho() {
@@ -3640,12 +3979,14 @@ function boot() {
   loadPhotos();
   state.meta = loadMeta();
   saveMeta();
+  loadCustomHeroImage(state.meta.customHero || "");
   touchPlayDay();
   refreshDaily();
   state.best = state.meta.best;
   updateBestLabels();
   renderDaily();
   renderSkinMeta();
+  renderHeroPicker();
   updateEconomyLabels();
   resize();
   applyThemeFromScore(false);
@@ -3653,6 +3994,7 @@ function boot() {
   updateHungerUi();
   updateMutationUi();
   resetDemo();
+  bindDrawHeroUi();
   bindHoldButton(btnStart, "start");
   bindHoldButton(btnRetry, "retry");
   canvas.addEventListener("pointerdown", onCanvasDown, { passive: false });
@@ -3731,7 +4073,7 @@ function boot() {
   const nativeShell = !!window.OttiskNative?.isNative;
   if ("serviceWorker" in navigator && !nativeShell) {
     navigator.serviceWorker
-      .register("./sw.js?v=37")
+      .register("./sw.js?v=38")
       .then((reg) => reg.update())
       .catch(() => {});
   }
