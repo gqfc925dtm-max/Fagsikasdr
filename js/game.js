@@ -2537,7 +2537,7 @@ function updateHunters(dt) {
   const soft = difficultyScale();
   // During opening: no hunters on the field at all.
   if (inOpening()) {
-    if (state.hunters.length) state.hunters = state.hunters.filter((h) => h.demo && !state.running);
+    if (state.running && state.hunters.length) state.hunters = [];
     return;
   }
 
