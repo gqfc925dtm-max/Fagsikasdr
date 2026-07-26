@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=65" />
+  <link rel="stylesheet" href="css/style.css?v=73" />
   <link rel="preload" href="assets/fish-evil.png?v=5" as="image" />
   <title>ОТТИСК</title>
 </head>
@@ -84,10 +84,19 @@
         </div>
 
         <div id="control-list" class="control-row" role="group" aria-label="Управление"></div>
+        <div class="mode-row" role="group" aria-label="Режимы">
+          <button id="btn-mode-daily" class="menu-toggle" type="button" aria-pressed="false">день</button>
+          <button id="btn-mode-coop" class="menu-toggle" type="button" aria-pressed="false">дуэт</button>
+        </div>
+        <p id="mode-note" class="menu-note quiet">обычный забег</p>
       </div>
 
       <div class="menu-more">
         <p id="daily-quest" class="menu-note" aria-live="polite"></p>
+        <section id="menu-trophies" class="menu-trophies" aria-label="Трофеи">
+          <p class="menu-section-label">Трофеи</p>
+          <div id="trophy-list" class="trophy-list" role="list"></div>
+        </section>
 
         <section id="menu-gifts" class="menu-gifts hidden" aria-label="Подарки">
           <div id="gift-list" class="gift-rail" role="list"></div>
@@ -166,7 +175,15 @@
             <span class="btn-main">+60 следов</span>
             <span class="btn-sub" id="shop-pack-sub">пак · App Store / донат</span>
           </button>
+          <button id="btn-shop-starter" class="btn btn-secondary" type="button">
+            <span class="btn-main">Стартовый пак · 199 ₽</span>
+            <span class="btn-sub">3 героя + 60 следов</span>
+          </button>
           <div id="shop-iap-heroes" class="shop-iap-heroes"></div>
+          <button id="btn-restore" class="btn btn-ghost" type="button">
+            <span class="btn-main">Восстановить покупки</span>
+            <span class="btn-sub">App Store</span>
+          </button>
         </div>
         <p class="shop-section-label">Косметика</p>
         <div id="shop-cosmetics" class="shop-cosmetics" role="list"></div>
@@ -254,8 +271,10 @@
         <p id="mut-summary" class="mut-summary"></p>
         <p id="skin-result" class="skin-result"></p>
         <p id="daily-result" class="daily-result"></p>
+        <p id="daily-mode-result" class="daily-result hidden"></p>
         <p id="marks-result" class="marks-result"></p>
         <p id="next-goal" class="next-goal"></p>
+        <div id="death-offers" class="death-offers hidden" aria-label="Предложения"></div>
         <p class="best">Рекорд <span id="best-over">0</span> · серия <span id="streak-over">0</span></p>
         <div class="over-actions">
           <button id="btn-rate" class="btn btn-secondary hidden" type="button">
@@ -281,11 +300,15 @@
       </div>
     </div>
 
+    <div id="mechanic-card" class="mechanic-card hidden" role="status" aria-live="polite">
+      <p id="mechanic-card-title" class="mechanic-card-title"></p>
+      <p id="mechanic-card-body" class="mechanic-card-body"></p>
+    </div>
     <canvas id="share-canvas" width="720" height="900" class="share-canvas" aria-hidden="true"></canvas>
   </div>
   <script>
     (async () => {
-      const stamp = "ottisk-force-v72";
+      const stamp = "ottisk-force-v73";
       if (localStorage.getItem(stamp)) return;
       localStorage.setItem(stamp, "1");
       try {
@@ -299,11 +322,11 @@
         }
       } catch (_) {}
       const url = new URL(location.href);
-      url.searchParams.set("v", "65");
+      url.searchParams.set("v", "73");
       location.replace(url.toString());
     })();
   </script>
   <script src="js/native.js" type="module"></script>
-  <script src="js/game.js?v=72" type="module"></script>
+  <script src="js/game.js?v=73" type="module"></script>
 </body>
 </html>

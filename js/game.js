@@ -1,3 +1,5 @@
+import "./pack.js";
+
 const BEST_KEY = "ottisk-best-v2";
 const META_KEY = "ottisk-meta-v1";
 const HOLD_SECONDS = 0.62;
@@ -14,6 +16,12 @@ const SUBMARINE_PRICE_LABEL = "99 ₽";
 const SUBMARINE_LIVES = 3;
 const CONTINUE_PRODUCT_ID = "ottisk_continue_10rub";
 const CONTINUE_PRICE_LABEL = "10 ₽";
+const STARTER_PACK_PRODUCT_ID = "ottisk_starter_pack";
+const STARTER_PACK_PRICE_LABEL = "199 ₽";
+const STARTER_PACK_MARKS = 60;
+const STARTER_PACK_HEROES = ["manta", "angler", "nautilus"];
+const GHOST_SAMPLE_SEC = 0.12;
+const GHOST_MAX_POINTS = 240;
 const EEL_PRODUCT_ID = "ottisk_hero_eel";
 const SQUID_PRODUCT_ID = "ottisk_hero_squid";
 const SEAHORSE_PRODUCT_ID = "ottisk_hero_seahorse";
@@ -158,6 +166,10 @@ const SKINS = [
   { id: "solar", name: "солнце", at: 9999, cost: 75, color: "#ffe08a", premium: true },
   { id: "noir", name: "нуар", at: 9999, cost: 115, color: "#8ab4ff", premium: true },
   { id: "pearl", name: "жемчуг", at: 9999, cost: 180, color: "#f5f0ff", premium: true },
+  { id: "season_thaw", name: "оттепель", at: 9999, color: "#b8e8ff", seasonal: true },
+  { id: "season_bloom", name: "цветение", at: 9999, color: "#ffb0d0", seasonal: true },
+  { id: "season_tide", name: "прилив", at: 9999, color: "#7affd4", seasonal: true },
+  { id: "season_ember", name: "жар-сезон", at: 9999, color: "#ffb068", seasonal: true },
 ];
 
 const HEROES = [
@@ -244,6 +256,7 @@ const FRAMES = [
   { id: "ring", name: "кольцо", sub: "мягкий ореол", cost: 60 },
   { id: "hex", name: "грань", sub: "геометрия вокруг", cost: 95 },
   { id: "crown", name: "корона", sub: "статус поддержки", cost: 150 },
+  { id: "season_ring", name: "сезон", sub: "рамка недели", cost: 0, seasonal: true },
 ];
 
 const CONTROL_MODES = [
@@ -419,6 +432,27 @@ const WAVES = [
     speedMul: 1.08,
     intervalMul: 0.82,
     label: "ВОЛНА 9 · БЕЗДНА",
+  },
+  {
+    id: "kraken",
+    at: 780,
+    name: "кракен",
+    species: "boss",
+    maxBonus: 0,
+    speedMul: 0.95,
+    intervalMul: 8,
+    boss: true,
+    label: "БОСС · КРАКЕН",
+  },
+  {
+    id: "titans",
+    at: 900,
+    name: "титаны",
+    species: "mix",
+    maxBonus: 3,
+    speedMul: 1.14,
+    intervalMul: 0.76,
+    label: "ВОЛНА 11 · ТИТАНЫ",
   },
 ];
 
@@ -640,6 +674,18 @@ const state = {
   whalePulse2: 0,
   bestAtStart: 0,
   shopReturn: "home",
+  dailyMode: false,
+  coopMode: false,
+  life2: null,
+  touchActive2: false,
+  pointerId2: null,
+  stick2: null,
+  ghost: null,
+  ghostPath: [],
+  ghostSampleAcc: 0,
+  ghostIndex: 0,
+  rng: null,
+  mechanicCard: null,
   tipFlags: {
     move: false,
     hunter: false,
@@ -1070,6 +1116,8 @@ function showHomeMenu() {
   hideFlowScreens();
   screenStartEl?.classList.remove("hidden");
   updateStartButtonCopy();
+  updateModeToggles();
+  renderTrophyList();
   syncMenuMusic();
 }
 
@@ -2110,25 +2158,26 @@ function applySpeciesToHunter(hunter, species) {
 
 function spawnBoss() {
   const point = hunterSpawnPointAwayFromPlayer();
+  const isKraken = state.waveId === "kraken";
   const boss = {
     x: point.x,
     y: point.y,
     vx: 0,
     vy: 0,
-    r: 40,
-    anger: 1.08,
+    r: isKraken ? 46 : 40,
+    anger: isKraken ? 1.18 : 1.08,
     slow: false,
     warn: 1.2,
     phase: Math.random() * Math.PI * 2,
     nearMissed: false,
     grace: 1.8,
     orbit: Math.random() * Math.PI * 2,
-    orbitR: 150,
-    orbitSpeed: 0.85,
+    orbitR: isKraken ? 168 : 150,
+    orbitSpeed: isKraken ? 1.05 : 0.85,
     species: "boss",
     boss: true,
     bossPhase: "orbit",
-    bossTimer: 2.4,
+    bossTimer: isKraken ? 1.8 : 2.4,
     chargeTx: 0,
     chargeTy: 0,
     dashCd: 0,
@@ -2136,12 +2185,20 @@ function spawnBoss() {
     pulse: Math.random() * Math.PI * 2,
     weave: Math.random() * Math.PI * 2,
     phaseAlpha: 1,
+    kraken: isKraken,
   };
   state.hunters.push(boss);
-  tipOnce("boss", "ЛЕВИАФАН", 1900, {
-    persist: true,
-    first: "Левиафан. Кружи вокруг и лови окна атаки.",
-  });
+  if (isKraken) {
+    tipOnce("boss-kraken", "КРАКЕН", 1900, {
+      persist: true,
+      first: "Кракен. Быстрее левиафана — держи дистанцию.",
+    });
+  } else {
+    tipOnce("boss", "ЛЕВИАФАН", 1900, {
+      persist: true,
+      first: "Левиафан. Кружи вокруг и лови окна атаки.",
+    });
+  }
   playPredatorSfx("boss", "call");
   sfxWaveShift();
   buzz([16, 22, 16, 22, 16]);
@@ -2185,7 +2242,7 @@ function syncWave(announce = true) {
       }
     }
     // If we just left the boss and the field is empty, seed one new hunter.
-    if (prevId === "leviathan" && !state.hunters.some((h) => !h.shadow)) {
+    if ((prevId === "leviathan" || prevId === "kraken") && !state.hunters.some((h) => !h.shadow)) {
       spawnHunter(true);
     }
   }
@@ -2484,9 +2541,13 @@ function loadMeta() {
   }
   const oldBest = Number(localStorage.getItem(BEST_KEY) || 0);
   const best = Math.max(0, Number(raw?.best || 0), oldBest);
-  const unlockedSkins = SKINS.filter((skin) => !skin.premium && best >= skin.at).map((skin) => skin.id);
+  const seasonalUnlocks = Array.isArray(raw?.seasonalUnlocks) ? raw.seasonalUnlocks.filter((id) => typeof id === "string") : [];
+  const unlockedSkins = SKINS.filter((skin) => !skin.premium && !skin.seasonal && best >= skin.at).map((skin) => skin.id);
   const premiumUnlocked = SKINS.filter((skin) => skin.premium && Array.isArray(raw?.premiumUnlocked) && raw.premiumUnlocked.includes(skin.id))
     .map((skin) => skin.id);
+  for (const id of seasonalUnlocks) {
+    if (SKINS.some((s) => s.id === id && s.seasonal) && !unlockedSkins.includes(id)) unlockedSkins.push(id);
+  }
   const streak = Math.max(0, Number(raw?.streak || 0));
   const marks = Math.max(0, Number(raw?.marks || 0));
   const activeId = typeof raw?.activeSkin === "string" ? raw.activeSkin : "";
@@ -2561,6 +2622,26 @@ function loadMeta() {
     returnGiftAt: typeof raw?.returnGiftAt === "string" ? raw.returnGiftAt : "",
     returnAvailableDay: typeof raw?.returnAvailableDay === "string" ? raw.returnAvailableDay : "",
     lastVisitAt: Math.max(0, Number(raw?.lastVisitAt || 0)),
+    starterPackBought: !!raw?.starterPackBought,
+    trophies: Array.isArray(raw?.trophies) ? raw.trophies.filter((id) => typeof id === "string") : [],
+    trophyWord: !!raw?.trophyWord,
+    trophyCoop: !!raw?.trophyCoop,
+    trophyDaily: !!raw?.trophyDaily,
+    trophyGhost: !!raw?.trophyGhost,
+    dailyBest: Math.max(0, Number(raw?.dailyBest || 0)),
+    dailyBestDay: typeof raw?.dailyBestDay === "string" ? raw.dailyBestDay : "",
+    ghostPath: Array.isArray(raw?.ghostPath)
+      ? raw.ghostPath.filter((p) => p && typeof p.x === "number" && typeof p.y === "number").slice(0, GHOST_MAX_POINTS)
+      : [],
+    ghostScore: Math.max(0, Number(raw?.ghostScore || 0)),
+    seasonalUnlocks: Array.isArray(raw?.seasonalUnlocks)
+      ? raw.seasonalUnlocks.filter((id) => typeof id === "string")
+      : [],
+    seenMechanicCards: Array.isArray(raw?.seenMechanicCards)
+      ? raw.seenMechanicCards.filter((id) => typeof id === "string")
+      : [],
+    coopEnabled: !!raw?.coopEnabled,
+    dailyModeEnabled: !!raw?.dailyModeEnabled,
   };
 }
 
@@ -2767,7 +2848,8 @@ function tryHeroDash(dx, dy, moved) {
   }
   floatText(state.life.x, state.life.y - 22, manta ? (sliced ? "шторм" : "крыло") : "рывок", cssVar("--life", "#7affd4"), 15);
   tipOnce("ability", activeHero().tip || "РЫВОК", 1400);
-  sfxPulse();
+  if (manta) sfxHeroAbility("manta");
+  else sfxPulse();
   buzz([8, 14, 8]);
   state.flash = Math.max(state.flash, manta ? 0.18 : 0.1);
   return true;
@@ -2860,7 +2942,7 @@ function fireShipCannons(dt) {
   mkShot(0.16, 520, 4.1, 0.78);
   mkShot(-0.16, 520, 4.1, 0.78);
   state.cannonCd = 0.24;
-  sfxDartDash();
+  sfxHeroAbility("sub");
   buzz(5);
 }
 
@@ -3024,7 +3106,7 @@ function fireEelZap(dt) {
   }
   floatText(state.life.x, state.life.y - 22, "молния", cssVar("--life", "#9ee8ff"), 14);
   tipOnce("ability", "ЦЕПНАЯ МОЛНИЯ", 1300);
-  sfxDartDash();
+  sfxHeroAbility("eel");
   buzz(8);
   state.flash = Math.max(state.flash, 0.14);
 }
@@ -3041,7 +3123,7 @@ function trySquidInk(hunter) {
     blind: true,
   };
   buzz([12, 18, 12]);
-  sfxPulse();
+  sfxHeroAbility("squid");
   burst(state.life.x, state.life.y, "rgba(40,30,70,0.95)", 34, 6.5);
   floatText(state.life.x, state.life.y - 22, "туман", "#c8b8ff", 15);
   tipOnce("ability", "ЧЕРНИЛЬНЫЙ ТУМАН", 1500);
@@ -3107,7 +3189,7 @@ function trySeahorseRewind(hunter) {
   state.hunger = clamp(state.hunger + 18, 0, 100);
   updateHungerUi();
   buzz([14, 22, 14]);
-  sfxPulse();
+  sfxHeroAbility("seahorse");
   burst(past.x, past.y, cssVar("--gold", "#ffe898"), 26, 5.5);
   burst(ox, oy, "rgba(255,200,140,0.5)", 14, 3.5);
   floatText(past.x, past.y - 24, "откат", cssVar("--gold", "#ffe898"), 15);
@@ -3162,7 +3244,7 @@ function fireWhaleSonar(dt) {
   state.sonarRings.push({ x: state.life.x, y: state.life.y, r: 20, t: 0 });
   floatText(state.life.x, state.life.y - 24, "сонар", "#9ed4ff", 15);
   tipOnce("ability", "ДВОЙНОЙ СОНАР", 1400);
-  sfxPulse();
+  sfxHeroAbility("whale");
   buzz([10, 16, 10]);
   state.flash = Math.max(state.flash, 0.14);
 }
@@ -3888,6 +3970,7 @@ function isTrailOwned(id) {
 function isFrameOwned(id) {
   const item = FRAMES.find((f) => f.id === id);
   if (!item) return false;
+  if (item.seasonal) return (state.meta?.seasonalUnlocks || []).includes(id) || (state.meta?.unlockedFrames || []).includes(id);
   if (!item.cost) return true;
   return (state.meta?.unlockedFrames || []).includes(id);
 }
@@ -4046,6 +4129,15 @@ function renderShop() {
   }
   const packSub = document.getElementById("shop-pack-sub");
   if (packSub) packSub.textContent = isNativeShop() ? "пак · покупка в App Store" : "пак · страница доната";
+  const starterBtn = document.getElementById("btn-shop-starter");
+  if (starterBtn) {
+    const owned = !!state.meta.starterPackBought;
+    starterBtn.classList.toggle("owned", owned);
+    starterBtn.disabled = owned;
+    starterBtn.innerHTML = owned
+      ? `<span class="btn-main">Стартовый пак · твой</span><span class="btn-sub">скат + удильщик + наутилус</span>`
+      : `<span class="btn-main">Стартовый пак · ${STARTER_PACK_PRICE_LABEL}</span><span class="btn-sub">3 героя + 60 следов · ${isNativeShop() ? "App Store" : "донат"}</span>`;
+  }
   renderShopIapHeroes();
   renderShopCosmetics();
   renderDonateOptions();
@@ -4225,7 +4317,7 @@ function syncMetaFromBest() {
   const hadPremiumSkin = !!skinById(state.meta.activeSkin).premium && state.meta.premiumUnlocked.includes(state.meta.activeSkin);
   state.meta.best = Math.max(state.meta.best, state.score);
   state.best = state.meta.best;
-  state.meta.unlockedSkins = SKINS.filter((skin) => !skin.premium && state.meta.best >= skin.at).map((skin) => skin.id);
+  state.meta.unlockedSkins = SKINS.filter((skin) => !skin.premium && !skin.seasonal && state.meta.best >= skin.at).map((skin) => skin.id);
   const newlyUnlocked = state.meta.unlockedSkins.filter((id) => !prev.has(id));
   if (!isSkinOwned(state.meta.activeSkin) || (!hadPremiumSkin && newlyUnlocked.length)) {
     state.meta.activeSkin = newlyUnlocked[newlyUnlocked.length - 1]
@@ -4643,6 +4735,355 @@ function showContinueScreen(reason) {
   clearHold();
 }
 
+
+function packApi() {
+  return window.OttiskPack || null;
+}
+
+function ensureSeasonalUnlock() {
+  if (!state.meta) return;
+  const pack = packApi();
+  if (!pack) return;
+  const cos = pack.seasonCosmetic(state.meta.weekId || weekKey());
+  const unlocks = new Set(state.meta.seasonalUnlocks || []);
+  unlocks.add(cos.skin);
+  unlocks.add(cos.frame);
+  state.meta.seasonalUnlocks = [...unlocks];
+  if (!state.meta.unlockedSkins.includes(cos.skin)) state.meta.unlockedSkins.push(cos.skin);
+  if (!(state.meta.unlockedFrames || []).includes(cos.frame)) {
+    state.meta.unlockedFrames = [...new Set([...(state.meta.unlockedFrames || ["none"]), cos.frame])];
+  }
+  saveMeta();
+}
+
+function sfxHeroAbility(kind = "pulse") {
+  if (!soundEnabled()) return;
+  if (kind === "eel") {
+    playNoise({ gain: 0.03, dur: 0.12, filterFreq: 2800 });
+    playOsc({ freq: 880, endFreq: 220, type: "sawtooth", gain: 0.02, dur: 0.1, filterFreq: 2400 });
+  } else if (kind === "whale") {
+    playOsc({ freq: 90, endFreq: 55, type: "sine", gain: 0.045, dur: 0.35, attack: 0.02, filterFreq: 400 });
+    playOsc({ freq: 180, endFreq: 110, type: "triangle", gain: 0.02, dur: 0.3, delay: 0.05 });
+  } else if (kind === "squid") {
+    playOsc({ freq: 220, endFreq: 80, type: "sine", gain: 0.03, dur: 0.22, filterFreq: 600 });
+    playNoise({ gain: 0.018, dur: 0.16, filterFreq: 900 });
+  } else if (kind === "seahorse") {
+    playOsc({ freq: 620, endFreq: 980, type: "triangle", gain: 0.028, dur: 0.16, filterFreq: 2600 });
+    playOsc({ freq: 980, endFreq: 420, type: "sine", gain: 0.018, dur: 0.2, delay: 0.06 });
+  } else if (kind === "manta") {
+    playOsc({ freq: 340, endFreq: 180, type: "triangle", gain: 0.025, dur: 0.14, filterFreq: 1800 });
+  } else if (kind === "sub") {
+    playOsc({ freq: 160, endFreq: 90, type: "square", gain: 0.016, dur: 0.08, filterFreq: 900 });
+  } else {
+    sfxPulse();
+  }
+}
+
+function showMechanicCard(id, title, body) {
+  if (!state.meta) return;
+  const seen = state.meta.seenMechanicCards || [];
+  if (seen.includes(id)) return;
+  state.meta.seenMechanicCards = [...seen, id];
+  saveMeta();
+  const el = document.getElementById("mechanic-card");
+  const titleEl = document.getElementById("mechanic-card-title");
+  const bodyEl = document.getElementById("mechanic-card-body");
+  if (!el || !titleEl || !bodyEl) {
+    showCoach(`${title}: ${body}`, 2600, true);
+    return;
+  }
+  titleEl.textContent = title;
+  bodyEl.textContent = body;
+  el.classList.remove("hidden");
+  clearTimeout(showMechanicCard.timer);
+  showMechanicCard.timer = setTimeout(() => el.classList.add("hidden"), 3200);
+}
+
+function evaluateTrophies(runCtx = {}) {
+  if (!state.meta) return [];
+  const pack = packApi();
+  const list = pack?.TROPHIES || [];
+  const have = new Set(state.meta.trophies || []);
+  const unlocked = [];
+  const ctx = {
+    best: state.meta.best || 0,
+    score: state.score || 0,
+    wordDone: !!state.wordDone || !!runCtx.wordDone,
+    meta: state.meta,
+  };
+  for (const t of list) {
+    if (have.has(t.id)) continue;
+    if (t.check(ctx)) {
+      have.add(t.id);
+      unlocked.push(t);
+    }
+  }
+  if (unlocked.length) {
+    state.meta.trophies = [...have];
+    saveMeta();
+    const first = unlocked[0];
+    showToast(`трофей · ${first.title}`);
+    goalChime();
+  }
+  return unlocked;
+}
+
+function renderTrophyList() {
+  const list = document.getElementById("trophy-list");
+  if (!list || !state.meta) return;
+  const pack = packApi();
+  const defs = pack?.TROPHIES || [];
+  const have = new Set(state.meta.trophies || []);
+  list.textContent = "";
+  for (const t of defs) {
+    const row = document.createElement("div");
+    const on = have.has(t.id);
+    row.className = `trophy-row${on ? " on" : ""}`;
+    row.innerHTML = `<strong>${t.title}</strong><span>${on ? "получен" : t.sub}</span>`;
+    list.appendChild(row);
+  }
+}
+
+async function purchaseStarterPack() {
+  if (!state.meta) return false;
+  if (state.meta.starterPackBought) {
+    showToast("стартовый пак уже твой");
+    return true;
+  }
+  if (isNativeShop()) {
+    showToast(`открываем · ${STARTER_PACK_PRICE_LABEL}`);
+    const result = await window.OttiskNative.purchase(STARTER_PACK_PRODUCT_ID).catch(() => null);
+    if (result?.ok) {
+      grantStarterPack(true);
+      return true;
+    }
+    showToast(result?.message || "покупка отменена");
+    return false;
+  }
+  try {
+    const url = new URL(DONATE_URL);
+    url.searchParams.set("tip", "starter");
+    url.searchParams.set("product", STARTER_PACK_PRODUCT_ID);
+    window.open(url.toString(), "_blank", "noopener,noreferrer");
+  } catch (_) {
+    location.href = "./donate.html?tip=starter";
+  }
+  showToast(`стартовый пак · ${STARTER_PACK_PRICE_LABEL}`);
+  return false;
+}
+
+function grantStarterPack(fromPurchase = false) {
+  if (!state.meta) return;
+  if (state.meta.starterPackBought) {
+    showToast("стартовый пак уже твой");
+    return;
+  }
+  state.meta.starterPackBought = true;
+  state.meta.unlockedHeroes = [...new Set([...(state.meta.unlockedHeroes || []), ...STARTER_PACK_HEROES])];
+  awardMarks(STARTER_PACK_MARKS, { metaOnly: true });
+  ensureSeasonalUnlock();
+  saveMeta();
+  renderHeroPicker();
+  renderShop();
+  renderDeathOffers();
+  renderTrophyList();
+  updateEconomyLabels();
+  goalChime();
+  showToast(fromPurchase ? "пак открыт · 3 героя + 60 следов" : "стартовый пак");
+}
+
+function nextDeathOfferHero() {
+  return HEROES.find((h) => h.iap && !isHeroOwned(h.id)) || null;
+}
+
+function renderDeathOffers() {
+  const box = document.getElementById("death-offers");
+  if (!box || !state.meta) return;
+  box.textContent = "";
+  const runs = state.meta.runs || 0;
+  const hero = nextDeathOfferHero();
+  if (hero) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn btn-secondary death-offer";
+    btn.innerHTML = `<span class="btn-main">${hero.name} · ${hero.priceLabel || ""}</span><span class="btn-sub">${hero.blurb || hero.ability} · уникальная сила</span>`;
+    btn.addEventListener("click", () => purchaseIapHero(hero.id).catch(() => {}));
+    box.appendChild(btn);
+  }
+  if (!state.meta.starterPackBought && runs >= 1 && runs <= 8) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn btn-secondary death-offer starter";
+    btn.innerHTML = `<span class="btn-main">Стартовый пак · ${STARTER_PACK_PRICE_LABEL}</span><span class="btn-sub">скат + удильщик + наутилус · +60 следов</span>`;
+    btn.addEventListener("click", () => purchaseStarterPack().catch(() => {}));
+    box.appendChild(btn);
+  }
+  box.classList.toggle("hidden", !box.childElementCount);
+}
+
+function updateModeToggles() {
+  const dailyBtn = document.getElementById("btn-mode-daily");
+  const coopBtn = document.getElementById("btn-mode-coop");
+  if (dailyBtn) {
+    dailyBtn.classList.toggle("on", !!state.meta?.dailyModeEnabled);
+    dailyBtn.setAttribute("aria-pressed", state.meta?.dailyModeEnabled ? "true" : "false");
+  }
+  if (coopBtn) {
+    coopBtn.classList.toggle("on", !!state.meta?.coopEnabled);
+    coopBtn.setAttribute("aria-pressed", state.meta?.coopEnabled ? "true" : "false");
+  }
+  const note = document.getElementById("mode-note");
+  if (note) {
+    const bits = [];
+    if (state.meta?.dailyModeEnabled) bits.push("забег дня");
+    if (state.meta?.coopEnabled) bits.push("дуэт");
+    const pack = packApi();
+    const cos = pack?.seasonCosmetic(state.meta?.weekId || weekKey());
+    if (cos) bits.push(`сезон · ${cos.name}`);
+    note.textContent = bits.length ? bits.join(" · ") : "обычный забег";
+  }
+}
+
+function restoreMathRandom() {
+  if (state._mathRandom) {
+    Math.random = state._mathRandom;
+    state._mathRandom = null;
+  }
+}
+
+function beginSeededRun() {
+  restoreMathRandom();
+  state.dailyMode = !!state.meta?.dailyModeEnabled;
+  state.coopMode = !!state.meta?.coopEnabled;
+  state.rng = null;
+  if (state.dailyMode) {
+    const pack = packApi();
+    const seed = pack ? pack.daySeed(localDayKey()) : Date.now();
+    state.rng = pack ? pack.mulberry32(seed) : null;
+    if (state.rng) {
+      state._mathRandom = Math.random;
+      Math.random = state.rng;
+    }
+    if (state.meta) {
+      state.meta.trophyDaily = true;
+      saveMeta();
+    }
+    showToast("забег дня");
+    showMechanicCard("daily", "Забег дня", "Общий сид на сегодня. Соревнуйся с собой.");
+  }
+  if (state.coopMode) showToast("дуэт · два пальца");
+}
+
+function randGame(a = 0, b = 1) {
+  if (state.rng) return a + (b - a) * state.rng();
+  return rand(a, b);
+}
+
+function sampleGhostPath(dt) {
+  if (!state.life || !state.running) return;
+  state.ghostSampleAcc += dt;
+  if (state.ghostSampleAcc < GHOST_SAMPLE_SEC) return;
+  state.ghostSampleAcc = 0;
+  state.ghostPath.push({ x: state.life.x, y: state.life.y });
+  if (state.ghostPath.length > GHOST_MAX_POINTS) state.ghostPath.shift();
+}
+
+function persistGhostPath() {
+  if (!state.meta || state.ghostPath.length < 12) return;
+  if (state.score < (state.meta.ghostScore || 0)) return;
+  state.meta.ghostPath = state.ghostPath.slice();
+  state.meta.ghostScore = state.score;
+  saveMeta();
+}
+
+function spawnRunGhost() {
+  state.ghost = null;
+  state.ghostIndex = 0;
+  const path = state.meta?.ghostPath;
+  if (!path || path.length < 8) return;
+  if ((state.meta.ghostScore || 0) < 20) return;
+  state.ghost = {
+    x: path[0].x,
+    y: path[0].y,
+    r: 14,
+    life: 1,
+    path,
+  };
+}
+
+function updateRunGhost(dt) {
+  if (!state.ghost || !state.running) return;
+  const g = state.ghost;
+  g.ghostIndex = (g.ghostIndex ?? state.ghostIndex) + dt * 9;
+  state.ghostIndex = g.ghostIndex;
+  const idx = Math.min(g.path.length - 1, Math.floor(g.ghostIndex));
+  const p = g.path[idx];
+  g.x += (p.x - g.x) * Math.min(1, dt * 8);
+  g.y += (p.y - g.y) * Math.min(1, dt * 8);
+  const targets = [state.life, state.life2].filter(Boolean);
+  for (const life of targets) {
+    if (dist(g.x, g.y, life.x, life.y) < g.r + life.r * 0.7) {
+      if (!state.meta.trophyGhost) {
+        state.meta.trophyGhost = true;
+        saveMeta();
+      }
+      // soft interference: push player and drain a bit of hunger
+      const ang = Math.atan2(life.y - g.y, life.x - g.x) || 0;
+      life.x += Math.cos(ang) * 10;
+      life.y += Math.sin(ang) * 10;
+      clampLifeEntity(life);
+      state.hunger = Math.max(0, state.hunger - 4 * dt);
+      tipOnce("ghost_run", "ТВОЙ ПРИЗРАК", 1400, {
+        persist: true,
+        first: "Это твой старый след. Он мешает — обходи.",
+      });
+    }
+  }
+}
+
+function clampLifeEntity(life) {
+  if (!life) return;
+  life.x = clamp(life.x, life.r, state.width - life.r);
+  life.y = clamp(life.y, life.r + 18, state.height - life.r - 18);
+}
+
+function drawRunGhost() {
+  if (!state.ghost || !state.running) return;
+  const g = state.ghost;
+  ctx.save();
+  ctx.globalAlpha = 0.35 + Math.sin(state.time * 4) * 0.08;
+  ctx.strokeStyle = "rgba(255,220,160,0.7)";
+  ctx.lineWidth = 1.6;
+  ctx.setLineDash([4, 5]);
+  ctx.beginPath();
+  ctx.arc(g.x, g.y, g.r, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = "rgba(255,200,120,0.2)";
+  ctx.beginPath();
+  ctx.arc(g.x, g.y, g.r * 0.7, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function createLife2(x, y) {
+  state.life2 = {
+    x,
+    y,
+    px: x,
+    py: y,
+    speed: 0,
+    r: 15,
+    wobble: Math.random() * Math.PI * 2,
+    aim: -Math.PI / 2,
+    teeth: 0,
+  };
+  burst(x, y, cssVar("--gold", "#ffe898"), 10, 3.2);
+  if (state.meta && !state.meta.trophyCoop) {
+    state.meta.trophyCoop = true;
+    saveMeta();
+  }
+}
+
 function finalizeGameOver(reason) {
   state.deathReason = reason;
   state.pendingDeathReason = "";
@@ -4669,9 +5110,22 @@ function finalizeGameOver(reason) {
   }
   const muts = state.unlockedMuts.filter((id) => id !== "spark");
   mutSummaryEl.textContent = muts.length ? `новых сил: ${muts.length}` : "";
+  if (state.wordDone && state.meta) state.meta.trophyWord = true;
+  persistGhostPath();
+  if (state.dailyMode && state.meta) {
+    if (state.meta.dailyBestDay !== localDayKey()) {
+      state.meta.dailyBestDay = localDayKey();
+      state.meta.dailyBest = 0;
+    }
+    state.meta.dailyBest = Math.max(state.meta.dailyBest || 0, state.score);
+    saveMeta();
+  }
+  evaluateTrophies({ wordDone: state.wordDone });
   renderSkinResult();
   renderDailyResult();
   renderNextGoal();
+  renderDeathOffers();
+  renderTrophyList();
   updateBestLabels();
   updateEconomyLabels();
   renderDaily();
@@ -4686,6 +5140,13 @@ function finalizeGameOver(reason) {
   if (isNewBest) {
     goalChime();
     buzz([12, 20, 12]);
+  }
+  const dailyLine = document.getElementById("daily-mode-result");
+  if (dailyLine) {
+    if (state.dailyMode) {
+      dailyLine.textContent = `забег дня · лучший сегодня ${state.meta?.dailyBest || state.score}`;
+      dailyLine.classList.remove("hidden");
+    } else dailyLine.classList.add("hidden");
   }
 }
 
@@ -4975,11 +5436,40 @@ function buildShareCard() {
   shareCtx.fillStyle = "rgba(243,238,232,0.78)";
   shareCtx.fillText(hero.ability || "свой след", 390, chipY + 26);
 
+  // Hero glyph mark
+  shareCtx.save();
+  shareCtx.beginPath();
+  shareCtx.arc(width - 140, 250, 58, 0, Math.PI * 2);
+  shareCtx.fillStyle = "rgba(255,255,255,0.08)";
+  shareCtx.fill();
+  shareCtx.strokeStyle = "rgba(255,232,160,0.45)";
+  shareCtx.lineWidth = 2;
+  shareCtx.stroke();
+  shareCtx.fillStyle = gold;
+  shareCtx.font = "800 42px Syne, sans-serif";
+  shareCtx.textAlign = "center";
+  shareCtx.fillText(hero.glyph || "✦", width - 140, 264);
+  shareCtx.restore();
+
+  shareCtx.textAlign = "left";
+  shareCtx.fillStyle = "rgba(243,238,232,0.9)";
+  shareCtx.font = "700 28px Instrument Sans, sans-serif";
+  shareCtx.fillText(hero.tip || hero.ability || "держи палец", 74, 580);
+
+  const modeBits = [];
+  if (state.dailyMode) modeBits.push("забег дня");
+  if (state.coopMode) modeBits.push("дуэт");
+  if (modeBits.length) {
+    shareCtx.fillStyle = "rgba(126, 255, 212, 0.85)";
+    shareCtx.font = "600 22px Instrument Sans, sans-serif";
+    shareCtx.fillText(modeBits.join(" · "), 74, 620);
+  }
+
   shareCtx.fillStyle = "rgba(243,238,232,0.82)";
   shareCtx.font = "600 26px Instrument Sans, sans-serif";
-  shareCtx.fillText(`Рекорд · ${state.best}`, 74, 600);
+  shareCtx.fillText(`Рекорд · ${state.best}`, 74, 670);
   if (state.runMarks > 0) {
-    shareCtx.fillText(`+${state.runMarks} следов`, 74, 646);
+    shareCtx.fillText(`+${state.runMarks} следов`, 74, 710);
   }
 
   shareCtx.fillStyle = "rgba(243,238,232,0.55)";
@@ -5279,8 +5769,16 @@ function resetRun() {
   state.touchActive = false;
   state.pointerId = null;
   state.stick = null;
+  state.touchActive2 = false;
+  state.pointerId2 = null;
+  state.stick2 = null;
   state.hasTouchedCanvas = false;
   state.life = null;
+  state.life2 = null;
+  state.ghost = null;
+  state.ghostPath = [];
+  state.ghostSampleAcc = 0;
+  state.ghostIndex = 0;
   state.echo = null;
   state.guideSpark = null;
   state.sparks = [];
@@ -5351,6 +5849,8 @@ function resetRun() {
   state.shipLives = activeHeroId() === "sub" ? SUBMARINE_LIVES : 0;
   state.heroShield = activeHeroId() !== "nautilus" || state.shellCharges > 0;
   state.bestAtStart = Math.max(state.best || 0, state.meta?.best || 0);
+  beginSeededRun();
+  spawnRunGhost();
   app.classList.remove("ink-dive");
   setDiveMeter(0);
   resetStats();
@@ -5438,8 +5938,23 @@ function startGame() {
     state.paused = false;
     state.demo = false;
     state.lastTs = performance.now();
-    showCoach(controlMode() === "joystick" ? "ДЕРЖИ СТИК" : "УДЕРЖИВАЙ", 1700, true);
+    const coach = state.coopMode
+      ? "ДВА ПАЛЬЦА"
+      : state.dailyMode
+        ? "ЗАБЕГ ДНЯ"
+        : controlMode() === "joystick"
+          ? "ДЕРЖИ СТИК"
+          : "УДЕРЖИВАЙ";
+    showCoach(coach, 1700, true);
     setTimeout(() => maybeShowHeroAbilityTip(), 1900);
+    setTimeout(() => {
+      showMechanicCard("hold", "Касание", "Пока палец на экране — ты жив. Отпусти — след гаснет.");
+    }, 2400);
+    if (state.ghost) {
+      setTimeout(() => {
+        showMechanicCard("ghost", "Призрак", "Старый след мешает. Обходи — или врежься ради трофея.");
+      }, 4200);
+    }
   });
 }
 
@@ -5447,12 +5962,17 @@ function goToMenu() {
   unlockAudio();
   hum(false);
   clearHold();
+  restoreMathRandom();
   state.running = false;
   state.paused = false;
   state.demo = false;
   state.touchActive = false;
   state.pointerId = null;
+  state.touchActive2 = false;
+  state.pointerId2 = null;
   state.life = null;
+  state.life2 = null;
+  state.ghost = null;
   state.echo = null;
   state.pendingDeathReason = "";
   state.continueBusy = false;
@@ -5466,6 +5986,8 @@ function goToMenu() {
   updateBestLabels();
   updateEconomyLabels();
   updateDonateThanks();
+  updateModeToggles();
+  renderTrophyList();
   renderDaily();
   renderGifts();
   resetDemo();
@@ -5479,6 +6001,8 @@ function finishRun(reason) {
   state.demo = false;
   state.touchActive = false;
   state.pointerId = null;
+  state.touchActive2 = false;
+  state.pointerId2 = null;
   state.deathReason = reason;
   hum(false);
   if (inInkDive()) exitInkDive();
@@ -5487,18 +6011,22 @@ function finishRun(reason) {
   buzz([20, 40, 36]);
   sfxDeath();
   if (state.life) burst(state.life.x, state.life.y, cssVar("--danger", "#e2556d"), 28, 5.2);
+  if (state.life2) burst(state.life2.x, state.life2.y, cssVar("--danger", "#e2556d"), 18, 4.2);
   if (state.echo) burst(state.echo.x, state.echo.y, cssVar("--danger", "#e2556d"), 18, 4.2);
   state.life = null;
+  state.life2 = null;
   state.echo = null;
   state.symbiote = null;
   state.shake = 10;
   state.flash = 0.22;
+  restoreMathRandom();
   const canContinueDeath =
     reason === DEATH.HUNTER ||
     reason === DEATH.ECHO ||
     reason === DEATH.HUNGER ||
     reason === "твой старый след догнал тебя" ||
-    reason === "левиафан сомкнул кольцо";
+    reason === "левиафан сомкнул кольцо" ||
+    reason === "кракен сомкнул кольцо";
   if (canOfferContinue() && canContinueDeath) {
     showContinueScreen(reason);
     return;
@@ -5511,24 +6039,36 @@ function tryCompleteByHunger() {
 }
 
 function onCanvasDown(e) {
-  if (!state.running || state.touchActive) return;
+  if (!state.running) return;
+  const coop = state.coopMode || state.meta?.coopEnabled;
+  if (state.touchActive && !(coop && !state.touchActive2)) return;
   e.preventDefault();
   unlockAudio();
-  state.touchActive = true;
-  state.pointerId = e.pointerId;
-  state.hasTouchedCanvas = true;
+  const p = pointerPos(e);
   try {
     canvas.setPointerCapture(e.pointerId);
   } catch (_) {
     // noop
   }
-  const p = pointerPos(e);
-  if (controlMode() === "joystick") {
-    state.stick = { ox: p.x, oy: p.y, x: p.x, y: p.y };
-    if (!state.life) createLife(state.width * 0.5, state.height * 0.56);
-  } else {
-    state.stick = null;
-    createLife(p.x, p.y);
+  state.hasTouchedCanvas = true;
+  if (!state.touchActive) {
+    state.touchActive = true;
+    state.pointerId = e.pointerId;
+    if (controlMode() === "joystick") {
+      state.stick = { ox: p.x, oy: p.y, x: p.x, y: p.y };
+      if (!state.life) createLife(state.width * 0.5, state.height * 0.56);
+    } else {
+      state.stick = null;
+      createLife(p.x, p.y);
+    }
+    return;
+  }
+  if (coop && !state.touchActive2) {
+    state.touchActive2 = true;
+    state.pointerId2 = e.pointerId;
+    state.stick2 = null;
+    createLife2(p.x, p.y);
+    showMechanicCard("coop", "Дуэт", "Второй палец — второй оттиск. Держите оба.");
   }
 }
 
@@ -5643,27 +6183,53 @@ function updateJoystickMove(dt) {
 }
 
 function onCanvasMove(e) {
-  if (!state.running || !state.touchActive || e.pointerId !== state.pointerId || !state.life) return;
+  if (!state.running) return;
   const p = pointerPos(e);
-  if (controlMode() === "joystick" && state.stick) {
-    state.stick.x = p.x;
-    state.stick.y = p.y;
+  if (state.touchActive && e.pointerId === state.pointerId && state.life) {
+    if (controlMode() === "joystick" && state.stick) {
+      state.stick.x = p.x;
+      state.stick.y = p.y;
+      return;
+    }
+    const prevX = state.life.x;
+    const prevY = state.life.y;
+    state.life.x = p.x;
+    state.life.y = p.y;
+    applyLifeMove(prevX, prevY);
     return;
   }
-  const prevX = state.life.x;
-  const prevY = state.life.y;
-  state.life.x = p.x;
-  state.life.y = p.y;
-  applyLifeMove(prevX, prevY);
+  if (state.touchActive2 && e.pointerId === state.pointerId2 && state.life2) {
+    const prevX = state.life2.x;
+    const prevY = state.life2.y;
+    state.life2.x = p.x;
+    state.life2.y = p.y;
+    clampLifeEntity(state.life2);
+    const moved = dist(prevX, prevY, state.life2.x, state.life2.y);
+    if (moved > 0.6) state.life2.aim = Math.atan2(state.life2.y - prevY, state.life2.x - prevX);
+    state.life2.speed = moved;
+  }
 }
 
 function onCanvasUp(e) {
+  if (state.touchActive2 && e.pointerId === state.pointerId2) {
+    state.touchActive2 = false;
+    state.pointerId2 = null;
+    state.stick2 = null;
+    if (state.running) releaseLife2();
+    return;
+  }
   if (!state.touchActive) return;
   if (state.pointerId != null && e.pointerId !== state.pointerId) return;
   state.touchActive = false;
   state.pointerId = null;
   state.stick = null;
   if (state.running) releaseLife();
+}
+
+function releaseLife2() {
+  if (!state.life2) return;
+  burst(state.life2.x, state.life2.y, cssVar("--gold", "#ffe898"), 8, 3);
+  state.life2 = null;
 }
 
 function updateSparkMotion(spark, dt) {
@@ -6081,6 +6647,16 @@ function updateHunters(dt) {
     hunter.x += hunter.vx * dt * 60;
     hunter.y += hunter.vy * dt * 60;
 
+    if (state.life2) {
+      const d2 = dist(hunter.x, hunter.y, state.life2.x, state.life2.y);
+      const killR2 = hunter.r * hunterReachMul(hunter) + state.life2.r * 0.7;
+      if (d2 < killR2 && hunter.grace <= 0) {
+        releaseLife2();
+        hunter.warn = 1;
+        if (!hunter.boss) placeHunterOnEdge(hunter);
+        continue;
+      }
+    }
     if (state.life) {
       const d = dist(hunter.x, hunter.y, state.life.x, state.life.y);
       const fishReach = hunter.r * hunterReachMul(hunter);
@@ -6108,7 +6684,9 @@ function updateHunters(dt) {
           hunter.shadow
             ? "твой старый след догнал тебя"
             : hunter.boss
-              ? "левиафан сомкнул кольцо"
+              ? hunter.kraken
+                ? "кракен сомкнул кольцо"
+                : "левиафан сомкнул кольцо"
               : DEATH.HUNTER
         );
         return;
@@ -6185,6 +6763,8 @@ function updateRun(dt) {
     recordLifeHistory(dt);
     updateInkCloud(dt);
     updateMantaWake(dt);
+    sampleGhostPath(dt);
+    updateRunGhost(dt);
     const prevX = state.life.px ?? state.life.x;
     const prevY = state.life.py ?? state.life.y;
     const moved = dist(state.life.x, state.life.y, prevX, prevY);
@@ -6197,6 +6777,11 @@ function updateRun(dt) {
     if (state.fever) state.life.r += 1.4;
     state.life.teeth = hasMut("fang") && state.combo >= 4 ? Math.min(1, state.life.teeth + dt * 3) : Math.max(0, state.life.teeth - dt * 3);
     clampLife();
+    if (state.life2) {
+      state.life2.wobble = (state.life2.wobble || 0) + dt * 7.2;
+      state.life2.r = 15 + Math.sin(state.life2.wobble) * 0.7;
+      clampLifeEntity(state.life2);
+    }
     updateHum();
   } else if (state.echo) {
     state.echo.wobble += dt * 4.2;
@@ -8951,6 +9536,10 @@ function draw() {
   drawMantaWakeFx();
   drawSonarRingsFx();
   drawEelBoltsFx();
+  drawRunGhost();
+  if (state.life2) {
+    drawLifeBody(state.life2, 0.82);
+  }
   if (state.life) {
     drawSafeShield();
     drawHeroFrame(state.life);
@@ -9016,6 +9605,7 @@ function frame(ts) {
 function boot() {
   loadPhotos();
   state.meta = loadMeta();
+  ensureSeasonalUnlock();
   saveMeta();
   loadCustomHeroImage(state.meta.customHero || "");
   touchPlayDay();
@@ -9029,6 +9619,9 @@ function boot() {
   renderGifts();
   updateEconomyLabels();
   updateDonateThanks();
+  updateModeToggles();
+  renderTrophyList();
+  evaluateTrophies();
   resize();
   applyThemeFromScore(false);
   updateScoreUi(false);
@@ -9037,6 +9630,31 @@ function boot() {
   updateWaveUi(false);
   resetDemo();
   bindDrawHeroUi();
+  document.getElementById("btn-mode-daily")?.addEventListener("click", () => {
+    if (!state.meta) return;
+    state.meta.dailyModeEnabled = !state.meta.dailyModeEnabled;
+    saveMeta();
+    updateModeToggles();
+    sfxUiTap(1);
+    showToast(state.meta.dailyModeEnabled ? "забег дня · вкл" : "забег дня · выкл");
+  });
+  document.getElementById("btn-mode-coop")?.addEventListener("click", () => {
+    if (!state.meta) return;
+    state.meta.coopEnabled = !state.meta.coopEnabled;
+    saveMeta();
+    updateModeToggles();
+    sfxUiTap(1);
+    showToast(state.meta.coopEnabled ? "дуэт · два пальца" : "дуэт · выкл");
+  });
+  document.getElementById("btn-shop-starter")?.addEventListener("click", () => {
+    purchaseStarterPack().catch(() => showToast("покупка недоступна"));
+  });
+  document.getElementById("btn-restore")?.addEventListener("click", () => {
+    restorePurchases().catch(() => showToast("восстановление недоступно"));
+  });
+  document.getElementById("mechanic-card")?.addEventListener("click", () => {
+    document.getElementById("mechanic-card")?.classList.add("hidden");
+  });
   btnRetry?.addEventListener("click", (e) => {
     e.preventDefault();
     if (state.running) return;
@@ -9212,10 +9830,43 @@ function boot() {
   const nativeShell = !!window.OttiskNative?.isNative;
   if ("serviceWorker" in navigator && !nativeShell) {
     navigator.serviceWorker
-      .register("./sw.js?v=72")
+      .register("./sw.js?v=73")
       .then((reg) => reg.update())
       .catch(() => {});
   }
+}
+
+async function restorePurchases() {
+  const native = window.OttiskNative;
+  if (!native?.isNative) {
+    showToast("восстановление · только в App Store");
+    return false;
+  }
+  showToast("восстанавливаем покупки…");
+  const result = await native.restorePurchases?.().catch(() => null);
+  if (!result?.ok) {
+    showToast(result?.message || "покупок не найдено");
+    return false;
+  }
+  const ids = Array.isArray(result.productIds) ? result.productIds : [];
+  let unlocked = 0;
+  for (const id of ids) {
+    const hero = HEROES.find((h) => h.iap && h.productId === id);
+    if (hero && !isHeroOwned(hero.id)) {
+      state.meta.iapHeroes = [...new Set([...(state.meta.iapHeroes || []), hero.id])];
+      unlocked += 1;
+    }
+    if (id === STARTER_PACK_PRODUCT_ID && !state.meta.starterPackBought) {
+      grantStarterPack(true);
+      unlocked += 1;
+    }
+  }
+  saveMeta();
+  renderHeroPicker();
+  renderShop();
+  renderDeathOffers();
+  showToast(unlocked ? `восстановлено · ${unlocked}` : "покупок не найдено");
+  return unlocked > 0;
 }
 
 boot();

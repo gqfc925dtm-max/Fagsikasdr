@@ -575,6 +575,116 @@ body {
   animation: menu-rise 0.78s 0.16s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
+.mode-row {
+  display: flex;
+  gap: 18px;
+  width: min(100%, 360px);
+  margin-top: 14px;
+  animation: menu-rise 0.8s 0.18s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.menu-section-label {
+  margin: 0 0 8px;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--foam) 48%, transparent);
+  font-weight: 700;
+}
+
+.menu-trophies {
+  width: min(100%, 360px);
+  margin: 10px 0 4px;
+}
+
+.trophy-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.trophy-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 0;
+  border-top: 1px solid color-mix(in srgb, var(--foam) 10%, transparent);
+  opacity: 0.45;
+}
+
+.trophy-row strong {
+  font-family: "Syne", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--foam);
+}
+
+.trophy-row span {
+  font-size: 11px;
+  color: color-mix(in srgb, var(--foam) 55%, transparent);
+}
+
+.trophy-row.on {
+  opacity: 1;
+}
+
+.trophy-row.on strong {
+  color: var(--gold);
+}
+
+.death-offers {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  margin: 8px 0 4px;
+}
+
+.death-offers.hidden {
+  display: none;
+}
+
+.death-offer .btn-sub {
+  opacity: 0.72;
+}
+
+.mechanic-card {
+  position: fixed;
+  left: 50%;
+  bottom: calc(88px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 40;
+  width: min(92vw, 340px);
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--foam) 16%, transparent);
+  background:
+    linear-gradient(180deg, rgba(18, 48, 72, 0.92), rgba(8, 22, 38, 0.94));
+  backdrop-filter: blur(10px);
+  animation: rise-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  pointer-events: auto;
+}
+
+.mechanic-card.hidden {
+  display: none;
+}
+
+.mechanic-card-title {
+  margin: 0 0 4px;
+  font-family: "Syne", sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--gold);
+}
+
+.mechanic-card-body {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.35;
+  color: color-mix(in srgb, var(--foam) 82%, transparent);
+}
+
 .control-chip {
   appearance: none;
   flex: 1 1 0;
