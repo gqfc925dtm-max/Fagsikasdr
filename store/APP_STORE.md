@@ -64,11 +64,17 @@ npx cap open ios
 - 1 бесплатный continue за забег
 - Доп. continue за следы
 - Косметика за следы / рекорд
-- Кнопка `+60 следов` → `OttiskNative.purchase('ottisk_marks_60')`
+- Кнопка `Донат` в меню → tip packs + пак следов
+- `OttiskNative.purchase('ottisk_marks_60')` — пак следов
+- `ottisk_tip_small` / `ottisk_tip_mid` / `ottisk_tip_big` — донаты с благодарностью в следах
 
 ### StoreKit позже
 
-1. App Store Connect → Consumable `ottisk_marks_60`
+1. App Store Connect → Consumable:
+   - `ottisk_marks_60`
+   - `ottisk_tip_small`
+   - `ottisk_tip_mid`
+   - `ottisk_tip_big`
 2. Подключи плагин покупок в iOS-оболочке
 3. Проброс в `Capacitor.Plugins.OttiskIAP`
 
