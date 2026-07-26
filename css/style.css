@@ -61,25 +61,6 @@ body {
   background: linear-gradient(180deg, #0a2848 0%, #041828 100%);
 }
 
-.dive-meter {
-  width: 72px;
-  height: 3px;
-  margin-top: 6px;
-  background: rgba(243, 238, 232, 0.08);
-  overflow: hidden;
-  opacity: 0;
-  transition: opacity 0.15s ease;
-}
-
-.dive-meter.show { opacity: 1; }
-
-.dive-meter i {
-  display: block;
-  width: 0%;
-  height: 100%;
-  background: #b8a0ff;
-}
-
 #app[data-theme="0"] {
   --bg0: #241828; --bg1: #442840; --bg2: #5a3428;
   --ember: #ff9a62; --gold: #ffe898; --life: #7affd4; --danger: #ff7898;
@@ -154,21 +135,21 @@ body {
   pointer-events: none;
 }
 
-.status {
+.status.hud {
   order: 2;
   position: relative;
   z-index: 6;
   flex: 0 0 auto;
   display: grid;
-  grid-template-columns: 72px 1fr;
-  gap: 16px;
-  align-items: center;
-  padding: 10px 16px calc(10px + var(--safe-bottom));
+  grid-template-columns: auto 1fr;
+  gap: 14px;
+  align-items: end;
+  padding: 12px 16px calc(12px + var(--safe-bottom));
   background:
-    linear-gradient(90deg, color-mix(in srgb, var(--accent-a) 22%, transparent), transparent 40%),
-    linear-gradient(270deg, color-mix(in srgb, var(--accent-b) 20%, transparent), transparent 40%),
-    var(--panel);
-  border-top: 1px solid var(--line);
+    linear-gradient(180deg, rgba(10, 28, 46, 0.2), rgba(6, 16, 28, 0.92)),
+    linear-gradient(90deg, color-mix(in srgb, #1a4a66 35%, transparent), transparent 55%);
+  border-top: 1px solid color-mix(in srgb, var(--foam) 12%, transparent);
+  backdrop-filter: blur(10px);
 }
 
 .status.hidden { display: none !important; }
@@ -176,82 +157,108 @@ body {
 .meta-label {
   display: block;
   font-size: 9px;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--sand);
   font-weight: 600;
   margin-bottom: 2px;
 }
 
-.status-left #score {
+.hud-score {
+  min-width: 64px;
+}
+
+.hud-score #score {
   display: block;
   font-family: "Syne", sans-serif;
-  font-size: 34px;
+  font-size: clamp(36px, 10vw, 44px);
   font-weight: 800;
-  letter-spacing: -0.04em;
-  line-height: 1;
+  letter-spacing: -0.05em;
+  line-height: 0.92;
   color: var(--gold);
-  text-shadow: 0 0 18px color-mix(in srgb, var(--gold) 45%, transparent);
   transition: transform 0.12s ease;
 }
 
-.status-left #score.pop { transform: scale(1.05); }
+.hud-score #score.pop { transform: scale(1.06); }
 
-.wave-label {
-  display: block;
-  margin-top: 4px;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--sand);
-  opacity: 0.85;
-  max-width: 11ch;
-  line-height: 1.25;
+.hud-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding-bottom: 4px;
 }
 
-.wave-label.flash {
+.hud-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.wave-chip,
+.wave-label {
+  display: inline-flex;
+  align-items: center;
+  max-width: 70%;
+  min-height: 22px;
+  padding: 3px 8px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--foam) 14%, transparent);
+  background: color-mix(in srgb, #0c2438 70%, transparent);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: var(--foam);
-  opacity: 1;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wave-chip.flash,
+.wave-label.flash {
+  border-color: color-mix(in srgb, var(--gold) 55%, transparent);
+  background: color-mix(in srgb, var(--gold) 18%, transparent);
+  color: var(--gold);
   animation: wave-pop 0.55s ease;
 }
 
 @keyframes wave-pop {
   0% { transform: translateY(4px); opacity: 0.2; }
   40% { transform: translateY(0); opacity: 1; }
-  100% { opacity: 0.85; }
+  100% { opacity: 1; }
 }
 
-.status-center {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.heat-head {
+.hud-hunger-label {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
+  flex: 0 0 auto;
 }
 
-.heat-head .meta-label { margin-bottom: 0; }
+.hud-hunger-label .meta-label {
+  margin-bottom: 0;
+}
 
 .heat-pct {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--sand);
+  font-family: "Syne", sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--foam);
   font-variant-numeric: tabular-nums;
 }
 
 .heat {
   width: 100%;
-  height: 6px;
+  height: 10px;
+  border-radius: 999px;
   background: rgba(243, 238, 232, 0.08);
   overflow: hidden;
   position: relative;
+  border: 1px solid color-mix(in srgb, var(--foam) 10%, transparent);
 }
 
 .heat::before {
@@ -259,8 +266,8 @@ body {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(90deg, transparent 0, transparent calc(33% - 1px), var(--line) calc(33% - 1px), var(--line) 33%, transparent 33%),
-    linear-gradient(90deg, transparent 0, transparent calc(66% - 1px), var(--line) calc(66% - 1px), var(--line) 66%, transparent 66%);
+    linear-gradient(90deg, transparent 0, transparent calc(33% - 1px), rgba(255,255,255,0.14) calc(33% - 1px), rgba(255,255,255,0.14) 33%, transparent 33%),
+    linear-gradient(90deg, transparent 0, transparent calc(66% - 1px), rgba(255,255,255,0.14) calc(66% - 1px), rgba(255,255,255,0.14) 66%, transparent 66%);
   pointer-events: none;
   z-index: 1;
 }
@@ -269,18 +276,17 @@ body {
   display: block;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, var(--life), var(--accent-b) 40%, var(--gold) 70%, var(--ember));
+  border-radius: inherit;
+  background: linear-gradient(90deg, #3fd6b0, #7affd4 35%, #ffe08a 72%, #ff9a62);
   transition: width 0.06s linear;
-  box-shadow: 0 0 16px color-mix(in srgb, var(--life) 50%, transparent);
 }
 
 .heat.low i {
-  background: linear-gradient(90deg, var(--ember), var(--danger));
-  box-shadow: 0 0 12px color-mix(in srgb, var(--danger) 40%, transparent);
+  background: linear-gradient(90deg, #ff9a62, #ff6b88);
 }
 
 .heat.critical i {
-  background: linear-gradient(90deg, var(--danger), #ffb0c0);
+  background: linear-gradient(90deg, #ff4d6d, #ffb0c0);
   animation: hunger-pulse 0.55s ease-in-out infinite;
 }
 
@@ -291,7 +297,8 @@ body {
 
 .mut-track {
   width: 100%;
-  height: 2px;
+  height: 3px;
+  border-radius: 999px;
   background: rgba(243, 238, 232, 0.06);
   overflow: hidden;
 }
@@ -299,8 +306,28 @@ body {
 .mut-track-fill {
   width: 0%;
   height: 100%;
+  border-radius: inherit;
   background: linear-gradient(90deg, var(--life), var(--gold));
-  box-shadow: 0 0 8px color-mix(in srgb, var(--life) 40%, transparent);
+}
+
+.dive-meter {
+  width: 100%;
+  height: 3px;
+  margin-top: 0;
+  border-radius: 999px;
+  background: rgba(243, 238, 232, 0.08);
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.dive-meter.show { opacity: 1; }
+
+.dive-meter i {
+  display: block;
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, #7ab8ff, #b8d8ff);
 }
 
 #app.in-run .float-layer .daily-chip,

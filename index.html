@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=diff1" />
+  <link rel="stylesheet" href="css/style.css?v=hud1" />
   <link rel="preload" href="assets/fish-evil.png?v=5" as="image" />
   <title>ОТТИСК</title>
 </head>
@@ -30,14 +30,18 @@
       </div>
     </main>
 
-    <footer id="status" class="status hidden">
-      <div class="status-left">
+    <footer id="status" class="status hud hidden">
+      <div class="hud-score">
+        <span class="meta-label">свет</span>
         <span id="score">0</span>
-        <span id="wave-label" class="wave-label">волна 1 · стая</span>
       </div>
-      <div class="status-center">
-        <div class="heat-head">
-          <span id="heat-pct" class="heat-pct">100%</span>
+      <div class="hud-main">
+        <div class="hud-row">
+          <span id="wave-label" class="wave-chip">волна 1 · стая</span>
+          <span class="hud-hunger-label">
+            <span class="meta-label">сытость</span>
+            <span id="heat-pct" class="heat-pct">100%</span>
+          </span>
         </div>
         <div id="heat" class="heat" aria-label="Сытость">
           <i id="heat-fill"></i>
