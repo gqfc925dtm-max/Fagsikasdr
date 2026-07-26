@@ -22,6 +22,22 @@ const STARTER_PACK_MARKS = 60;
 const STARTER_PACK_HEROES = ["manta", "angler", "nautilus"];
 const GHOST_SAMPLE_SEC = 0.12;
 const GHOST_MAX_POINTS = 240;
+const MAX_PARTICLES = 110;
+const MAX_FLOATERS = 20;
+const MAX_VEINS = 56;
+const CSS_VARS = [
+  "--bg0", "--bg1", "--foam", "--sand", "--mute", "--line",
+  "--gold", "--life", "--ember", "--danger", "--accent-a", "--accent-b",
+];
+const cssCache = Object.create(null);
+const rgbCache = new Map();
+const mixCache = new Map();
+const bgCache = { w: 0, h: 0, ink: false, base: null, vignette: null };
+const pointerCache = { left: 0, top: 0, scaleX: 1, scaleY: 1 };
+const uiCache = { hunger: -1, wave: "", dive: -1, diveShow: null, score: -1 };
+let humAcc = 0;
+let lastHumKey = "";
+let portraitSkip = 0;
 const EEL_PRODUCT_ID = "ottisk_hero_eel";
 const SQUID_PRODUCT_ID = "ottisk_hero_squid";
 const SEAHORSE_PRODUCT_ID = "ottisk_hero_seahorse";
@@ -749,6 +765,12 @@ function dist(ax, ay, bx, by) {
   return Math.hypot(ax - bx, ay - by);
 }
 
+function dist2(ax, ay, bx, by) {
+  const dx = ax - bx;
+  const dy = ay - by;
+  return dx * dx + dy * dy;
+}
+
 function shuffle(arr) {
   for (let i = arr.length - 1; i > 0; i -= 1) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -757,31 +779,68 @@ function shuffle(arr) {
   return arr;
 }
 
+function refreshCssCache() {
+  const style = getComputedStyle(app);
+  for (const name of CSS_VARS) {
+    cssCache[name] = style.getPropertyValue(name).trim();
+  }
+  rgbCache.clear();
+  mixCache.clear();
+  invalidateBgCache();
+}
+
 function cssVar(name, fallback) {
+  const cached = cssCache[name];
+  if (cached) return cached;
   const value = getComputedStyle(app).getPropertyValue(name).trim();
+  if (value) cssCache[name] = value;
   return value || fallback;
 }
 
 function hexToRgb(hex) {
-  const value = hex.trim();
+  const key = typeof hex === "string" ? hex : String(hex);
+  const hit = rgbCache.get(key);
+  if (hit) return hit;
+  const value = key.trim();
+  let rgb;
   if (value.startsWith("rgb")) {
     const nums = value.match(/[\d.]+/g) || ["255", "255", "255"];
-    return nums.slice(0, 3).map(Number);
+    rgb = [Number(nums[0]) || 255, Number(nums[1]) || 255, Number(nums[2]) || 255];
+  } else {
+    const clean = value.replace("#", "");
+    const full = clean.length === 3 ? clean.split("").map((c) => c + c).join("") : clean.padEnd(6, "0");
+    rgb = [
+      parseInt(full.slice(0, 2), 16) || 0,
+      parseInt(full.slice(2, 4), 16) || 0,
+      parseInt(full.slice(4, 6), 16) || 0,
+    ];
   }
-  const clean = value.replace("#", "");
-  const full = clean.length === 3 ? clean.split("").map((c) => c + c).join("") : clean;
-  return [
-    parseInt(full.slice(0, 2), 16),
-    parseInt(full.slice(2, 4), 16),
-    parseInt(full.slice(4, 6), 16),
-  ];
+  rgbCache.set(key, rgb);
+  return rgb;
 }
 
 function mixColor(a, b, t) {
+  const q = (clamp(t, 0, 1) * 20 + 0.5) | 0;
+  const key = `${a}|${b}|${q}`;
+  const hit = mixCache.get(key);
+  if (hit) return hit;
   const aa = hexToRgb(a);
   const bb = hexToRgb(b);
-  const m = aa.map((v, i) => Math.round(v + (bb[i] - v) * clamp(t, 0, 1)));
-  return `rgb(${m[0]}, ${m[1]}, ${m[2]})`;
+  const u = q / 20;
+  const out = `rgb(${(aa[0] + (bb[0] - aa[0]) * u + 0.5) | 0},${(aa[1] + (bb[1] - aa[1]) * u + 0.5) | 0},${(aa[2] + (bb[2] - aa[2]) * u + 0.5) | 0})`;
+  mixCache.set(key, out);
+  return out;
+}
+
+function invalidateBgCache() {
+  bgCache.w = 0;
+  bgCache.h = 0;
+  bgCache.base = null;
+  bgCache.vignette = null;
+}
+
+function particleRoom() {
+  return Math.max(0, MAX_PARTICLES - state.particles.length);
 }
 
 function soundEnabled() {
@@ -987,6 +1046,8 @@ function tone(freq, dur = 0.08, type = "sine", gain = 0.04, delay = 0) {
 
 function hum(on) {
   if (!on) {
+    lastHumKey = "";
+    humAcc = 0;
     if (!state.humNode || !state.audio) {
       state.humNode = null;
       return;
@@ -1068,15 +1129,21 @@ function hum(on) {
   state.humNode = { o1, o2, o3, lfo, g, noise, noiseGain, filter, noiseFilter };
 }
 
-function updateHum() {
+function updateHum(dt = 0.016) {
   if (!state.humNode || !state.audio || !state.life) return;
-  const ac = state.audio;
+  humAcc += dt;
+  if (humAcc < 0.07) return;
+  humAcc = 0;
   const urgency = 1 - state.hunger / 100;
   let hunterBoost = 0;
   for (const h of state.hunters) {
-    const d = dist(h.x, h.y, state.life.x, state.life.y);
-    hunterBoost = Math.max(hunterBoost, clamp(1 - d / 220, 0, 1));
+    const d2 = dist2(h.x, h.y, state.life.x, state.life.y);
+    hunterBoost = Math.max(hunterBoost, clamp(1 - Math.sqrt(d2) / 220, 0, 1));
   }
+  const key = `${(urgency * 20) | 0}|${(hunterBoost * 20) | 0}`;
+  if (key === lastHumKey) return;
+  lastHumKey = key;
+  const ac = state.audio;
   const base = 46 + urgency * 54 + hunterBoost * 28;
   const t = ac.currentTime;
   state.humNode.o1.frequency.setTargetAtTime(base, t, 0.1);
@@ -1859,8 +1926,15 @@ function inInkDive() {
 function setDiveMeter(progress) {
   if (!diveMeterEl || !diveFillEl) return;
   const show = progress > 0.05 && progress < 1 && !inInkDive();
-  diveMeterEl.classList.toggle("show", show);
-  diveFillEl.style.width = `${Math.round(clamp(progress, 0, 1) * 100)}%`;
+  const pct = Math.round(clamp(progress, 0, 1) * 100);
+  if (uiCache.diveShow !== show) {
+    uiCache.diveShow = show;
+    diveMeterEl.classList.toggle("show", show);
+  }
+  if (uiCache.dive !== pct) {
+    uiCache.dive = pct;
+    diveFillEl.style.width = `${pct}%`;
+  }
 }
 
 function enterInkDive() {
@@ -1870,6 +1944,7 @@ function enterInkDive() {
   state.stillAcc = 0;
   setDiveMeter(0);
   app.classList.add("ink-dive");
+  refreshCssCache();
   pulseUnlock("#8ae0ff", 0.16);
   tipOnce("dive", "ЗДЕСЬ ТИХО", 1600, {
     persist: true,
@@ -1884,6 +1959,7 @@ function enterInkDive() {
 function exitInkDive() {
   state.inkDive = 0;
   app.classList.remove("ink-dive");
+  refreshCssCache();
   if (!state.event) setEventChip("");
   pulseUnlock(cssVar("--life", "#7affd4"), 0.1);
   sfxDiveOut();
@@ -2118,7 +2194,11 @@ function waveForScore(score = state.score) {
 function updateWaveUi(flash = false) {
   if (!waveLabelEl) return;
   const wave = waveForScore();
-  waveLabelEl.textContent = `волна ${WAVES.indexOf(wave) + 1} · ${wave.name}`;
+  const text = `волна ${WAVES.indexOf(wave) + 1} · ${wave.name}`;
+  if (uiCache.wave !== text) {
+    uiCache.wave = text;
+    waveLabelEl.textContent = text;
+  }
   if (flash) {
     waveLabelEl.classList.remove("flash");
     void waveLabelEl.offsetWidth;
@@ -2209,7 +2289,6 @@ function spawnBoss() {
 function syncWave(announce = true) {
   const wave = waveForScore();
   if (wave.id === state.waveId) {
-    updateWaveUi(false);
     return wave;
   }
   const prevId = state.waveId;
@@ -2258,10 +2337,15 @@ function syncWave(announce = true) {
 }
 
 function floatText(x, y, text, color = "#f2c15a", size = 16) {
+  if (state.floaters.length >= MAX_FLOATERS) {
+    state.floaters[0] = state.floaters[state.floaters.length - 1];
+    state.floaters.pop();
+  }
   state.floaters.push({ x, y, text, color, size, life: 1, vy: -0.45 });
 }
 
 function pushParticle(p) {
+  if (state.particles.length >= MAX_PARTICLES) return false;
   state.particles.push({
     x: p.x,
     y: p.y,
@@ -2276,11 +2360,14 @@ function pushParticle(p) {
     spin: p.spin || 0,
     grav: p.grav ?? 0.03,
   });
+  return true;
 }
 
 function burst(x, y, color, count = 12, speed = 3.5) {
+  const n = Math.min(count, particleRoom());
+  if (n <= 0) return;
   const accent = cssVar("--accent-b", cssVar("--gold", "#ffd27a"));
-  for (let i = 0; i < count; i += 1) {
+  for (let i = 0; i < n; i += 1) {
     const a = Math.random() * Math.PI * 2;
     const s = rand(0.7, speed);
     pushParticle({
@@ -4414,6 +4501,7 @@ function applyThemeFromScore(announce = false) {
   if (!changed && !announce) return;
   state.theme = theme;
   app.dataset.theme = String(theme);
+  refreshCssCache();
   document.querySelector('meta[name="theme-color"]')?.setAttribute("content", cssVar("--bg0", "#241828"));
   if (changed && announce && state.score >= 100) {
     pulseUnlock(cssVar("--accent-a", "#ff9a62"), 0.18);
@@ -4422,6 +4510,8 @@ function applyThemeFromScore(announce = false) {
 }
 
 function updateScoreUi(pop = false) {
+  if (!pop && uiCache.score === state.score) return;
+  uiCache.score = state.score;
   scoreEl.textContent = String(state.score);
   if (pop) {
     scoreEl.classList.remove("pop");
@@ -4432,10 +4522,13 @@ function updateScoreUi(pop = false) {
 
 function updateHungerUi() {
   const pct = Math.round(clamp(state.hunger, 0, 100));
-  heatFillEl.style.width = `${pct}%`;
-  heatPctEl.textContent = `${pct}%`;
-  heatEl.classList.toggle("low", pct < 30);
-  heatEl.classList.toggle("critical", pct < 18);
+  if (uiCache.hunger !== pct) {
+    uiCache.hunger = pct;
+    heatFillEl.style.width = `${pct}%`;
+    heatPctEl.textContent = `${pct}%`;
+    heatEl.classList.toggle("low", pct < 30);
+    heatEl.classList.toggle("critical", pct < 18);
+  }
   if (pct < 28 && state.running && state.life) tipOnce("hunger", "ЕШЬ СВЕТ", 1500);
 }
 
@@ -4567,7 +4660,8 @@ function resize() {
   const prevW = state.width || 1;
   const prevH = state.height || 1;
   const rect = stage.getBoundingClientRect();
-  state.dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  const canvasRect = canvas.getBoundingClientRect();
+  state.dpr = Math.min(window.devicePixelRatio || 1, 2);
   state.width = Math.max(1, Math.floor(rect.width));
   state.height = Math.max(1, Math.floor(rect.height));
   canvas.width = Math.floor(state.width * state.dpr);
@@ -4575,11 +4669,20 @@ function resize() {
   canvas.style.width = `${state.width}px`;
   canvas.style.height = `${state.height}px`;
   ctx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
+  pointerCache.left = canvasRect.left;
+  pointerCache.top = canvasRect.top;
+  pointerCache.scaleX = state.width / Math.max(1, canvasRect.width);
+  pointerCache.scaleY = state.height / Math.max(1, canvasRect.height);
+  invalidateBgCache();
   const sx = state.width / prevW;
   const sy = state.height / prevH;
   if (state.life) {
     state.life.x *= sx;
     state.life.y *= sy;
+  }
+  if (state.life2) {
+    state.life2.x *= sx;
+    state.life2.y *= sy;
   }
   if (state.echo) {
     state.echo.x *= sx;
@@ -4594,12 +4697,9 @@ function resize() {
 }
 
 function pointerPos(e) {
-  const rect = canvas.getBoundingClientRect();
-  const scaleX = state.width / Math.max(1, rect.width);
-  const scaleY = state.height / Math.max(1, rect.height);
   return {
-    x: (e.clientX - rect.left) * scaleX,
-    y: (e.clientY - rect.top) * scaleY,
+    x: (e.clientX - pointerCache.left) * pointerCache.scaleX,
+    y: (e.clientY - pointerCache.top) * pointerCache.scaleY,
   };
 }
 
@@ -6081,7 +6181,10 @@ function pushVein(x, y) {
     life: 1,
     decay: 0.32,
   });
-  if (state.veins.length > 140) state.veins.shift();
+  if (state.veins.length > MAX_VEINS) {
+    state.veins[0] = state.veins[state.veins.length - 1];
+    state.veins.pop();
+  }
 }
 
 function applyLifeMove(prevX, prevY) {
@@ -6100,7 +6203,8 @@ function applyLifeMove(prevX, prevY) {
 function spawnTrailParticles(x0, y0, x1, y1, moved) {
   const trail = activeTrail();
   if (!trail || trail.id === "plain") return;
-  const n = trail.id === "ember" ? 3 : 2;
+  if (particleRoom() < 2) return;
+  const n = Math.min(trail.id === "ember" ? 2 : 1, particleRoom());
   for (let i = 0; i < n; i += 1) {
     const t = (i + 1) / (n + 1);
     pushParticle({
@@ -6115,7 +6219,7 @@ function spawnTrailParticles(x0, y0, x1, y1, moved) {
       life: 0.85,
     });
   }
-  if (moved > 10 && Math.random() < 0.35) {
+  if (moved > 10 && Math.random() < 0.28) {
     pushVein((x0 + x1) * 0.5, (y0 + y1) * 0.5);
   }
 }
@@ -6719,21 +6823,29 @@ function updateVeins(dt) {
 }
 
 function updateParticles(dt) {
+  const step = dt * 60;
+  const damp = Math.exp(-0.008032 * step);
   for (let i = state.particles.length - 1; i >= 0; i -= 1) {
     const p = state.particles[i];
-    p.x += p.vx * dt * 60;
-    p.y += p.vy * dt * 60;
-    p.vy += (p.grav ?? 0.03) * dt * 60;
-    p.vx *= Math.pow(0.992, dt * 60);
-    if (p.spin) p.rot = (p.rot || 0) + p.spin * dt * 60;
-    p.life -= p.decay * dt * 60;
-    if (p.life <= 0) state.particles.splice(i, 1);
+    p.x += p.vx * step;
+    p.y += p.vy * step;
+    p.vy += (p.grav ?? 0.03) * step;
+    p.vx *= damp;
+    if (p.spin) p.rot = (p.rot || 0) + p.spin * step;
+    p.life -= p.decay * step;
+    if (p.life <= 0) {
+      state.particles[i] = state.particles[state.particles.length - 1];
+      state.particles.pop();
+    }
   }
   for (let i = state.floaters.length - 1; i >= 0; i -= 1) {
     const f = state.floaters[i];
-    f.y += f.vy * dt * 60;
+    f.y += f.vy * step;
     f.life -= dt * 1.18;
-    if (f.life <= 0) state.floaters.splice(i, 1);
+    if (f.life <= 0) {
+      state.floaters[i] = state.floaters[state.floaters.length - 1];
+      state.floaters.pop();
+    }
   }
 }
 
@@ -6782,7 +6894,7 @@ function updateRun(dt) {
       state.life2.r = 15 + Math.sin(state.life2.wobble) * 0.7;
       clampLifeEntity(state.life2);
     }
-    updateHum();
+    updateHum(dt);
   } else if (state.echo) {
     state.echo.wobble += dt * 4.2;
     state.echo.life = Math.max(0, (state.echo.life ?? 1) - dt / ECHO_FADE_SEC);
@@ -6864,10 +6976,9 @@ function updateRun(dt) {
   updateHunters(dt);
   if (!state.running) return;
   updateVeins(dt);
-  updateParticles(dt);
   state.bloomPulse = Math.max(0, state.bloomPulse - dt * 0.85);
   state.flash = Math.max(0, state.flash - dt * 1.9);
-  state.shake *= Math.pow(0.9, dt * 60);
+  state.shake *= Math.exp(-0.10536 * dt * 60);
 }
 
 function updateDemo(dt) {
@@ -6938,28 +7049,41 @@ function lifeInkColor() {
 function drawOceanBackground() {
   const w = state.width;
   const h = state.height;
-  const t = state.time;
-  const grad = ctx.createLinearGradient(0, 0, 0, h);
-  if (inInkDive()) {
-    grad.addColorStop(0, "#041828");
-    grad.addColorStop(0.5, "#0a2848");
-    grad.addColorStop(1, "#121438");
-  } else {
-    grad.addColorStop(0, "#0c2248");
-    grad.addColorStop(0.45, "#081830");
-    grad.addColorStop(1, "#040c1c");
+  const ink = inInkDive();
+  if (bgCache.w !== w || bgCache.h !== h || bgCache.ink !== ink || !bgCache.base) {
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    if (ink) {
+      grad.addColorStop(0, "#041828");
+      grad.addColorStop(0.5, "#0a2848");
+      grad.addColorStop(1, "#121438");
+    } else {
+      grad.addColorStop(0, "#0c2248");
+      grad.addColorStop(0.45, "#081830");
+      grad.addColorStop(1, "#040c1c");
+    }
+    const vignette = ctx.createRadialGradient(
+      w * 0.5, h * 0.5, Math.min(w, h) * 0.28,
+      w * 0.5, h * 0.5, Math.max(w, h) * 0.72
+    );
+    vignette.addColorStop(0, "transparent");
+    vignette.addColorStop(1, "rgba(0, 4, 16, 0.45)");
+    bgCache.w = w;
+    bgCache.h = h;
+    bgCache.ink = ink;
+    bgCache.base = grad;
+    bgCache.vignette = vignette;
   }
-  ctx.fillStyle = grad;
+  ctx.fillStyle = bgCache.base;
   ctx.fillRect(0, 0, w, h);
-  const glow = ctx.createRadialGradient(w * 0.5, h * 0.42, 20, w * 0.5, h * 0.5, Math.max(w, h) * 0.7);
-  glow.addColorStop(0, `rgba(40, 120, 200, ${0.1 + Math.sin(t * 1.4) * 0.025})`);
-  glow.addColorStop(1, "transparent");
-  ctx.fillStyle = glow;
-  ctx.fillRect(0, 0, w, h);
-  const vignette = ctx.createRadialGradient(w * 0.5, h * 0.5, Math.min(w, h) * 0.28, w * 0.5, h * 0.5, Math.max(w, h) * 0.72);
-  vignette.addColorStop(0, "transparent");
-  vignette.addColorStop(1, "rgba(0, 4, 16, 0.45)");
-  ctx.fillStyle = vignette;
+  // Soft center glow without recreating a radial every frame.
+  ctx.save();
+  ctx.globalAlpha = 0.1 + Math.sin(state.time * 1.4) * 0.025;
+  ctx.fillStyle = ink ? "#1a5088" : "#2878c8";
+  ctx.beginPath();
+  ctx.arc(w * 0.5, h * 0.45, Math.max(w, h) * 0.42, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  ctx.fillStyle = bgCache.vignette;
   ctx.fillRect(0, 0, w, h);
 }
 
@@ -7013,18 +7137,22 @@ function drawSymbiote() {
 }
 
 function drawVeins() {
+  if (!state.veins.length) return;
   const trail = activeTrail();
+  const color = trail.id !== "plain" && trail.color ? trail.color : cssVar("--life", "#6fd9b0");
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.2;
+  ctx.setLineDash([2, 4]);
   for (const vein of state.veins) {
-    ctx.save();
+    if (vein.life < 0.12) continue;
     ctx.globalAlpha = 0.16 * vein.life;
-    ctx.strokeStyle = trail.id !== "plain" && trail.color ? trail.color : cssVar("--life", "#6fd9b0");
-    ctx.lineWidth = 1.2;
-    ctx.setLineDash([2, 4]);
     ctx.beginPath();
     ctx.arc(vein.x, vein.y, vein.r, 0, Math.PI * 2);
     ctx.stroke();
-    ctx.restore();
   }
+  ctx.setLineDash([]);
+  ctx.restore();
 }
 
 function drawHeroFrame(body) {
@@ -7076,27 +7204,29 @@ function drawHeroFrame(body) {
 function drawLightOrb(x, y, r, color, pulse, alpha = 1, kind = "normal") {
   const isSuper = kind === "super";
   const isRare = kind === "rare";
+  const fancy = isSuper || isRare;
   const wob = 1 + Math.sin(pulse) * (isSuper ? 0.14 : 0.1);
   const bodyR = r * wob;
+  const hi = mixColor(color, "#ffffff", 0.65);
   ctx.save();
   ctx.translate(x, y);
-  ctx.globalAlpha = alpha * 0.4;
-  const glow = ctx.createRadialGradient(0, 0, bodyR * 0.15, 0, 0, bodyR * (isSuper ? 2.8 : 2.15));
-  glow.addColorStop(0, mixColor(color, "#ffffff", 0.65));
-  glow.addColorStop(0.4, color);
-  glow.addColorStop(1, "transparent");
-  ctx.fillStyle = glow;
+  // Common sparks: soft filled glow (no radial gradient alloc).
+  ctx.globalAlpha = alpha * (fancy ? 0.38 : 0.28);
+  ctx.fillStyle = color;
   ctx.beginPath();
-  ctx.arc(0, 0, bodyR * (isSuper ? 2.8 : 2.15), 0, Math.PI * 2);
+  ctx.arc(0, 0, bodyR * (isSuper ? 2.55 : fancy ? 2.1 : 1.85), 0, Math.PI * 2);
   ctx.fill();
 
-  // Soft organic core (not a star)
   ctx.globalAlpha = alpha;
-  const core = ctx.createRadialGradient(-bodyR * 0.2, -bodyR * 0.25, bodyR * 0.05, 0, 0, bodyR);
-  core.addColorStop(0, mixColor(color, "#ffffff", 0.75));
-  core.addColorStop(0.55, color);
-  core.addColorStop(1, mixColor(color, "#102038", 0.35));
-  ctx.fillStyle = core;
+  if (fancy) {
+    const core = ctx.createRadialGradient(-bodyR * 0.2, -bodyR * 0.25, bodyR * 0.05, 0, 0, bodyR);
+    core.addColorStop(0, mixColor(color, "#ffffff", 0.75));
+    core.addColorStop(0.55, color);
+    core.addColorStop(1, mixColor(color, "#102038", 0.35));
+    ctx.fillStyle = core;
+  } else {
+    ctx.fillStyle = color;
+  }
   ctx.beginPath();
   const lobes = isSuper ? 7 : isRare ? 6 : 5;
   for (let i = 0; i <= lobes; i += 1) {
@@ -7109,20 +7239,25 @@ function drawLightOrb(x, y, r, color, pulse, alpha = 1, kind = "normal") {
   }
   ctx.closePath();
   ctx.fill();
+  ctx.globalAlpha = alpha * 0.7;
+  ctx.fillStyle = hi;
+  ctx.beginPath();
+  ctx.arc(-bodyR * 0.18, -bodyR * 0.2, bodyR * 0.28, 0, Math.PI * 2);
+  ctx.fill();
 
   // Orbiting motes / ribbons
-  const moteCount = isSuper ? 6 : isRare ? 4 : 3;
+  const moteCount = isSuper ? 5 : isRare ? 3 : 2;
   for (let i = 0; i < moteCount; i += 1) {
     const a = pulse * (1.4 + i * 0.18) + (i / moteCount) * Math.PI * 2;
     const orbit = bodyR * (1.15 + (i % 2) * 0.35 + Math.sin(pulse + i) * 0.08);
     const mx = Math.cos(a) * orbit;
     const my = Math.sin(a) * orbit * 0.72;
     ctx.globalAlpha = alpha * (0.55 + (i % 2) * 0.25);
-    ctx.fillStyle = mixColor(color, "#ffffff", 0.55);
+    ctx.fillStyle = hi;
     ctx.beginPath();
     ctx.arc(mx, my, Math.max(1.4, bodyR * (isSuper ? 0.16 : 0.11)), 0, Math.PI * 2);
     ctx.fill();
-    if (isSuper || isRare) {
+    if (fancy) {
       ctx.strokeStyle = mixColor(color, "#ffffff", 0.35);
       ctx.lineWidth = 1.2;
       ctx.globalAlpha = alpha * 0.35;
@@ -9340,30 +9475,27 @@ function drawHungerVignette() {
     ctx.fillStyle = `rgba(${e[0]}, ${e[1]}, ${e[2]}, ${0.08 + Math.sin(state.time * 8) * 0.03})`;
     ctx.fillRect(0, 0, state.width, state.height);
   }
-  if (activeEventId() === "calm") {
+  const eventId = activeEventId();
+  if (eventId === "calm") {
     const l = hexToRgb(cssVar("--life", "#6ff0c4"));
     ctx.fillStyle = `rgba(${l[0]}, ${l[1]}, ${l[2]}, 0.07)`;
     ctx.fillRect(0, 0, state.width, state.height);
-  }
-  if (activeEventId() === "rain") {
+  } else if (eventId === "rain") {
     const g = hexToRgb(cssVar("--gold", "#ffe08a"));
     ctx.fillStyle = `rgba(${g[0]}, ${g[1]}, ${g[2]}, 0.06)`;
     ctx.fillRect(0, 0, state.width, state.height);
   }
   if (state.hunger >= 28 || !state.life) return;
   const strength = clamp((28 - state.hunger) / 28, 0, 1);
-  const grad = ctx.createRadialGradient(
-    state.width * 0.5,
-    state.height * 0.5,
-    Math.min(state.width, state.height) * 0.28,
-    state.width * 0.5,
-    state.height * 0.5,
-    Math.max(state.width, state.height) * 0.72
-  );
-  grad.addColorStop(0, "transparent");
-  grad.addColorStop(1, `rgba(226, 85, 109, ${0.08 + strength * 0.28})`);
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, state.width, state.height);
+  // Reuse the cached vignette geometry with a tinted overlay instead of a new radial.
+  ctx.save();
+  ctx.globalAlpha = 0.08 + strength * 0.28;
+  ctx.fillStyle = "#e2556d";
+  ctx.beginPath();
+  ctx.rect(0, 0, state.width, state.height);
+  ctx.arc(state.width * 0.5, state.height * 0.5, Math.min(state.width, state.height) * 0.34, 0, Math.PI * 2, true);
+  ctx.fill("evenodd");
+  ctx.restore();
 }
 
 function drawPauseHint() {
@@ -9506,12 +9638,9 @@ function drawParticles() {
   for (const f of state.floaters) {
     ctx.globalAlpha = Math.max(0, f.life);
     ctx.fillStyle = f.color;
-    ctx.shadowColor = f.color;
-    ctx.shadowBlur = 6;
     ctx.font = `800 ${f.size}px Syne, sans-serif`;
     ctx.textAlign = "center";
     ctx.fillText(f.text, f.x, f.y);
-    ctx.shadowBlur = 0;
   }
   ctx.globalAlpha = 1;
 }
@@ -9521,10 +9650,10 @@ function drawOpeningPulse() {
 }
 
 function draw() {
-  const sx = (Math.random() - 0.5) * state.shake;
-  const sy = (Math.random() - 0.5) * state.shake;
   ctx.save();
-  ctx.translate(sx, sy);
+  if (state.shake > 0.08) {
+    ctx.translate((Math.random() - 0.5) * state.shake, (Math.random() - 0.5) * state.shake);
+  }
   drawBackground();
   drawVeins();
   drawGlyphs();
@@ -9594,7 +9723,10 @@ function frame(ts) {
     (screenVisible(screenStartEl) || screenVisible(screenHeroEl) || screenVisible(screenDiffEl))
   ) {
     updateDemo(dt);
-    if (screenVisible(screenHeroEl)) paintHeroPortrait();
+    if (screenVisible(screenHeroEl)) {
+      portraitSkip = (portraitSkip + 1) % 3;
+      if (portraitSkip === 0) paintHeroPortrait();
+    }
   } else {
     updateOver(dt);
   }
@@ -9605,6 +9737,7 @@ function frame(ts) {
 function boot() {
   loadPhotos();
   state.meta = loadMeta();
+  refreshCssCache();
   ensureSeasonalUnlock();
   saveMeta();
   loadCustomHeroImage(state.meta.customHero || "");
@@ -9830,7 +9963,7 @@ function boot() {
   const nativeShell = !!window.OttiskNative?.isNative;
   if ("serviceWorker" in navigator && !nativeShell) {
     navigator.serviceWorker
-      .register("./sw.js?v=73")
+      .register("./sw.js?v=74")
       .then((reg) => reg.update())
       .catch(() => {});
   }
