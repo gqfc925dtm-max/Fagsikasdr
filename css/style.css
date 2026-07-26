@@ -197,6 +197,31 @@ body {
 
 .status-left #score.pop { transform: scale(1.05); }
 
+.wave-label {
+  display: block;
+  margin-top: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sand);
+  opacity: 0.85;
+  max-width: 11ch;
+  line-height: 1.25;
+}
+
+.wave-label.flash {
+  color: var(--foam);
+  opacity: 1;
+  animation: wave-pop 0.55s ease;
+}
+
+@keyframes wave-pop {
+  0% { transform: translateY(4px); opacity: 0.2; }
+  40% { transform: translateY(0); opacity: 1; }
+  100% { opacity: 0.85; }
+}
+
 .status-center {
   min-width: 0;
   display: flex;

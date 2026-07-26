@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=hero2" />
+  <link rel="stylesheet" href="css/style.css?v=wave1" />
   <link rel="preload" href="assets/fish-evil.png?v=5" as="image" />
   <title>ОТТИСК</title>
 </head>
@@ -33,6 +33,7 @@
     <footer id="status" class="status hidden">
       <div class="status-left">
         <span id="score">0</span>
+        <span id="wave-label" class="wave-label">волна 1 · стая</span>
       </div>
       <div class="status-center">
         <div class="heat-head">
@@ -52,7 +53,7 @@
       <div class="screen-bg" aria-hidden="true"></div>
       <div class="brand-block">
         <p class="brand">ОТТИСК</p>
-        <h1 class="tagline">Удерживай палец — ешь свет, избегай рыб.</h1>
+        <h1 class="tagline">Удерживай палец — ешь свет, переживай волны хищников.</h1>
         <div class="meta-panel meta-panel-simple">
           <div class="meta-row">
             <span class="meta-label">рекорд</span>
@@ -181,7 +182,7 @@
   </div>
   <script>
     (async () => {
-      const stamp = "ottisk-force-v39";
+      const stamp = "ottisk-force-v40";
       if (localStorage.getItem(stamp)) return;
       localStorage.setItem(stamp, "1");
       try {
@@ -195,11 +196,11 @@
         }
       } catch (_) {}
       const url = new URL(location.href);
-      url.searchParams.set("v", "39");
+      url.searchParams.set("v", "40");
       location.replace(url.toString());
     })();
   </script>
   <script src="js/native.js" type="module"></script>
-  <script src="js/game.js?v=hero2" type="module"></script>
+  <script src="js/game.js?v=wave1" type="module"></script>
 </body>
 </html>

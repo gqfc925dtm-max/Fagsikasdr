@@ -18,8 +18,8 @@ const SUPPORT_URL = `${SHARE_URL}support.html`;
 const THEME_COUNT = 6;
 const ONBOARD_STEPS = [
   "Удерживай палец — существо живёт только в касании.",
-  "Замри на секунду — можно провалиться в чернила.",
-  "Отпущенный след иногда оживает и идёт за тобой.",
+  "Лови живой свет — он прыгает и крутится.",
+  "Счёт растёт — волны меняют хищников: стая, стрелки, медузы…",
 ];
 const SECRET_WORD = "ЯЕЩЁЗДЕСЬ";
 const SCORE_MILESTONES = [
@@ -118,6 +118,60 @@ const HEROES = [
   { id: "turtle", name: "черепаха" },
   { id: "crab", name: "краб" },
   { id: "custom", name: "свой" },
+];
+
+/** Difficulty waves: each tier swaps predator species + pacing. */
+const WAVES = [
+  {
+    id: "school",
+    at: 0,
+    name: "стая",
+    species: "fish",
+    maxBonus: 0,
+    speedMul: 1,
+    intervalMul: 1,
+    label: "ВОЛНА 1 · СТАЯ",
+  },
+  {
+    id: "darts",
+    at: 22,
+    name: "стрелки",
+    species: "dart",
+    maxBonus: 1,
+    speedMul: 1.38,
+    intervalMul: 0.82,
+    label: "ВОЛНА 2 · СТРЕЛКИ",
+  },
+  {
+    id: "jellies",
+    at: 48,
+    name: "медузы",
+    species: "jelly",
+    maxBonus: 1,
+    speedMul: 0.72,
+    intervalMul: 0.9,
+    label: "ВОЛНА 3 · МЕДУЗЫ",
+  },
+  {
+    id: "eels",
+    at: 80,
+    name: "угри",
+    species: "eel",
+    maxBonus: 2,
+    speedMul: 1.18,
+    intervalMul: 0.74,
+    label: "ВОЛНА 4 · УГРИ",
+  },
+  {
+    id: "sharks",
+    at: 120,
+    name: "акулы",
+    species: "shark",
+    maxBonus: 2,
+    speedMul: 1.3,
+    intervalMul: 0.66,
+    label: "ВОЛНА 5 · АКУЛЫ",
+  },
 ];
 
 const customHeroImage = { img: null, src: "", ready: false };
@@ -301,6 +355,8 @@ const state = {
   symbiote: null,
   openingBurst: false,
   firstEatDone: false,
+  waveId: "school",
+  waveIndex: 0,
   tipFlags: {
     move: false,
     hunter: false,
@@ -799,6 +855,67 @@ function difficultyScale() {
   return 1;
 }
 
+const waveLabelEl = document.getElementById("wave-label");
+
+function waveForScore(score = state.score) {
+  let current = WAVES[0];
+  for (const wave of WAVES) {
+    if (score >= wave.at) current = wave;
+  }
+  return current;
+}
+
+function updateWaveUi(flash = false) {
+  if (!waveLabelEl) return;
+  const wave = waveForScore();
+  waveLabelEl.textContent = `волна ${WAVES.indexOf(wave) + 1} · ${wave.name}`;
+  if (flash) {
+    waveLabelEl.classList.remove("flash");
+    void waveLabelEl.offsetWidth;
+    waveLabelEl.classList.add("flash");
+  }
+}
+
+function applySpeciesToHunter(hunter, species) {
+  hunter.species = species;
+  hunter.dashCd = species === "dart" ? rand(0.4, 1.1) : species === "shark" ? rand(1.2, 2.2) : 0;
+  hunter.dashT = 0;
+  hunter.pulse = Math.random() * Math.PI * 2;
+  hunter.weave = Math.random() * Math.PI * 2;
+  if (species === "dart") hunter.r = rand(11, 14);
+  else if (species === "jelly") hunter.r = rand(18, 24);
+  else if (species === "eel") hunter.r = rand(13, 16);
+  else if (species === "shark") hunter.r = rand(20, 26);
+  else hunter.r = rand(15, 19);
+}
+
+function syncWave(announce = true) {
+  const wave = waveForScore();
+  if (wave.id === state.waveId) {
+    updateWaveUi(false);
+    return wave;
+  }
+  state.waveId = wave.id;
+  state.waveIndex = WAVES.indexOf(wave);
+  for (const hunter of state.hunters) {
+    if (hunter.shadow || hunter.demo) continue;
+    applySpeciesToHunter(hunter, wave.species);
+    hunter.warn = 1;
+    placeHunterOnEdge(hunter);
+    hunter.grace = Math.max(hunter.grace || 0, 0.75);
+  }
+  updateWaveUi(true);
+  if (announce && state.running && !inOpening()) {
+    tipOnce(`wave-${wave.id}`, wave.label, 1700);
+    showCombo(wave.label, true);
+    buzz([12, 18, 12]);
+    tone(360, 0.07, "triangle", 0.03);
+    tone(540, 0.1, "sine", 0.026, 0.06);
+    state.flash = Math.max(state.flash, 0.16);
+  }
+  return wave;
+}
+
 function floatText(x, y, text, color = "#f2c15a", size = 16) {
   state.floaters.push({ x, y, text, color, size, life: 1, vy: -0.45 });
 }
@@ -996,7 +1113,7 @@ function eatSparkBlast(spark, opening = false) {
   if (spark.type === "super") {
     state.shake = Math.max(state.shake, 26);
     state.flash = Math.max(state.flash, 1.25);
-    floatText(x, y - 26, "СУПЕР", "#ff2f45", 22);
+    floatText(x, y - 26, "ПУЛЬСАР", "#ff2f45", 22);
     buzz([14, 20, 14, 28]);
   }
 }
@@ -2054,33 +2171,34 @@ async function shareRun() {
 
 function sparkProfile(type) {
   if (type === "super") {
-    return { type, worth: 10, restore: 48, color: "#ff2f45", r: rand(20, 24), super: true };
+    return { type, worth: 10, restore: 48, color: "#ff2f45", r: rand(18, 22), super: true, form: "pulsar" };
   }
   if (type === "rare") {
-    return { type, worth: 3, restore: 35, color: "#ffcc44", r: rand(15, 19) };
+    return { type, worth: 3, restore: 35, color: "#ffcc44", r: rand(14, 18), form: "prism" };
   }
   if (type === "cool") {
-    return { type, worth: 1, restore: 25, color: "#58c8ff", r: rand(13.5, 17) };
+    return { type, worth: 1, restore: 25, color: "#58c8ff", r: rand(12.5, 16), form: "frost" };
   }
   if (type === "bait") {
-    return { type, worth: 1, restore: 12, color: "#ff58d0", r: rand(13.5, 17) };
+    return { type, worth: 1, restore: 12, color: "#ff58d0", r: rand(12.5, 16), form: "lure" };
   }
   if (type === "comet") {
-    return { type, worth: 5, restore: 28, color: "#ffd840", r: rand(16, 20), comet: true };
+    return { type, worth: 5, restore: 28, color: "#ffd840", r: rand(15, 19), comet: true, form: "bolt" };
   }
   if (type === "deep") {
-    return { type, worth: 4, restore: 32, color: "#70d8ff", r: rand(14.5, 18) };
+    return { type, worth: 4, restore: 32, color: "#70d8ff", r: rand(13.5, 17), form: "abyss" };
   }
   if (type === "seed") {
-    return { type, worth: 2, restore: 16, color: "#58ffb0", r: rand(14, 17.5), seed: true };
+    return { type, worth: 2, restore: 16, color: "#58ffb0", r: rand(13, 16.5), seed: true, form: "seed" };
   }
-  const normals = ["#ffd080", "#ffb868", "#fff0a0", cssVar("--accent-b", "#62f0c8")];
+  const normals = ["#ffd080", "#ffb868", "#7affd4", "#9ad0ff", cssVar("--accent-b", "#62f0c8")];
   return {
     type: "normal",
     worth: 1,
     restore: 18,
     color: normals[Math.floor(Math.random() * normals.length)],
-    r: rand(13, 17),
+    r: rand(12, 16),
+    form: "plankton",
   };
 }
 
@@ -2138,8 +2256,8 @@ function maybeSpawnSuperStar() {
     ...profile,
   });
   state.superStarSpawned = true;
-  tipOnce("super", "СУПЕР ЗВЕЗДА", 1800);
-  floatText(x, y - 28, "СУПЕР", "#ff2f45", 18);
+  tipOnce("super", "ПУЛЬСАР", 1800);
+  floatText(x, y - 28, "ПУЛЬСАР", "#ff2f45", 18);
 }
 
 function spawnComet() {
@@ -2221,8 +2339,9 @@ function hunterSpawnPointAwayFromPlayer() {
 function spawnHunter(slow = false) {
   const point = hunterSpawnPointAwayFromPlayer();
   const soft = difficultyScale();
+  const wave = syncWave(false);
   const anger = (slow ? 0.28 : rand(0.62, 0.95) + Math.min(0.4, state.score * 0.005)) * soft;
-  state.hunters.push({
+  const hunter = {
     x: point.x,
     y: point.y,
     vx: 0,
@@ -2237,8 +2356,15 @@ function spawnHunter(slow = false) {
     orbit: (state.hunters.length * 2.1) + Math.random() * 1.2,
     orbitR: rand(36, 64),
     orbitSpeed: rand(0.7, 1.25) * (Math.random() < 0.5 ? -1 : 1),
-  });
-  if (state.running && !state.tipFlags.hunter) tipOnce("hunter", "ХИЩНИК", 1500);
+    species: wave.species,
+    dashCd: 0,
+    dashT: 0,
+    pulse: Math.random() * Math.PI * 2,
+    weave: Math.random() * Math.PI * 2,
+  };
+  applySpeciesToHunter(hunter, wave.species);
+  state.hunters.push(hunter);
+  if (state.running && !state.tipFlags.hunter) tipOnce("hunter", wave.label.replace("ВОЛНА ", "ХИЩНИК · "), 1500);
 }
 
 function registerNearMiss(hunter, x, y) {
@@ -2325,6 +2451,8 @@ function resetRun() {
   state.firstEatDone = false;
   state.superStarSpawned = false;
   state.superStarEaten = false;
+  state.waveId = "school";
+  state.waveIndex = 0;
   app.classList.remove("ink-dive");
   setDiveMeter(0);
   resetStats();
@@ -2333,6 +2461,7 @@ function resetRun() {
   updateScoreUi(false);
   updateHungerUi();
   updateMutationUi();
+  updateWaveUi(false);
   renderDaily();
   setEventChip("");
   comboEl.className = "combo";
@@ -2500,16 +2629,51 @@ function onCanvasUp(e) {
 }
 
 function updateSparkMotion(spark, dt) {
-  spark.pulse += dt * 5.2;
+  spark.pulse += dt * (spark.type === "super" ? 7.2 : spark.type === "rare" ? 6.2 : 5.2);
+  spark.drift = (spark.drift || 0) + dt;
   if (spark.comet) {
     spark.x += spark.vx * dt * 60;
-    spark.y += spark.vy * dt * 60;
+    spark.y += spark.vy * dt * 60 + Math.sin(spark.pulse * 2) * 8 * dt;
+    // Comet particle wake
+    if (Math.random() < 0.55) {
+      pushParticle({
+        x: spark.x - spark.vx * 2,
+        y: spark.y - spark.vy * 2,
+        vx: -spark.vx * 0.08 + rand(-0.3, 0.3),
+        vy: -spark.vy * 0.08 + rand(-0.3, 0.3),
+        size: rand(1.2, 2.8),
+        color: spark.color,
+        kind: "dot",
+        grav: 0.01,
+        decay: 0.04,
+        life: 0.7,
+      });
+    }
     return;
   }
-  spark.vx += Math.sin(state.time * 1.3 + spark.y * 0.012) * 0.006;
-  spark.vy += Math.cos(state.time * 1.1 + spark.x * 0.01) * 0.004;
-  spark.vx *= 0.992;
-  spark.vy *= 0.992;
+  if (spark.pinned) {
+    // Pulsar circles in place
+    const orbit = 10 + Math.sin(spark.pulse) * 6;
+    spark.x += Math.cos(spark.pulse * 1.4) * orbit * dt * 2.2;
+    spark.y += Math.sin(spark.pulse * 1.1) * orbit * dt * 2.2;
+  } else if (spark.type === "rare") {
+    spark.vx += Math.cos(spark.pulse * 1.8) * 0.045;
+    spark.vy += Math.sin(spark.pulse * 1.5) * 0.045;
+  } else if (spark.type === "cool") {
+    spark.vx += Math.sin(spark.drift * 2.4) * 0.03;
+    spark.vy -= 0.012;
+  } else {
+    spark.vx += Math.sin(state.time * 1.7 + spark.y * 0.014) * 0.014;
+    spark.vy += Math.cos(state.time * 1.4 + spark.x * 0.012) * 0.012;
+    // Occasional dart hop
+    if (Math.random() < 0.01) {
+      const a = Math.random() * Math.PI * 2;
+      spark.vx += Math.cos(a) * 0.55;
+      spark.vy += Math.sin(a) * 0.55;
+    }
+  }
+  spark.vx *= spark.type === "super" ? 0.97 : 0.988;
+  spark.vy *= spark.type === "super" ? 0.97 : 0.988;
   spark.x += spark.vx * dt * 60;
   spark.y += spark.vy * dt * 60;
   const margin = spark.r + 8;
@@ -2600,7 +2764,8 @@ function eatSpark(index, spark) {
     buzz([10, 18, 10]);
     floatText(spark.x, spark.y - 18, "!", cssVar("--gold", "#ffe898"), 22);
   }
-  if (state.stats.sparkEats === 1) tipOnce("move", "ТЯНИСЬ К СВЕТУ", 1600);
+  if (state.stats.sparkEats === 1) tipOnce("move", "ЛОВИ СВЕТ", 1600);
+  syncWave(true);
   playSparkTone(spark.type);
   eatSparkBlast(spark, openingEat);
   addScore(spark.worth, spark.x, spark.y - 12, { color: spark.color });
@@ -2614,6 +2779,18 @@ function placeHunterOnEdge(hunter) {
   hunter.vy = 0;
 }
 
+function hunterReachMul(hunter) {
+  const species = hunter.species || "fish";
+  if (species === "dart") return 1.25;
+  if (species === "jelly") {
+    const swell = 1 + Math.max(0, Math.sin(hunter.pulse || 0)) * 0.55;
+    return 1.7 * swell;
+  }
+  if (species === "eel") return 1.9;
+  if (species === "shark") return 1.85;
+  return 1.55;
+}
+
 function updateHunters(dt) {
   const soft = difficultyScale();
   // During opening: no hunters on the field at all.
@@ -2622,12 +2799,13 @@ function updateHunters(dt) {
     return;
   }
 
+  const wave = syncWave(true);
   const early = state.elapsed < OPENING_SEC + 8 || state.score < 12;
   const maxHunters = early
     ? 1
-    : Math.min(7, Math.max(1, Math.floor((1 + Math.floor(state.score / 22)) * soft)));
+    : Math.min(7, Math.max(1, Math.floor((1 + Math.floor(state.score / 22) + wave.maxBonus) * soft)));
   state.hunterAcc += dt;
-  let interval = Math.max(1.2, 3.8 - state.score * 0.022) / Math.max(0.55, soft);
+  let interval = (Math.max(1.2, 3.8 - state.score * 0.022) * wave.intervalMul) / Math.max(0.55, soft);
   if (!state.slowHunterSeen) interval = Math.max(interval, 3.4);
   const firstHunterAt = OPENING_SEC + 2.8;
   // Spawn at most one hunter per update to avoid a sudden ambush pack.
@@ -2643,10 +2821,15 @@ function updateHunters(dt) {
 
   for (let i = state.hunters.length - 1; i >= 0; i -= 1) {
     const hunter = state.hunters[i];
-    hunter.phase += dt * 5;
+    const species = hunter.species || wave.species || "fish";
+    hunter.phase += dt * (species === "dart" ? 8 : species === "jelly" ? 3.2 : 5);
+    hunter.pulse = (hunter.pulse || 0) + dt * (species === "jelly" ? 2.4 : 1.6);
+    hunter.weave = (hunter.weave || 0) + dt * (species === "eel" ? 3.6 : 1.2);
     if (hunter.shadow) hunter.wobble = (hunter.wobble || 0) + dt * 5.5;
     hunter.warn = Math.max(0, hunter.warn - dt * 1.45);
     hunter.grace = Math.max(0, (hunter.grace || 0) - dt);
+    hunter.dashCd = Math.max(0, (hunter.dashCd || 0) - dt);
+    hunter.dashT = Math.max(0, (hunter.dashT || 0) - dt);
     if (hunter.parade || hunter.demo) {
       // Convert showcase fish safely: always re-enter from a far edge.
       placeHunterOnEdge(hunter);
@@ -2660,6 +2843,7 @@ function updateHunters(dt) {
       hunter.orbitR = rand(36, 64);
       hunter.orbitSpeed = rand(0.7, 1.2) * (i % 2 === 0 ? -1 : 1);
       hunter.nearMissed = false;
+      applySpeciesToHunter(hunter, wave.species);
     }
     let tx = state.width * 0.5;
     let ty = state.height * 0.5;
@@ -2669,12 +2853,17 @@ function updateHunters(dt) {
       const orbitR = hunter.orbitR ?? 42;
       const orbitSpeed = hunter.orbitSpeed ?? 0.9;
       const angOff = orbit + state.time * orbitSpeed;
-      if (dLife > 160) {
-        // Far away: chase the player directly.
+      if (species === "jelly") {
+        tx = state.life.x + Math.sin(hunter.weave) * 48;
+        ty = state.life.y - 20 + Math.cos(hunter.pulse) * 36;
+      } else if (species === "eel") {
+        const lane = 70 + Math.sin(hunter.weave) * 50;
+        tx = state.life.x + Math.cos(angOff) * lane;
+        ty = state.life.y + Math.sin(angOff * 1.4) * lane * 0.7;
+      } else if (dLife > 160) {
         tx = state.life.x;
         ty = state.life.y;
       } else {
-        // Close in: flank on unique orbits so fish don't stack.
         tx = state.life.x + Math.cos(angOff) * orbitR;
         ty = state.life.y + Math.sin(angOff) * orbitR * 0.85;
       }
@@ -2683,15 +2872,34 @@ function updateHunters(dt) {
       ty = state.echo.y;
     }
     const ang = Math.atan2(ty - hunter.y, tx - hunter.x);
-    let speed = (0.95 + state.score * 0.012) * hunter.anger;
+    let speed = (0.95 + state.score * 0.012) * hunter.anger * wave.speedMul;
     if (hunter.shadow) speed *= 0.9;
     if (hunter.slow) speed *= 0.72;
     if (hasMut("cool") && state.hunger < 50) speed *= 0.85;
     if (activeEventId() === "calm") speed *= 0.62;
     if (activeEventId() === "raid") speed *= 1.12;
     if (inInkDive()) speed *= 0.35;
+    if (species === "dart" && hunter.dashT > 0) speed *= 2.35;
+    if (species === "shark" && hunter.dashT > 0) speed *= 2.8;
+
+    // Periodic lunges for dart/shark waves.
+    if (state.life && hunter.dashCd <= 0 && hunter.dashT <= 0 && (species === "dart" || species === "shark")) {
+      const dLife = dist(hunter.x, hunter.y, state.life.x, state.life.y);
+      if (dLife < (species === "shark" ? 220 : 170) && dLife > 48) {
+        hunter.dashT = species === "shark" ? 0.42 : 0.22;
+        hunter.dashCd = species === "shark" ? rand(1.8, 2.8) : rand(0.7, 1.3);
+        const dashAng = Math.atan2(state.life.y - hunter.y, state.life.x - hunter.x);
+        hunter.vx += Math.cos(dashAng) * (species === "shark" ? 4.2 : 3.1);
+        hunter.vy += Math.sin(dashAng) * (species === "shark" ? 4.2 : 3.1);
+      }
+    }
+
     hunter.vx += Math.cos(ang) * speed * dt * 3.1;
     hunter.vy += Math.sin(ang) * speed * dt * 3.1;
+    if (species === "eel") {
+      hunter.vx += Math.cos(hunter.weave * 2.2) * 0.55;
+      hunter.vy += Math.sin(hunter.weave * 1.7) * 0.55;
+    }
     // Keep fish apart so they don't pile into one blob.
     for (let j = 0; j < state.hunters.length; j += 1) {
       if (j === i) continue;
@@ -2704,15 +2912,15 @@ function updateHunters(dt) {
         hunter.vy += ((hunter.y - other.y) / gap) * push;
       }
     }
-    hunter.vx *= 0.955;
-    hunter.vy *= 0.955;
+    const damp = species === "shark" && hunter.dashT > 0 ? 0.985 : 0.955;
+    hunter.vx *= damp;
+    hunter.vy *= damp;
     hunter.x += hunter.vx * dt * 60;
     hunter.y += hunter.vy * dt * 60;
 
     if (state.life) {
       const d = dist(hunter.x, hunter.y, state.life.x, state.life.y);
-      // Match kill radius to the visible fish sprite, not just the tiny body radius.
-      const fishReach = hunter.r * 1.55;
+      const fishReach = hunter.r * hunterReachMul(hunter);
       const killR = fishReach + state.life.r * 0.7;
       const nearR = killR + 22;
       if (d < nearR && d >= killR) {
@@ -2737,7 +2945,7 @@ function updateHunters(dt) {
       }
     } else if (state.echo && !inInkDive()) {
       const d = dist(hunter.x, hunter.y, state.echo.x, state.echo.y);
-      const killR = hunter.r * 1.55 + state.echo.r * 0.7;
+      const killR = hunter.r * hunterReachMul(hunter) + state.echo.r * 0.7;
       if (d < killR + 16 && d >= killR) {
         registerNearMiss(hunter, state.echo.x, state.echo.y);
       }
@@ -3025,82 +3233,83 @@ function drawVeins() {
   }
 }
 
-function drawLightShard(x, y, r, color, rot, alpha = 1, kind = "normal") {
+function drawLightOrb(x, y, r, color, pulse, alpha = 1, kind = "normal") {
   const isSuper = kind === "super";
-  const isRare = kind === "rare" || isSuper;
+  const isRare = kind === "rare";
+  const wob = 1 + Math.sin(pulse) * (isSuper ? 0.14 : 0.1);
+  const bodyR = r * wob;
   ctx.save();
   ctx.translate(x, y);
-  ctx.rotate(rot);
-  ctx.globalAlpha = alpha * 0.35;
-  const glow = ctx.createRadialGradient(0, 0, r * 0.1, 0, 0, r * (isSuper ? 2.4 : 1.85));
-  glow.addColorStop(0, mixColor(color, "#ffffff", 0.55));
-  glow.addColorStop(0.45, color);
+  ctx.globalAlpha = alpha * 0.4;
+  const glow = ctx.createRadialGradient(0, 0, bodyR * 0.15, 0, 0, bodyR * (isSuper ? 2.8 : 2.15));
+  glow.addColorStop(0, mixColor(color, "#ffffff", 0.65));
+  glow.addColorStop(0.4, color);
   glow.addColorStop(1, "transparent");
   ctx.fillStyle = glow;
   ctx.beginPath();
-  ctx.arc(0, 0, r * (isSuper ? 2.4 : 1.85), 0, Math.PI * 2);
+  ctx.arc(0, 0, bodyR * (isSuper ? 2.8 : 2.15), 0, Math.PI * 2);
   ctx.fill();
-  if (isSuper) {
-    ctx.globalAlpha = alpha * 0.55;
-    ctx.strokeStyle = mixColor(color, "#ffffff", 0.4);
-    ctx.lineWidth = 1.4;
-    for (let i = 0; i < 6; i += 1) {
-      const a = (i / 6) * Math.PI * 2 + state.time * 1.6;
+
+  // Soft organic core (not a star)
+  ctx.globalAlpha = alpha;
+  const core = ctx.createRadialGradient(-bodyR * 0.2, -bodyR * 0.25, bodyR * 0.05, 0, 0, bodyR);
+  core.addColorStop(0, mixColor(color, "#ffffff", 0.75));
+  core.addColorStop(0.55, color);
+  core.addColorStop(1, mixColor(color, "#102038", 0.35));
+  ctx.fillStyle = core;
+  ctx.beginPath();
+  const lobes = isSuper ? 7 : isRare ? 6 : 5;
+  for (let i = 0; i <= lobes; i += 1) {
+    const a = (i / lobes) * Math.PI * 2 + pulse * 0.2;
+    const rad = bodyR * (0.72 + 0.28 * Math.sin(pulse * 1.7 + i * 1.3));
+    const px = Math.cos(a) * rad;
+    const py = Math.sin(a) * rad;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fill();
+
+  // Orbiting motes / ribbons
+  const moteCount = isSuper ? 6 : isRare ? 4 : 3;
+  for (let i = 0; i < moteCount; i += 1) {
+    const a = pulse * (1.4 + i * 0.18) + (i / moteCount) * Math.PI * 2;
+    const orbit = bodyR * (1.15 + (i % 2) * 0.35 + Math.sin(pulse + i) * 0.08);
+    const mx = Math.cos(a) * orbit;
+    const my = Math.sin(a) * orbit * 0.72;
+    ctx.globalAlpha = alpha * (0.55 + (i % 2) * 0.25);
+    ctx.fillStyle = mixColor(color, "#ffffff", 0.55);
+    ctx.beginPath();
+    ctx.arc(mx, my, Math.max(1.4, bodyR * (isSuper ? 0.16 : 0.11)), 0, Math.PI * 2);
+    ctx.fill();
+    if (isSuper || isRare) {
+      ctx.strokeStyle = mixColor(color, "#ffffff", 0.35);
+      ctx.lineWidth = 1.2;
+      ctx.globalAlpha = alpha * 0.35;
       ctx.beginPath();
-      ctx.moveTo(Math.cos(a) * r * 0.5, Math.sin(a) * r * 0.5);
-      ctx.lineTo(Math.cos(a) * r * 2.1, Math.sin(a) * r * 2.1);
+      ctx.arc(0, 0, orbit, a - 0.45, a + 0.05);
       ctx.stroke();
     }
   }
-  ctx.globalAlpha = alpha;
-  const points = isSuper ? 12 : 8;
-  const outer = ctx.createLinearGradient(-r, -r, r, r);
-  outer.addColorStop(0, mixColor(color, "#ffffff", 0.55));
-  outer.addColorStop(0.45, color);
-  outer.addColorStop(1, mixColor(color, "#804018", 0.2));
-  ctx.fillStyle = outer;
-  ctx.beginPath();
-  for (let i = 0; i < points; i += 1) {
-    const a = (i / points) * Math.PI * 2 - Math.PI / 2;
-    const long = i % 2 === 0;
-    const rad = long ? r : r * (isSuper ? 0.42 : 0.34);
-    const px = Math.cos(a) * rad;
-    const py = Math.sin(a) * rad;
-    if (i === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
-  }
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = mixColor(color, "#ffffff", isRare ? 0.55 : 0.3);
-  ctx.lineWidth = isSuper ? 2.4 : 1.7;
-  ctx.globalAlpha = alpha * 0.9;
-  ctx.stroke();
-  ctx.globalAlpha = alpha;
-  ctx.fillStyle = mixColor(color, "#ffffff", 0.5);
-  ctx.beginPath();
-  for (let i = 0; i < 4; i += 1) {
-    const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
-    const rad = r * 0.42;
-    const px = Math.cos(a) * rad;
-    const py = Math.sin(a) * rad;
-    if (i === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
-  }
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = "rgba(255,255,255,0.95)";
-  ctx.beginPath();
-  ctx.arc(-r * 0.12, -r * 0.14, Math.max(1.5, r * 0.16), 0, Math.PI * 2);
-  ctx.fill();
-  ctx.globalAlpha = alpha * 0.75;
-  ctx.fillStyle = mixColor(color, "#ffffff", 0.65);
-  for (let i = 0; i < (isSuper ? 4 : 2); i += 1) {
-    const a = state.time * (1.8 + i) + i * 1.7;
-    const pr = r * (0.55 + (i % 2) * 0.2);
+
+  if (isSuper) {
+    ctx.globalAlpha = alpha * 0.7;
+    ctx.strokeStyle = mixColor(color, "#ffffff", 0.25);
+    ctx.lineWidth = 2;
+    const ring = bodyR * (1.55 + Math.sin(pulse * 2) * 0.2);
     ctx.beginPath();
-    ctx.arc(Math.cos(a) * pr, Math.sin(a) * pr, Math.max(1, r * 0.08), 0, Math.PI * 2);
-    ctx.fill();
+    ctx.ellipse(0, 0, ring * 1.15, ring * 0.55, pulse * 0.5, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(0, 0, ring * 0.55, ring * 1.1, -pulse * 0.4, 0, Math.PI * 2);
+    ctx.stroke();
   }
+
+  ctx.globalAlpha = alpha * 0.9;
+  ctx.fillStyle = "rgba(255,255,255,0.92)";
+  ctx.beginPath();
+  ctx.arc(-bodyR * 0.18, -bodyR * 0.2, Math.max(1.6, bodyR * 0.18), 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 }
 
@@ -3253,24 +3462,22 @@ function drawInkPolyp(body, alpha = 1) {
 }
 
 function drawSpark(spark) {
-  const pulse = 1 + Math.sin(spark.pulse) * 0.08;
-  const r = spark.r * pulse;
-  const rot = spark.pulse * 0.35 + (spark.comet ? Math.atan2(spark.vy, spark.vx || 0.001) : 0);
+  const r = spark.r;
   if (spark.comet) {
     const ang = Math.atan2(spark.vy, spark.vx || 0.001);
     ctx.save();
     ctx.translate(spark.x, spark.y);
     ctx.rotate(ang);
-    const trail = ctx.createLinearGradient(-32, 0, 12, 0);
+    const trail = ctx.createLinearGradient(-40, 0, 14, 0);
     trail.addColorStop(0, "transparent");
-    trail.addColorStop(0.65, spark.color);
-    trail.addColorStop(1, mixColor(spark.color, "#fff4d8", 0.28));
+    trail.addColorStop(0.55, spark.color);
+    trail.addColorStop(1, mixColor(spark.color, "#fff4d8", 0.4));
     ctx.fillStyle = trail;
     ctx.globalAlpha = 0.95;
     ctx.beginPath();
-    ctx.moveTo(-32, 0);
-    ctx.lineTo(8, -5);
-    ctx.lineTo(8, 5);
+    ctx.moveTo(-40, 0);
+    ctx.lineTo(10, -6);
+    ctx.lineTo(10, 6);
     ctx.closePath();
     ctx.fill();
     ctx.restore();
@@ -3278,7 +3485,7 @@ function drawSpark(spark) {
   if (spark.type === "seed") {
     ctx.save();
     ctx.translate(spark.x, spark.y);
-    ctx.rotate(rot);
+    ctx.rotate(spark.pulse * 0.4);
     ctx.fillStyle = spark.color;
     ctx.beginPath();
     ctx.ellipse(0, 0, r * 0.55, r, 0.3, 0, Math.PI * 2);
@@ -3292,36 +3499,30 @@ function drawSpark(spark) {
     ctx.restore();
   } else {
     const kind = spark.type === "super" ? "super" : spark.type === "rare" ? "rare" : "normal";
-    drawLightShard(spark.x, spark.y, r, spark.color, rot, 1, kind);
+    drawLightOrb(spark.x, spark.y, r, spark.color, spark.pulse, 1, kind);
   }
   if (spark.type === "super") {
-    const t = (state.time * 1.8) % 1;
-    ctx.globalAlpha = (1 - t) * 0.7;
+    const t = (state.time * 2.2) % 1;
+    ctx.globalAlpha = (1 - t) * 0.75;
     ctx.strokeStyle = "#ff2f45";
-    ctx.lineWidth = 2.6;
+    ctx.lineWidth = 2.4;
     ctx.beginPath();
-    ctx.arc(spark.x, spark.y, r * (1.55 + t * 1.5), 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.globalAlpha = 0.9;
-    ctx.strokeStyle = "#ff7a88";
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(spark.x, spark.y, r * 1.28, 0, Math.PI * 2);
+    ctx.ellipse(
+      spark.x,
+      spark.y,
+      r * (1.4 + t * 1.8),
+      r * (0.7 + t * 0.9),
+      state.time * 1.2,
+      0,
+      Math.PI * 2
+    );
     ctx.stroke();
     ctx.globalAlpha = 0.95;
     ctx.fillStyle = "#ff2f45";
-    ctx.font = "800 13px Syne, sans-serif";
+    ctx.font = "800 12px Syne, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "bottom";
-    ctx.fillText("СУПЕР", spark.x, spark.y - r * 1.7);
-    ctx.globalAlpha = 1;
-  } else if (spark.type === "rare" || spark.comet || spark.deep) {
-    ctx.strokeStyle = spark.deep ? "#90e8ff" : "#ffe070";
-    ctx.lineWidth = 2;
-    ctx.globalAlpha = 0.85;
-    ctx.beginPath();
-    ctx.arc(spark.x, spark.y, r * 1.35, 0, Math.PI * 2);
-    ctx.stroke();
+    ctx.fillText("ПУЛЬСАР", spark.x, spark.y - r * 1.85);
     ctx.globalAlpha = 1;
   }
   if (spark.tutorial) {
@@ -3443,21 +3644,182 @@ function drawEvilFish(hunter, alpha = 1, ghost = false) {
   ctx.restore();
 }
 
+function drawDartHunter(hunter, alpha = 1) {
+  const angle = Math.atan2(hunter.vy || 0.001, hunter.vx || 0.001);
+  const r = hunter.r;
+  const dash = hunter.dashT > 0;
+  ctx.save();
+  ctx.translate(hunter.x, hunter.y);
+  ctx.rotate(angle);
+  ctx.globalAlpha = alpha;
+  if (dash) {
+    ctx.strokeStyle = "rgba(255,220,140,0.55)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-r * 2.8, 0);
+    ctx.lineTo(-r * 0.8, 0);
+    ctx.stroke();
+  }
+  ctx.fillStyle = "#ffb45a";
+  ctx.beginPath();
+  ctx.moveTo(r * 1.7, 0);
+  ctx.lineTo(-r * 1.1, -r * 0.55);
+  ctx.lineTo(-r * 0.7, 0);
+  ctx.lineTo(-r * 1.1, r * 0.55);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#fff4d8";
+  ctx.beginPath();
+  ctx.arc(r * 0.7, -r * 0.1, r * 0.16, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#1a0810";
+  ctx.beginPath();
+  ctx.arc(r * 0.78, -r * 0.08, r * 0.08, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawJellyHunter(hunter, alpha = 1) {
+  const r = hunter.r * (1 + Math.max(0, Math.sin(hunter.pulse || 0)) * 0.18);
+  const wob = hunter.phase || 0;
+  ctx.save();
+  ctx.translate(hunter.x, hunter.y);
+  ctx.globalAlpha = alpha * 0.9;
+  const bell = ctx.createRadialGradient(0, -r * 0.2, r * 0.1, 0, 0, r * 1.2);
+  bell.addColorStop(0, "rgba(255,180,220,0.95)");
+  bell.addColorStop(0.55, "rgba(255,90,160,0.85)");
+  bell.addColorStop(1, "rgba(120,40,90,0.2)");
+  ctx.fillStyle = bell;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, r * 1.15, r * 0.85, 0, Math.PI, 0);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,210,230,0.55)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, r * 1.15, r * 0.85, 0, Math.PI, 0);
+  ctx.stroke();
+  for (let i = 0; i < 5; i += 1) {
+    const ox = (i - 2) * r * 0.28;
+    ctx.strokeStyle = "rgba(255,150,200,0.65)";
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(ox, r * 0.05);
+    ctx.quadraticCurveTo(
+      ox + Math.sin(wob + i) * r * 0.25,
+      r * 0.7,
+      ox + Math.cos(wob * 1.3 + i) * r * 0.2,
+      r * 1.35
+    );
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawEelHunter(hunter, alpha = 1) {
+  const angle = Math.atan2(hunter.vy || 0.001, hunter.vx || 0.001);
+  const r = hunter.r;
+  const weave = hunter.weave || 0;
+  ctx.save();
+  ctx.translate(hunter.x, hunter.y);
+  ctx.rotate(angle);
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = "#3cffb0";
+  ctx.lineWidth = r * 0.85;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(-r * 2.4, Math.sin(weave) * r * 0.5);
+  ctx.quadraticCurveTo(-r * 0.8, -Math.sin(weave * 1.4) * r * 0.7, r * 0.2, Math.sin(weave * 0.8) * r * 0.25);
+  ctx.quadraticCurveTo(r * 1.1, -Math.sin(weave) * r * 0.35, r * 2.1, 0);
+  ctx.stroke();
+  ctx.strokeStyle = "#9dffd8";
+  ctx.lineWidth = r * 0.35;
+  ctx.beginPath();
+  ctx.moveTo(-r * 2.1, Math.sin(weave) * r * 0.35);
+  ctx.lineTo(r * 1.6, 0);
+  ctx.stroke();
+  ctx.fillStyle = "#fffdf8";
+  ctx.beginPath();
+  ctx.arc(r * 1.55, -r * 0.12, r * 0.18, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#081018";
+  ctx.beginPath();
+  ctx.arc(r * 1.62, -r * 0.1, r * 0.09, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawSharkHunter(hunter, alpha = 1) {
+  const angle = Math.atan2(hunter.vy || 0.001, hunter.vx || 0.001);
+  const r = hunter.r;
+  const dash = hunter.dashT > 0;
+  ctx.save();
+  ctx.translate(hunter.x, hunter.y);
+  ctx.rotate(angle);
+  ctx.globalAlpha = alpha;
+  if (dash) {
+    ctx.fillStyle = "rgba(140,190,255,0.28)";
+    ctx.beginPath();
+    ctx.moveTo(-r * 3.2, 0);
+    ctx.lineTo(-r * 1.2, -r * 0.45);
+    ctx.lineTo(-r * 1.2, r * 0.45);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.fillStyle = "#6a8eae";
+  ctx.beginPath();
+  ctx.ellipse(0, 0, r * 1.55, r * 0.72, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#4a6a86";
+  ctx.beginPath();
+  ctx.moveTo(-r * 1.2, 0);
+  ctx.lineTo(-r * 2.15, -r * 0.55);
+  ctx.lineTo(-r * 1.7, 0);
+  ctx.lineTo(-r * 2.15, r * 0.55);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#3d5a74";
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.1, -r * 0.55);
+  ctx.lineTo(r * 0.25, -r * 1.35);
+  ctx.lineTo(r * 0.55, -r * 0.4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#dfeaf4";
+  ctx.beginPath();
+  ctx.ellipse(r * 0.1, r * 0.2, r * 0.7, r * 0.32, 0.1, 0, Math.PI);
+  ctx.fill();
+  ctx.fillStyle = "#fff8f0";
+  ctx.beginPath();
+  ctx.arc(r * 0.85, -r * 0.12, r * 0.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#120810";
+  ctx.beginPath();
+  ctx.arc(r * 0.92, -r * 0.1, r * 0.1, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
 function drawHunter(hunter) {
+  const alpha = inInkDive() ? 0.28 : 1;
   if (hunter.shadow) {
     ctx.save();
     drawEvilFish(hunter, inInkDive() ? 0.2 : 0.68, true);
     ctx.restore();
     return;
   }
-  drawEvilFish(hunter, inInkDive() ? 0.28 : 1, false);
+  const species = hunter.species || "fish";
+  if (species === "dart") drawDartHunter(hunter, alpha);
+  else if (species === "jelly") drawJellyHunter(hunter, alpha);
+  else if (species === "eel") drawEelHunter(hunter, alpha);
+  else if (species === "shark") drawSharkHunter(hunter, alpha);
+  else drawEvilFish(hunter, alpha, false);
   if (hunter.warn > 0 && !inInkDive()) {
     ctx.save();
     ctx.globalAlpha = hunter.warn * 0.5;
-    ctx.strokeStyle = cssVar("--danger", "#ff6888");
+    ctx.strokeStyle = species === "eel" ? "#3cffb0" : species === "jelly" ? "#ff7ab8" : cssVar("--danger", "#ff6888");
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(hunter.x, hunter.y, hunter.r * (1.55 + (1 - hunter.warn) * 1.6), 0, Math.PI * 2);
+    ctx.arc(hunter.x, hunter.y, hunter.r * (hunterReachMul(hunter) + (1 - hunter.warn) * 1.2), 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
   }
@@ -4060,6 +4422,7 @@ function boot() {
   updateScoreUi(false);
   updateHungerUi();
   updateMutationUi();
+  updateWaveUi(false);
   resetDemo();
   bindDrawHeroUi();
   bindHoldButton(btnStart, "start");
