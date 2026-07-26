@@ -415,7 +415,9 @@ const skinResultEl = document.getElementById("skin-result");
 const skinNameEl = document.getElementById("skin-name");
 const skinUnlocksEl = document.getElementById("skin-unlocks");
 const btnStart = document.getElementById("btn-start");
+const btnStartSub = document.getElementById("btn-start-sub");
 const btnRetry = document.getElementById("btn-retry");
+const nextGoalEl = document.getElementById("next-goal");
 const dailyCardEl = document.getElementById("daily-card");
 const streakStartEl = document.getElementById("streak-start");
 const marksStartEl = document.getElementById("marks-start");
@@ -987,9 +989,17 @@ function hideFlowScreens() {
   screenDrawEl?.classList.add("hidden");
 }
 
+function updateStartButtonCopy() {
+  if (!btnStartSub) return;
+  btnStartSub.textContent = (state.meta?.runs || 0) === 0
+    ? "первый забег сразу"
+    : "герой и сложность";
+}
+
 function showHomeMenu() {
   hideFlowScreens();
   screenStartEl?.classList.remove("hidden");
+  updateStartButtonCopy();
   syncMenuMusic();
 }
 
@@ -1011,6 +1021,19 @@ function showDiffPick() {
 function beginPlayFlow() {
   unlockAudio();
   sfxUiTap(1);
+  // First session: skip hero/difficulty so the core hook hits immediately.
+  if (state.meta && (state.meta.runs || 0) === 0) {
+    if (!isHeroOwned(state.meta.activeHero || "octopus")) {
+      state.meta.activeHero = "octopus";
+    }
+    if (!DIFFICULTIES.some((d) => d.id === state.meta.difficulty)) {
+      state.meta.difficulty = "normal";
+    }
+    state.meta.onboarded = true;
+    saveMeta();
+    startGame();
+    return;
+  }
   showHeroPick();
 }
 
@@ -2509,6 +2532,10 @@ function nextLockedPremiumHero() {
   return HEROES.find((h) => h.premium && !h.iap && !isHeroOwned(h.id)) || null;
 }
 
+function nextScoreSkinGoal() {
+  return SKINS.find((skin) => !skin.premium && !isSkinOwned(skin.id)) || null;
+}
+
 function controlMode() {
   return state.meta?.controlMode === "joystick" ? "joystick" : "hand";
 }
@@ -3883,6 +3910,38 @@ function renderDailyResult() {
   }
 }
 
+function renderNextGoal() {
+  if (!nextGoalEl || !state.meta) return;
+  const daily = currentDailyDef();
+  if (daily && !state.meta.dailyDone) {
+    nextGoalEl.textContent = `следующая цель · ${daily.title}: ${daily.label(state)}`;
+    return;
+  }
+  if (!state.meta.weekRewardTaken) {
+    const best = Math.min(WEEKLY_TARGET, state.meta.weekBest || 0);
+    nextGoalEl.textContent = `следующая цель · неделя ${best}/${WEEKLY_TARGET} света · +${WEEKLY_REWARD}`;
+    return;
+  }
+  const skin = nextScoreSkinGoal();
+  if (skin) {
+    nextGoalEl.textContent = `следующая цель · оттиск «${skin.name}»: рекорд ${state.meta.best || 0}/${skin.at}`;
+    return;
+  }
+  const hero = nextLockedPremiumHero();
+  if (hero) {
+    const have = Math.min(state.meta.marks || 0, hero.cost);
+    nextGoalEl.textContent = `следующая цель · герой «${hero.name}»: ${have}/${hero.cost} следов`;
+    return;
+  }
+  const pearl = SKINS.find((s) => s.id === "pearl");
+  if (pearl && !isSkinOwned("pearl")) {
+    const have = Math.min(state.meta.marks || 0, pearl.cost);
+    nextGoalEl.textContent = `следующая цель · окрас «жемчуг»: ${have}/${pearl.cost} следов`;
+    return;
+  }
+  nextGoalEl.textContent = "следующая цель · новый рекорд";
+}
+
 function syncMutation() {
   const now = mutationForScore(state.score);
   const newly = MUTATIONS.filter((mut) => state.score >= mut.at && !state.unlockedMuts.includes(mut.id));
@@ -4132,9 +4191,11 @@ function finalizeGameOver(reason) {
   mutSummaryEl.textContent = muts.length ? `новых сил: ${muts.length}` : "";
   renderSkinResult();
   renderDailyResult();
+  renderNextGoal();
   updateBestLabels();
   updateEconomyLabels();
   renderDaily();
+  updateStartButtonCopy();
   maybeAskRate();
   app.classList.remove("in-run");
   statusEl.classList.add("hidden");
@@ -8028,7 +8089,9 @@ function boot() {
     if (event.detail?.isActive) resumeFromBackground();
     else pauseForBackground();
   });
-  if (!state.meta.onboarded) {
+  updateStartButtonCopy();
+  // Don't block the first session with onboarding — the run itself teaches the hook.
+  if (!state.meta.onboarded && (state.meta.runs || 0) > 0) {
     showOnboard();
   } else if (state.meta?.streak > 1) {
     setTimeout(() => showToast(`серия · ${state.meta.streak} дн`), 650);
@@ -8037,7 +8100,7 @@ function boot() {
   const nativeShell = !!window.OttiskNative?.isNative;
   if ("serviceWorker" in navigator && !nativeShell) {
     navigator.serviceWorker
-            .register("./sw.js?v=65")
+      .register("./sw.js?v=70")
       .then((reg) => reg.update())
       .catch(() => {});
   }

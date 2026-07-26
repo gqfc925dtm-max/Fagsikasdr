@@ -79,7 +79,7 @@
         <div class="actions menu-play">
           <button id="btn-start" class="btn btn-primary btn-play" type="button">
             <span class="btn-main">Играть</span>
-            <span class="btn-sub">выбери героя</span>
+            <span class="btn-sub" id="btn-start-sub">первый забег сразу</span>
           </button>
         </div>
 
@@ -254,6 +254,7 @@
         <p id="skin-result" class="skin-result"></p>
         <p id="daily-result" class="daily-result"></p>
         <p id="marks-result" class="marks-result"></p>
+        <p id="next-goal" class="next-goal"></p>
         <p class="best">Рекорд <span id="best-over">0</span> · серия <span id="streak-over">0</span></p>
         <div class="over-actions">
           <button id="btn-rate" class="btn btn-secondary hidden" type="button">
@@ -283,7 +284,7 @@
   </div>
   <script>
     (async () => {
-      const stamp = "ottisk-force-v69";
+      const stamp = "ottisk-force-v70";
       if (localStorage.getItem(stamp)) return;
       localStorage.setItem(stamp, "1");
       try {
