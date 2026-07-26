@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=feat52" />
+  <link rel="stylesheet" href="css/style.css?v=menu53" />
   <link rel="preload" href="assets/fish-evil.png?v=5" as="image" />
   <title>ОТТИСК</title>
 </head>
@@ -61,49 +61,48 @@
       </div>
 
       <header class="menu-top">
+        <p class="menu-stats" aria-label="Прогресс">
+          <span>рекорд <strong id="best-start">0</strong></span>
+          <span aria-hidden="true">·</span>
+          <span id="marks-start">0 следов</span>
+        </p>
         <div class="settings-row menu-settings" role="group" aria-label="Настройки">
-          <button id="btn-sound" class="set-chip on" type="button" aria-pressed="true">звук</button>
-          <button id="btn-haptics" class="set-chip on" type="button" aria-pressed="true">вибро</button>
+          <button id="btn-sound" class="set-chip on" type="button" aria-pressed="true" aria-label="Звук">звук</button>
+          <button id="btn-haptics" class="set-chip on" type="button" aria-pressed="true" aria-label="Вибрация">вибро</button>
         </div>
       </header>
 
       <div class="menu-hero">
         <p class="brand menu-brand">ОТТИСК</p>
-        <h1 class="menu-line">Удерживай палец. Лови свет.</h1>
+        <h1 class="menu-line">Удерживай палец</h1>
       </div>
 
-      <section class="menu-choose" aria-label="Выбор героя">
-        <div class="menu-choose-head">
-          <span class="meta-label">кто играет</span>
-          <button id="btn-draw-hero" class="menu-draw-link" type="button">нарисовать</button>
-        </div>
-        <div id="hero-list" class="hero-rail" role="listbox" aria-label="Выбор героя"></div>
-      </section>
-
-      <section class="menu-gifts" aria-label="Подарки">
-        <div class="menu-choose-head">
-          <span class="meta-label">подарки</span>
-          <span id="marks-start" class="menu-marks">0 следов</span>
-        </div>
-        <div id="gift-list" class="gift-rail" role="list"></div>
-      </section>
-
       <div class="menu-dock">
-        <section class="menu-diff" aria-label="Сложность">
-          <span class="meta-label">сложность</span>
-          <div id="difficulty-list" class="diff-row" role="group"></div>
+        <section class="menu-choose" aria-label="Выбор героя">
+          <div class="menu-choose-head">
+            <span class="meta-label">герой</span>
+            <span id="hero-ability-hint" class="menu-hero-hint">рывок</span>
+            <button id="btn-draw-hero" class="menu-draw-link" type="button">нарисовать</button>
+          </div>
+          <div id="hero-list" class="hero-rail" role="listbox" aria-label="Выбор героя"></div>
         </section>
-        <div class="menu-record">
-          <span class="meta-label">рекорд</span>
-          <span id="best-start" class="menu-record-value">0</span>
-        </div>
+
+        <section id="menu-gifts" class="menu-gifts hidden" aria-label="Подарки">
+          <div id="gift-list" class="gift-rail" role="list"></div>
+        </section>
+
         <div class="actions menu-actions">
           <button id="btn-start" class="btn btn-primary btn-play" type="button">
             <span class="btn-main">Играть</span>
-            <span class="btn-sub">обычный · удерживай</span>
+            <span class="btn-sub">удерживай кнопку</span>
           </button>
           <div class="hold-meter" aria-hidden="true"><i id="hold-fill"></i></div>
         </div>
+
+        <section class="menu-diff" aria-label="Сложность">
+          <div id="difficulty-list" class="diff-row" role="group"></div>
+        </section>
+
         <p class="legal-links menu-legal">
           <a href="./privacy.html">Конфиденциальность</a>
           <span aria-hidden="true">·</span>
@@ -210,7 +209,7 @@
   </div>
   <script>
     (async () => {
-      const stamp = "ottisk-force-v52";
+      const stamp = "ottisk-force-v53";
       if (localStorage.getItem(stamp)) return;
       localStorage.setItem(stamp, "1");
       try {
@@ -224,11 +223,11 @@
         }
       } catch (_) {}
       const url = new URL(location.href);
-      url.searchParams.set("v", "52");
+      url.searchParams.set("v", "53");
       location.replace(url.toString());
     })();
   </script>
   <script src="js/native.js" type="module"></script>
-  <script src="js/game.js?v=feat52" type="module"></script>
+  <script src="js/game.js?v=menu53" type="module"></script>
 </body>
 </html>
