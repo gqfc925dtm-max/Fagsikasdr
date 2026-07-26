@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=63" />
+  <link rel="stylesheet" href="css/style.css?v=64" />
   <link rel="preload" href="assets/fish-evil.png?v=5" as="image" />
   <title>ОТТИСК</title>
 </head>
@@ -93,11 +93,15 @@
           <div id="gift-list" class="gift-rail" role="list"></div>
         </section>
         <p id="gift-next" class="menu-note quiet hidden" aria-live="polite"></p>
+        <p id="shop-progress" class="menu-note shop-progress" aria-live="polite"></p>
 
         <nav class="menu-foot" aria-label="Дополнительно">
+          <button id="btn-shop" class="menu-link" type="button">
+            <span class="btn-donate-main">Магазин</span>
+            <span id="donate-thanks" class="btn-donate-sub">следы и донат</span>
+          </button>
           <button id="btn-donate" class="menu-link" type="button">
             <span class="btn-donate-main">Донат</span>
-            <span id="donate-thanks" class="btn-donate-sub">поддержать</span>
           </button>
           <a href="./privacy.html">Конфиденциальность</a>
           <a href="./support.html">Поддержка</a>
@@ -126,6 +130,7 @@
         <h2 id="hero-pick-name" class="flow-title">осьминог</h2>
         <p id="hero-ability-hint" class="flow-sub">рывок</p>
         <p id="hero-lock-hint" class="flow-sub hero-lock-hint hidden"></p>
+        <button id="btn-buy-marks-hero" class="menu-link flow-draw hidden" type="button">купить следы</button>
         <div id="hero-list" class="hero-rail" role="listbox" aria-label="Выбор героя"></div>
         <button id="btn-draw-hero" class="menu-link flow-draw" type="button">нарисовать своего</button>
         <button id="btn-hero-next" class="btn btn-primary" type="button">
@@ -151,10 +156,20 @@
 
     <div id="screen-donate" class="screen hidden">
       <div class="screen-bg dim" aria-hidden="true"></div>
-      <div class="over-card donate-card">
-        <p class="over-label">Поддержать</p>
-        <p class="brand over-brand">ДОНАТ</p>
-        <p class="hint continue-hint">Игра бесплатная. Донат добровольный — спасибо, если поможешь сделать ОТТИСК лучше.</p>
+      <div class="over-card donate-card shop-card">
+        <p class="over-label">Магазин</p>
+        <p class="brand over-brand">СЛЕДЫ</p>
+        <p id="shop-balance" class="shop-balance">0 следов</p>
+        <p id="shop-hero-goal" class="hint continue-hint"></p>
+        <div class="shop-section">
+          <button id="btn-shop-pack" class="btn btn-primary" type="button">
+            <span class="btn-main">+60 следов</span>
+            <span class="btn-sub" id="shop-pack-sub">пак · App Store / донат</span>
+          </button>
+        </div>
+        <p class="shop-section-label">Косметика</p>
+        <div id="shop-cosmetics" class="shop-cosmetics" role="list"></div>
+        <p class="shop-section-label">Поддержать</p>
         <div id="donate-list" class="donate-list" role="list"></div>
         <p id="donate-note" class="donate-note">В App Store — покупка внутри игры. На сайте — страница доната.</p>
         <button id="btn-donate-close" class="btn btn-ghost" type="button">
@@ -212,6 +227,10 @@
           <span class="btn-main" id="continue-label">Продолжить</span>
           <span class="btn-sub" id="continue-sub">бесплатно · 1 раз</span>
         </button>
+        <button id="btn-continue-shop" class="btn btn-secondary hidden" type="button">
+          <span class="btn-main">Купить следы</span>
+          <span class="btn-sub">+60 · потом продолжить</span>
+        </button>
         <button id="btn-skip-continue" class="btn btn-ghost" type="button">
           <span class="btn-main">Закончить</span>
         </button>
@@ -241,6 +260,10 @@
             <span class="btn-main">Поделиться</span>
             <span class="btn-sub">Stories · волна и герой</span>
           </button>
+          <button id="btn-buy-marks" class="btn btn-secondary" type="button">
+            <span class="btn-main">Купить следы</span>
+            <span class="btn-sub">герои · косметика · continue</span>
+          </button>
           <button id="btn-retry" class="btn btn-primary" type="button">
             <span class="btn-main">Ещё раз</span>
             <span class="btn-sub">удерживай кнопку</span>
@@ -257,7 +280,7 @@
   </div>
   <script>
     (async () => {
-      const stamp = "ottisk-force-v63";
+      const stamp = "ottisk-force-v64";
       if (localStorage.getItem(stamp)) return;
       localStorage.setItem(stamp, "1");
       try {
@@ -271,11 +294,11 @@
         }
       } catch (_) {}
       const url = new URL(location.href);
-      url.searchParams.set("v", "63");
+      url.searchParams.set("v", "64");
       location.replace(url.toString());
     })();
   </script>
   <script src="js/native.js" type="module"></script>
-  <script src="js/game.js?v=63" type="module"></script>
+  <script src="js/game.js?v=64" type="module"></script>
 </body>
 </html>

@@ -1079,6 +1079,102 @@ body {
   color: var(--sand);
 }
 
+.shop-balance {
+  margin: 4px 0 8px;
+  font-family: "Syne", sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--gold);
+}
+
+.shop-section {
+  margin: 10px 0 14px;
+}
+
+.shop-section-label {
+  margin: 12px 0 6px;
+  font-family: "Instrument Sans", sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--foam) 48%, transparent);
+}
+
+.shop-cosmetics {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+
+.shop-item {
+  appearance: none;
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--foam) 14%, transparent);
+  border-radius: 0;
+  background: transparent;
+  color: var(--foam);
+  padding: 12px 2px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.shop-item.on {
+  border-bottom-color: color-mix(in srgb, var(--life) 45%, transparent);
+}
+
+.shop-item-title {
+  font-family: "Syne", sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.shop-item-sub {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--mute);
+}
+
+.shop-item-meta {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--gold);
+}
+
+.shop-progress {
+  color: color-mix(in srgb, var(--gold) 80%, var(--foam));
+}
+
+.shop-progress:empty {
+  display: none;
+}
+
+.progress-bar {
+  margin-top: 8px;
+  width: 100%;
+  height: 4px;
+  background: color-mix(in srgb, var(--foam) 12%, transparent);
+  overflow: hidden;
+}
+
+.progress-bar > i {
+  display: block;
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--life), var(--gold));
+}
+
 @keyframes menu-rise {
   from { opacity: 0; transform: translateY(16px); }
   to { opacity: 1; transform: translateY(0); }
