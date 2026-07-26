@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=62" />
+  <link rel="stylesheet" href="css/style.css?v=63" />
   <link rel="preload" href="assets/fish-evil.png?v=5" as="image" />
   <title>ОТТИСК</title>
 </head>
@@ -82,6 +82,8 @@
             <span class="btn-sub">выбери героя</span>
           </button>
         </div>
+
+        <div id="control-list" class="control-row" role="group" aria-label="Управление"></div>
       </div>
 
       <div class="menu-more">
@@ -123,6 +125,7 @@
         <canvas id="hero-portrait" class="hero-portrait" width="420" height="420" aria-label="Портрет героя"></canvas>
         <h2 id="hero-pick-name" class="flow-title">осьминог</h2>
         <p id="hero-ability-hint" class="flow-sub">рывок</p>
+        <p id="hero-lock-hint" class="flow-sub hero-lock-hint hidden"></p>
         <div id="hero-list" class="hero-rail" role="listbox" aria-label="Выбор героя"></div>
         <button id="btn-draw-hero" class="menu-link flow-draw" type="button">нарисовать своего</button>
         <button id="btn-hero-next" class="btn btn-primary" type="button">
@@ -254,7 +257,7 @@
   </div>
   <script>
     (async () => {
-      const stamp = "ottisk-force-v62";
+      const stamp = "ottisk-force-v63";
       if (localStorage.getItem(stamp)) return;
       localStorage.setItem(stamp, "1");
       try {
@@ -268,11 +271,11 @@
         }
       } catch (_) {}
       const url = new URL(location.href);
-      url.searchParams.set("v", "62");
+      url.searchParams.set("v", "63");
       location.replace(url.toString());
     })();
   </script>
   <script src="js/native.js" type="module"></script>
-  <script src="js/game.js?v=62" type="module"></script>
+  <script src="js/game.js?v=63" type="module"></script>
 </body>
 </html>

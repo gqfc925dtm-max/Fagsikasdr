@@ -145,8 +145,19 @@ const HEROES = [
   { id: "jellyfish", name: "медуза", glyph: "Ме", ability: "аура", tip: "АУРА ЗАМЕДЛЯЕТ" },
   { id: "turtle", name: "черепаха", glyph: "Че", ability: "панцирь", tip: "ПАНЦИРЬ ДЕРЖИТ ДОЛЬШЕ" },
   { id: "crab", name: "краб", glyph: "Кр", ability: "щит", tip: "ЩИТ НА 1 УДАР" },
+  { id: "manta", name: "скат", glyph: "Ск", ability: "рывок", tip: "РЕЗКИЙ СВАЙП — РЫВОК", premium: true, cost: 45 },
+  { id: "angler", name: "удильщик", glyph: "Уд", ability: "аура", tip: "АУРА ЗАМЕДЛЯЕТ", premium: true, cost: 80 },
+  { id: "nautilus", name: "наутилус", glyph: "На", ability: "щит", tip: "ЩИТ НА 1 УДАР", premium: true, cost: 120 },
   { id: "custom", name: "свой", glyph: "✦", ability: "рывок", tip: "РЕЗКИЙ СВАЙП — РЫВОК" },
 ];
+
+const CONTROL_MODES = [
+  { id: "hand", name: "рука", blurb: "палец = герой" },
+  { id: "joystick", name: "джойстик", blurb: "держи и веди" },
+];
+
+const STICK_RADIUS = 78;
+const STICK_SPEED = 310;
 
 const DIFFICULTIES = [
   { id: "easy", name: "лёгкий", blurb: "спокойнее хищники", speed: 0.78, spawn: 1.28, hunters: 0.72, hunger: 0.82, dash: 0.8 },
@@ -456,6 +467,7 @@ const state = {
   unlockedMuts: ["spark"],
   touchActive: false,
   pointerId: null,
+  stick: null,
   hasTouchedCanvas: false,
   life: null,
   echo: null,
@@ -974,6 +986,9 @@ function paintHeroPortrait() {
   pctx.arc(w * 0.5, h * 0.55, w * 0.42, 0, Math.PI * 2);
   pctx.fill();
 
+  const previewId = state.meta?.activeHero && HEROES.some((h) => h.id === state.meta.activeHero)
+    ? state.meta.activeHero
+    : activeHeroId();
   const prev = ctx;
   ctx = pctx;
   try {
@@ -985,7 +1000,8 @@ function paintHeroPortrait() {
         wobble: t * 2.4,
         aim: -Math.PI / 2 + Math.sin(t * 1.1) * 0.14,
       },
-      1
+      1,
+      previewId
     );
   } catch (_) {
     // ignore portrait paint errors
@@ -2346,6 +2362,10 @@ function loadMeta() {
       : [],
     activeHero: HEROES.some((h) => h.id === raw?.activeHero) ? raw.activeHero : "octopus",
     customHero: typeof raw?.customHero === "string" && raw.customHero.startsWith("data:image") ? raw.customHero : "",
+    unlockedHeroes: Array.isArray(raw?.unlockedHeroes)
+      ? raw.unlockedHeroes.filter((id) => HEROES.some((h) => h.id === id && h.premium))
+      : [],
+    controlMode: CONTROL_MODES.some((m) => m.id === raw?.controlMode) ? raw.controlMode : "hand",
     difficulty: DIFFICULTIES.some((d) => d.id === raw?.difficulty) ? raw.difficulty : "normal",
     hourlyGiftAt: Math.max(0, Number(raw?.hourlyGiftAt || 0)),
     dailyGiftDay: typeof raw?.dailyGiftDay === "string" ? raw.dailyGiftDay : "",
@@ -2374,11 +2394,59 @@ function activeSkin() {
 function activeHeroId() {
   const id = state.meta?.activeHero || "octopus";
   if (id === "custom" && !state.meta?.customHero) return "octopus";
-  return HEROES.some((h) => h.id === id) ? id : "octopus";
+  if (!HEROES.some((h) => h.id === id)) return "octopus";
+  if (!isHeroOwned(id)) return "octopus";
+  return id;
 }
 
 function activeHero() {
   return HEROES.find((h) => h.id === activeHeroId()) || HEROES[0];
+}
+
+function isHeroOwned(id, meta = state.meta) {
+  const hero = HEROES.find((h) => h.id === id);
+  if (!hero) return false;
+  if (!hero.premium) return true;
+  return (meta?.unlockedHeroes || []).includes(id);
+}
+
+function controlMode() {
+  return state.meta?.controlMode === "joystick" ? "joystick" : "hand";
+}
+
+function setControlMode(id) {
+  if (!state.meta) return;
+  if (!CONTROL_MODES.some((m) => m.id === id)) return;
+  state.meta.controlMode = id;
+  saveMeta();
+  renderControlPicker();
+  updateControlCopy();
+  showToast(id === "joystick" ? "джойстик" : "управление рукой");
+}
+
+function updateControlCopy() {
+  const title = document.querySelector(".menu-title");
+  const lead = document.querySelector(".menu-lead");
+  const joy = controlMode() === "joystick";
+  if (title) title.textContent = joy ? "Веди джойстиком" : "Удерживай палец";
+  if (lead) lead.textContent = joy ? "Держи стик — герой живёт, пока касание активно" : "Существо живёт только в касании";
+}
+
+function renderControlPicker() {
+  const list = document.getElementById("control-list");
+  if (!list || !state.meta) return;
+  list.textContent = "";
+  const current = controlMode();
+  for (const mode of CONTROL_MODES) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `control-chip${mode.id === current ? " on" : ""}`;
+    btn.textContent = mode.name;
+    btn.title = mode.blurb;
+    btn.setAttribute("aria-pressed", mode.id === current ? "true" : "false");
+    btn.addEventListener("click", () => setControlMode(mode.id));
+    list.appendChild(btn);
+  }
 }
 
 function playerIsSafe() {
@@ -2387,15 +2455,21 @@ function playerIsSafe() {
 
 function heroCanDash() {
   const id = activeHeroId();
-  return id === "octopus" || id === "custom";
+  return id === "octopus" || id === "custom" || id === "manta";
 }
 
 function heroHasAura() {
-  return activeHeroId() === "jellyfish";
+  const id = activeHeroId();
+  return id === "jellyfish" || id === "angler";
 }
 
 function heroHungerMul() {
   return activeHeroId() === "turtle" ? 0.78 : 1;
+}
+
+function heroHasShield() {
+  const id = activeHeroId();
+  return id === "crab" || id === "nautilus";
 }
 
 function heroAuraSlowMul(hunter) {
@@ -2451,7 +2525,7 @@ function tryHeroDash(dx, dy, moved) {
 }
 
 function tryCrabShield(hunter) {
-  if (activeHeroId() !== "crab" || !state.heroShield || !state.life) return false;
+  if (!heroHasShield() || !state.heroShield || !state.life) return false;
   state.heroShield = false;
   buzz([12, 20, 12]);
   sfxPulse();
@@ -2514,6 +2588,10 @@ function setActiveHero(id) {
     openDrawHero();
     return;
   }
+  if (!isHeroOwned(id)) {
+    tryUnlockHero(id);
+    return;
+  }
   state.meta.activeHero = id;
   saveMeta();
   renderHeroPicker();
@@ -2521,31 +2599,92 @@ function setActiveHero(id) {
   showToast(`герой · ${activeHero().name}`);
 }
 
+function tryUnlockHero(id) {
+  if (!state.meta) return false;
+  const hero = HEROES.find((h) => h.id === id);
+  if (!hero?.premium || isHeroOwned(id)) return false;
+  const cost = Math.max(1, Number(hero.cost) || 0);
+  const marks = state.meta.marks || 0;
+  if (marks < cost) {
+    showToast(`нужно ${cost} следов · есть ${marks}`);
+    renderHeroPicker();
+    paintHeroPortrait();
+    return false;
+  }
+  state.meta.marks = Math.max(0, marks - cost);
+  const unlocked = new Set(state.meta.unlockedHeroes || []);
+  unlocked.add(id);
+  state.meta.unlockedHeroes = [...unlocked];
+  state.meta.activeHero = id;
+  saveMeta();
+  updateEconomyLabels();
+  renderHeroPicker();
+  paintHeroPortrait();
+  goalChime();
+  buzz([10, 18, 10]);
+  showToast(`открыт · ${hero.name} · −${cost}`);
+  return true;
+}
+
 function updateHeroAbilityHint() {
   const hint = document.getElementById("hero-ability-hint");
-  const hero = activeHero();
-  if (hint) hint.textContent = hero?.ability || "";
+  const lock = document.getElementById("hero-lock-hint");
+  const selectedId = state.meta?.activeHero || "octopus";
+  const hero = HEROES.find((h) => h.id === selectedId) || activeHero();
+  const owned = isHeroOwned(hero.id);
+  if (hint) {
+    hint.textContent = hero?.ability || "";
+  }
   if (heroPickNameEl) {
     const label = hero?.id === "custom" && !state.meta?.customHero ? "свой" : hero?.name || "";
     heroPickNameEl.textContent = label;
+  }
+  if (lock) {
+    if (hero?.premium && !owned) {
+      lock.classList.remove("hidden");
+      lock.textContent = `Закрыт · ${hero.cost} следов · тапни ещё раз чтобы купить`;
+    } else {
+      lock.classList.add("hidden");
+      lock.textContent = "";
+    }
   }
 }
 
 function renderHeroPicker() {
   if (!heroListEl) return;
   heroListEl.textContent = "";
-  const current = activeHeroId();
+  const current = state.meta?.activeHero || activeHeroId();
   let activeBtn = null;
   for (const hero of HEROES) {
+    const owned = isHeroOwned(hero.id);
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = `hero-tile${hero.id === current ? " on" : ""}`;
+    btn.className = `hero-tile${hero.id === current ? " on" : ""}${hero.premium && !owned ? " locked" : ""}`;
     const label = hero.id === "custom" && !state.meta?.customHero ? "свой" : hero.name;
-    btn.innerHTML = `<span class="hero-glyph" aria-hidden="true">${hero.glyph || "•"}</span><span class="hero-tile-name">${label}</span>`;
+    const costHtml = hero.premium && !owned
+      ? `<span class="hero-tile-cost">${hero.cost}</span>`
+      : "";
+    btn.innerHTML = `<span class="hero-glyph" aria-hidden="true">${hero.glyph || "•"}</span><span class="hero-tile-name">${label}</span>${costHtml}`;
     btn.setAttribute("role", "option");
-    btn.setAttribute("aria-label", hero.ability ? `${label}, ${hero.ability}` : label);
+    const aria = hero.premium && !owned
+      ? `${label}, ${hero.cost} следов`
+      : hero.ability ? `${label}, ${hero.ability}` : label;
+    btn.setAttribute("aria-label", aria);
     btn.setAttribute("aria-selected", hero.id === current ? "true" : "false");
-    btn.addEventListener("click", () => setActiveHero(hero.id));
+    btn.addEventListener("click", () => {
+      if (hero.premium && !isHeroOwned(hero.id)) {
+        if (state.meta?.activeHero === hero.id) tryUnlockHero(hero.id);
+        else {
+          state.meta.activeHero = hero.id;
+          saveMeta();
+          renderHeroPicker();
+          paintHeroPortrait();
+          showToast(`${hero.name} · ${hero.cost} следов`);
+        }
+        return;
+      }
+      setActiveHero(hero.id);
+    });
     heroListEl.appendChild(btn);
     if (hero.id === current) activeBtn = btn;
   }
@@ -2777,6 +2916,8 @@ function renderSettings() {
     btnHaptics.textContent = state.meta.haptics !== false ? "вибро" : "вибро off";
   }
   renderDifficultyPicker();
+  renderControlPicker();
+  updateControlCopy();
 }
 
 function setDifficulty(id, opts = {}) {
@@ -3567,6 +3708,7 @@ function releaseLife() {
   };
   state.life = null;
   state.holdLifeTime = 0;
+  state.stick = null;
   hum(false);
   if (state.running) tipOnce("echo", "СЛЕД УЯЗВИМ", 1400);
 }
@@ -4013,6 +4155,7 @@ function resetRun() {
   state.unlockedMuts = ["spark"];
   state.touchActive = false;
   state.pointerId = null;
+  state.stick = null;
   state.hasTouchedCanvas = false;
   state.life = null;
   state.echo = null;
@@ -4152,7 +4295,7 @@ function startGame() {
     state.paused = false;
     state.demo = false;
     state.lastTs = performance.now();
-    showCoach("УДЕРЖИВАЙ", 1700, true);
+    showCoach(controlMode() === "joystick" ? "ДЕРЖИ СТИК" : "УДЕРЖИВАЙ", 1700, true);
     setTimeout(() => maybeShowHeroAbilityTip(), 1900);
   });
 }
@@ -4237,7 +4380,13 @@ function onCanvasDown(e) {
     // noop
   }
   const p = pointerPos(e);
-  createLife(p.x, p.y);
+  if (controlMode() === "joystick") {
+    state.stick = { ox: p.x, oy: p.y, x: p.x, y: p.y };
+    if (!state.life) createLife(state.width * 0.5, state.height * 0.56);
+  } else {
+    state.stick = null;
+    createLife(p.x, p.y);
+  }
 }
 
 function pushVein(x, y) {
@@ -4252,13 +4401,8 @@ function pushVein(x, y) {
   if (state.veins.length > 140) state.veins.shift();
 }
 
-function onCanvasMove(e) {
-  if (!state.running || !state.touchActive || e.pointerId !== state.pointerId || !state.life) return;
-  const p = pointerPos(e);
-  const prevX = state.life.x;
-  const prevY = state.life.y;
-  state.life.x = p.x;
-  state.life.y = p.y;
+function applyLifeMove(prevX, prevY) {
+  if (!state.life) return;
   clampLife();
   const moved = dist(prevX, prevY, state.life.x, state.life.y);
   if (moved > 7 && hasMut("veins")) {
@@ -4269,11 +4413,54 @@ function onCanvasMove(e) {
   if (moved > 0.5) tryHeroDash(state.life.x - prevX, state.life.y - prevY, moved);
 }
 
+function stickVector() {
+  if (!state.stick) return { nx: 0, ny: 0, mag: 0, dx: 0, dy: 0 };
+  const dx = state.stick.x - state.stick.ox;
+  const dy = state.stick.y - state.stick.oy;
+  const len = Math.hypot(dx, dy);
+  const mag = clamp(len / STICK_RADIUS, 0, 1);
+  return {
+    dx,
+    dy,
+    mag,
+    nx: len > 0.001 ? dx / len : 0,
+    ny: len > 0.001 ? dy / len : 0,
+  };
+}
+
+function updateJoystickMove(dt) {
+  if (controlMode() !== "joystick" || !state.life || !state.stick || !state.touchActive) return;
+  const { nx, ny, mag } = stickVector();
+  if (mag < 0.04) return;
+  const prevX = state.life.x;
+  const prevY = state.life.y;
+  const speed = STICK_SPEED * mag * (playerDifficulty().dash || 1);
+  state.life.x += nx * speed * dt;
+  state.life.y += ny * speed * dt;
+  applyLifeMove(prevX, prevY);
+}
+
+function onCanvasMove(e) {
+  if (!state.running || !state.touchActive || e.pointerId !== state.pointerId || !state.life) return;
+  const p = pointerPos(e);
+  if (controlMode() === "joystick" && state.stick) {
+    state.stick.x = p.x;
+    state.stick.y = p.y;
+    return;
+  }
+  const prevX = state.life.x;
+  const prevY = state.life.y;
+  state.life.x = p.x;
+  state.life.y = p.y;
+  applyLifeMove(prevX, prevY);
+}
+
 function onCanvasUp(e) {
   if (!state.touchActive) return;
   if (state.pointerId != null && e.pointerId !== state.pointerId) return;
   state.touchActive = false;
   state.pointerId = null;
+  state.stick = null;
   if (state.running) releaseLife();
 }
 
@@ -4782,6 +4969,7 @@ function updateRun(dt) {
   state.pulseCd = Math.max(0, state.pulseCd - dt);
   if (state.life) {
     state.holdLifeTime += dt;
+    updateJoystickMove(dt);
     const prevX = state.life.px ?? state.life.x;
     const prevY = state.life.py ?? state.life.y;
     const moved = dist(state.life.x, state.life.y, prevX, prevY);
@@ -6067,7 +6255,7 @@ function drawHeroAura() {
     ctx.arc(state.life.x, state.life.y, reach, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
-  } else if (hero === "crab" && state.heroShield) {
+  } else if (heroHasShield() && state.heroShield) {
     const pulse = 1 + Math.sin(state.time * 4) * 0.06;
     ctx.save();
     ctx.globalAlpha = 0.45;
@@ -6264,6 +6452,92 @@ function drawCrab(body, alpha = 1) {
   ctx.restore();
 }
 
+function drawManta(body, alpha = 1) {
+  const ink = lifeInkColor();
+  const accent = cssVar("--accent-b", "#7affd4");
+  const aim = body.aim ?? -Math.PI / 2;
+  const s = body.r;
+  const wob = body.wobble;
+  const flap = Math.sin(wob * 1.6) * 0.28;
+  ctx.save();
+  ctx.translate(body.x, body.y);
+  ctx.rotate(aim);
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = mixColor(ink, accent, 0.22);
+  ctx.beginPath();
+  ctx.moveTo(s * 1.05, 0);
+  ctx.quadraticCurveTo(s * 0.2, -s * (1.15 + flap), -s * 0.7, -s * 0.35);
+  ctx.quadraticCurveTo(-s * 1.05, 0, -s * 0.7, s * 0.35);
+  ctx.quadraticCurveTo(s * 0.2, s * (1.15 + flap), s * 1.05, 0);
+  ctx.fill();
+  ctx.fillStyle = mixColor(ink, "#ffffff", 0.18);
+  ctx.beginPath();
+  ctx.ellipse(s * 0.15, 0, s * 0.42, s * 0.28, 0, 0, Math.PI * 2);
+  ctx.fill();
+  drawHeroEyes(s * 0.85, wob, alpha, 0);
+  ctx.restore();
+}
+
+function drawAngler(body, alpha = 1) {
+  const ink = lifeInkColor();
+  const gold = cssVar("--gold", "#ffe898");
+  const aim = body.aim ?? -Math.PI / 2;
+  const s = body.r;
+  const wob = body.wobble;
+  ctx.save();
+  ctx.translate(body.x, body.y);
+  ctx.rotate(aim);
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = mixColor(ink, gold, 0.35);
+  ctx.lineWidth = Math.max(1.6, s * 0.1);
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(s * 0.55, -s * 0.15);
+  ctx.quadraticCurveTo(s * 1.05, -s * 0.85, s * 1.35, -s * 0.2);
+  ctx.stroke();
+  ctx.fillStyle = gold;
+  ctx.beginPath();
+  ctx.arc(s * 1.38, -s * 0.12, s * 0.16, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = mixColor(ink, "#1a2848", 0.2);
+  ctx.beginPath();
+  ctx.ellipse(0, 0, s * 0.9, s * 0.7, 0, 0, Math.PI * 2);
+  ctx.fill();
+  drawHeroEyes(s, wob, alpha, -s * 0.05);
+  ctx.restore();
+}
+
+function drawNautilus(body, alpha = 1) {
+  const ink = lifeInkColor();
+  const accent = cssVar("--accent-a", "#ff9a62");
+  const aim = body.aim ?? -Math.PI / 2;
+  const s = body.r;
+  const wob = body.wobble;
+  ctx.save();
+  ctx.translate(body.x, body.y);
+  ctx.rotate(aim);
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = mixColor(ink, accent, 0.28);
+  ctx.beginPath();
+  ctx.arc(-s * 0.08, 0, s * 0.92, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = mixColor(ink, "#ffffff", 0.25);
+  ctx.lineWidth = Math.max(1.4, s * 0.08);
+  ctx.beginPath();
+  for (let i = 0; i < 3; i += 1) {
+    const r = s * (0.35 + i * 0.2);
+    ctx.moveTo(r, 0);
+    ctx.arc(-s * 0.08, 0, r, 0, Math.PI * 1.4);
+  }
+  ctx.stroke();
+  ctx.fillStyle = mixColor(ink, "#ffffff", 0.16);
+  ctx.beginPath();
+  ctx.ellipse(s * 0.55, 0, s * 0.32, s * 0.42, 0.2, 0, Math.PI * 2);
+  ctx.fill();
+  drawHeroEyes(s * 0.7, wob, alpha, 0);
+  ctx.restore();
+}
+
 function drawCustomHero(body, alpha = 1) {
   if (!customHeroImage.ready || !customHeroImage.img) {
     drawInkPolyp(body, alpha);
@@ -6280,11 +6554,14 @@ function drawCustomHero(body, alpha = 1) {
   ctx.restore();
 }
 
-function drawLifeBody(body, alpha = 1) {
-  const hero = activeHeroId();
+function drawLifeBody(body, alpha = 1, heroOverride = null) {
+  const hero = heroOverride || activeHeroId();
   if (hero === "jellyfish") drawJellyfish(body, alpha);
   else if (hero === "turtle") drawTurtle(body, alpha);
   else if (hero === "crab") drawCrab(body, alpha);
+  else if (hero === "manta") drawManta(body, alpha);
+  else if (hero === "angler") drawAngler(body, alpha);
+  else if (hero === "nautilus") drawNautilus(body, alpha);
   else if (hero === "custom") drawCustomHero(body, alpha);
   else drawInkPolyp(body, alpha);
 }
@@ -6583,7 +6860,37 @@ function drawHoldHint() {
   ctx.fillStyle = cssVar("--sand", "#a89b90");
   ctx.font = "600 12px Instrument Sans, sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText("удерживай", cx, cy + s + 28);
+  ctx.fillText(controlMode() === "joystick" ? "держи стик" : "удерживай", cx, cy + s + 28);
+  ctx.restore();
+}
+
+function drawJoystick() {
+  if (controlMode() !== "joystick" || !state.stick || !state.touchActive) return;
+  const { ox, oy } = state.stick;
+  const { nx, ny, mag } = stickVector();
+  const knobX = ox + nx * STICK_RADIUS * mag;
+  const knobY = oy + ny * STICK_RADIUS * mag;
+  ctx.save();
+  ctx.globalAlpha = 0.22;
+  ctx.strokeStyle = cssVar("--foam", "#fffdf8");
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(ox, oy, STICK_RADIUS, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.globalAlpha = 0.16;
+  ctx.fillStyle = cssVar("--foam", "#fffdf8");
+  ctx.beginPath();
+  ctx.arc(ox, oy, STICK_RADIUS, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 0.55;
+  ctx.beginPath();
+  ctx.arc(knobX, knobY, 22, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 0.85;
+  ctx.fillStyle = cssVar("--life", "#7affd4");
+  ctx.beginPath();
+  ctx.arc(knobX, knobY, 10, 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 }
 
@@ -6671,6 +6978,7 @@ function draw() {
   }
   drawParticles();
   drawOpeningPulse();
+  drawJoystick();
   drawHungerVignette();
   if (state.flash > 0) {
     const flashRgb = hexToRgb(cssVar("--gold", "#ffe08a"));
@@ -6754,8 +7062,17 @@ function boot() {
   });
   btnHeroNext?.addEventListener("click", (e) => {
     e.preventDefault();
-    if (activeHeroId() === "custom" && !state.meta?.customHero) {
+    const selected = state.meta?.activeHero || "octopus";
+    if (selected === "custom" && !state.meta?.customHero) {
       openDrawHero();
+      return;
+    }
+    if (!isHeroOwned(selected)) {
+      if (!tryUnlockHero(selected)) return;
+    }
+    // Ensure active hero is owned selection.
+    if (!isHeroOwned(state.meta?.activeHero || "")) {
+      showToast("выбери героя");
       return;
     }
     sfxUiTap(1);
@@ -6874,7 +7191,7 @@ function boot() {
   const nativeShell = !!window.OttiskNative?.isNative;
   if ("serviceWorker" in navigator && !nativeShell) {
     navigator.serviceWorker
-      .register("./sw.js?v=61")
+            .register("./sw.js?v=63")
       .then((reg) => reg.update())
       .catch(() => {});
   }
