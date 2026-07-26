@@ -604,6 +604,41 @@ body {
   animation: menu-rise 0.75s 0.2s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
+.menu-diff {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.diff-row {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.diff-chip {
+  appearance: none;
+  flex: 1 1 0;
+  min-height: 42px;
+  border: 1px solid color-mix(in srgb, var(--foam) 16%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, #0c2034 55%, transparent);
+  color: var(--mute);
+  font-family: "Syne", sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.diff-chip.on {
+  color: #1a140c;
+  border-color: color-mix(in srgb, var(--gold) 60%, transparent);
+  background: color-mix(in srgb, var(--gold) 82%, #fff3d0);
+}
+
 .menu-record {
   display: flex;
   align-items: baseline;

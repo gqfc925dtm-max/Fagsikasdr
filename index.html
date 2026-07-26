@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=menu3" />
+  <link rel="stylesheet" href="css/style.css?v=diff1" />
   <link rel="preload" href="assets/fish-evil.png?v=5" as="image" />
   <title>ОТТИСК</title>
 </head>
@@ -77,6 +77,10 @@
       </section>
 
       <div class="menu-dock">
+        <section class="menu-diff" aria-label="Сложность">
+          <span class="meta-label">сложность</span>
+          <div id="difficulty-list" class="diff-row" role="group"></div>
+        </section>
         <div class="menu-record">
           <span class="meta-label">рекорд</span>
           <span id="best-start" class="menu-record-value">0</span>
@@ -84,7 +88,7 @@
         <div class="actions menu-actions">
           <button id="btn-start" class="btn btn-primary btn-play" type="button">
             <span class="btn-main">Играть</span>
-            <span class="btn-sub">удерживай палец</span>
+            <span class="btn-sub">обычный · удерживай</span>
           </button>
           <div class="hold-meter" aria-hidden="true"><i id="hold-fill"></i></div>
         </div>
@@ -195,7 +199,7 @@
   </div>
   <script>
     (async () => {
-      const stamp = "ottisk-force-v47";
+      const stamp = "ottisk-force-v48";
       if (localStorage.getItem(stamp)) return;
       localStorage.setItem(stamp, "1");
       try {
@@ -209,11 +213,11 @@
         }
       } catch (_) {}
       const url = new URL(location.href);
-      url.searchParams.set("v", "47");
+      url.searchParams.set("v", "48");
       location.replace(url.toString());
     })();
   </script>
   <script src="js/native.js" type="module"></script>
-  <script src="js/game.js?v=menu3" type="module"></script>
+  <script src="js/game.js?v=diff1" type="module"></script>
 </body>
 </html>

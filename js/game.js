@@ -120,6 +120,12 @@ const HEROES = [
   { id: "custom", name: "свой", glyph: "✦" },
 ];
 
+const DIFFICULTIES = [
+  { id: "easy", name: "лёгкий", speed: 0.78, spawn: 1.28, hunters: 0.72, hunger: 0.82, dash: 0.8 },
+  { id: "normal", name: "обычный", speed: 1, spawn: 1, hunters: 1, hunger: 1, dash: 1 },
+  { id: "hard", name: "сложный", speed: 1.2, spawn: 0.8, hunters: 1.22, hunger: 1.18, dash: 1.18 },
+];
+
 /** Difficulty waves: each tier swaps predator species + pacing. */
 const WAVES = [
   {
@@ -1255,7 +1261,12 @@ function tipOnce(key, text, ms = 1700) {
   showCoach(text, ms, true);
 }
 
-function difficultyScale() {
+function playerDifficulty() {
+  const id = state.meta?.difficulty || "normal";
+  return DIFFICULTIES.find((d) => d.id === id) || DIFFICULTIES[1];
+}
+
+function skillSoftScale() {
   const best = Math.max(state.best || 0, state.meta?.best || 0);
   if (best < 12) return 0.52;
   if (best < 30) return 0.68;
@@ -1264,17 +1275,26 @@ function difficultyScale() {
   return 1;
 }
 
+function difficultyScale() {
+  return skillSoftScale() * playerDifficulty().speed;
+}
+
 /** Ease the mid-run spike so objects feel a bit slower around 20–110 score. */
 function midgamePace() {
   const s = state.score || 0;
-  if (s < 18) return 1;
-  if (s < 40) return 0.88;
-  if (s < 70) return 0.82;
-  if (s < 110) return 0.85;
-  if (s < 150) return 0.92;
-  if (s < 220) return 0.94;
-  if (s < 280) return 0.96;
-  return 1;
+  let pace = 1;
+  if (s < 18) pace = 1;
+  else if (s < 40) pace = 0.88;
+  else if (s < 70) pace = 0.82;
+  else if (s < 110) pace = 0.85;
+  else if (s < 150) pace = 0.92;
+  else if (s < 220) pace = 0.94;
+  else if (s < 280) pace = 0.96;
+  else pace = 1;
+  // Easy stays gentler late; hard keeps more pressure.
+  if (playerDifficulty().id === "easy") pace *= 0.94;
+  if (playerDifficulty().id === "hard") pace = Math.min(1, pace + 0.06);
+  return pace;
 }
 
 const waveLabelEl = document.getElementById("wave-label");
@@ -1644,6 +1664,7 @@ function loadMeta() {
     iapMarksBought: Math.max(0, Number(raw?.iapMarksBought || 0)),
     activeHero: HEROES.some((h) => h.id === raw?.activeHero) ? raw.activeHero : "octopus",
     customHero: typeof raw?.customHero === "string" && raw.customHero.startsWith("data:image") ? raw.customHero : "",
+    difficulty: DIFFICULTIES.some((d) => d.id === raw?.difficulty) ? raw.difficulty : "normal",
   };
 }
 
@@ -1798,6 +1819,37 @@ function renderSettings() {
     btnHaptics.setAttribute("aria-pressed", state.meta.haptics !== false ? "true" : "false");
     btnHaptics.textContent = state.meta.haptics !== false ? "вибро" : "вибро off";
   }
+  renderDifficultyPicker();
+}
+
+function setDifficulty(id) {
+  if (!state.meta) return;
+  if (!DIFFICULTIES.some((d) => d.id === id)) return;
+  state.meta.difficulty = id;
+  saveMeta();
+  renderDifficultyPicker();
+  const diff = playerDifficulty();
+  showToast(`сложность · ${diff.name}`);
+  const sub = document.querySelector("#btn-start .btn-sub");
+  if (sub) sub.textContent = `${diff.name} · удерживай`;
+}
+
+function renderDifficultyPicker() {
+  const list = document.getElementById("difficulty-list");
+  if (!list || !state.meta) return;
+  list.textContent = "";
+  const current = playerDifficulty().id;
+  for (const diff of DIFFICULTIES) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `diff-chip${diff.id === current ? " on" : ""}`;
+    btn.textContent = diff.name;
+    btn.setAttribute("aria-pressed", diff.id === current ? "true" : "false");
+    btn.addEventListener("click", () => setDifficulty(diff.id));
+    list.appendChild(btn);
+  }
+  const sub = document.querySelector("#btn-start .btn-sub");
+  if (sub) sub.textContent = `${playerDifficulty().name} · удерживай`;
 }
 
 function evaluateWeekly(score) {
@@ -2769,7 +2821,7 @@ function hunterSpawnPointAwayFromPlayer() {
 
 function spawnHunter(slow = false) {
   const point = hunterSpawnPointAwayFromPlayer();
-  const soft = difficultyScale();
+  const soft = skillSoftScale();
   const wave = syncWave(false);
   const anger = (slow ? 0.26 : rand(0.58, 0.88) + Math.min(0.28, state.score * 0.0035)) * soft;
   const hunter = {
@@ -3227,16 +3279,17 @@ function hunterReachMul(hunter) {
 }
 
 function updateHunters(dt) {
-  const soft = difficultyScale();
+  const soft = skillSoftScale();
+  const diff = playerDifficulty();
   const wave = syncWave(true);
   // Fish from the start: only one slow hunter early, then ramp with score.
   const early = state.elapsed < OPENING_SEC + 8 || state.score < 12;
   const opening = inOpening();
   const maxHunters = early || opening
     ? 1
-    : Math.min(7, Math.max(1, Math.floor((1 + Math.floor(state.score / 22) + wave.maxBonus) * soft)));
+    : Math.min(7, Math.max(1, Math.floor((1 + Math.floor(state.score / 22) + wave.maxBonus) * soft * diff.hunters)));
   state.hunterAcc += dt;
-  let interval = (Math.max(1.35, 4.1 - state.score * 0.018) * wave.intervalMul) / Math.max(0.55, soft);
+  let interval = (Math.max(1.35, 4.1 - state.score * 0.018) * wave.intervalMul * diff.spawn) / Math.max(0.55, soft);
   interval /= Math.max(0.75, midgamePace());
   // Mid-game: spawn a bit less often so the field stays readable.
   if (state.score >= 22 && state.score < 110) interval *= 1.12;
@@ -3320,26 +3373,27 @@ function updateHunters(dt) {
       ty = state.echo.y;
     }
     const ang = Math.atan2(ty - hunter.y, tx - hunter.x);
-    let speed = (0.88 + state.score * 0.0085) * hunter.anger * wave.speedMul * midgamePace();
+    let speed = (0.88 + state.score * 0.0085) * hunter.anger * wave.speedMul * midgamePace() * diff.speed;
     if (hunter.shadow) speed *= 0.88;
     if (hunter.slow) speed *= 0.68;
     if (hasMut("cool") && state.hunger < 50) speed *= 0.85;
     if (activeEventId() === "calm") speed *= 0.62;
     if (activeEventId() === "raid") speed *= 1.08;
     if (inInkDive()) speed *= 0.35;
-    if (species === "dart" && hunter.dashT > 0) speed *= 2.05;
-    if (species === "shark" && hunter.dashT > 0) speed *= 1.75;
+    if (species === "dart" && hunter.dashT > 0) speed *= 2.05 * diff.dash;
+    if (species === "shark" && hunter.dashT > 0) speed *= 1.75 * diff.dash;
     if (species === "ray") speed *= 0.92;
 
     // Periodic lunges for dart/shark waves.
     if (state.life && hunter.dashCd <= 0 && hunter.dashT <= 0 && (species === "dart" || species === "shark")) {
       const dLife2 = dist(hunter.x, hunter.y, state.life.x, state.life.y);
       if (dLife2 < (species === "shark" ? 160 : 170) && dLife2 > 56) {
-        hunter.dashT = species === "shark" ? 0.24 : 0.22;
-        hunter.dashCd = species === "shark" ? rand(2.8, 4.2) : rand(0.7, 1.3);
+        hunter.dashT = (species === "shark" ? 0.24 : 0.22) * (0.85 + diff.dash * 0.15);
+        hunter.dashCd = (species === "shark" ? rand(2.8, 4.2) : rand(0.7, 1.3)) / Math.max(0.7, diff.dash);
         const dashAng = Math.atan2(state.life.y - hunter.y, state.life.x - hunter.x);
-        hunter.vx += Math.cos(dashAng) * (species === "shark" ? 2.4 : 3.1);
-        hunter.vy += Math.sin(dashAng) * (species === "shark" ? 2.4 : 3.1);
+        const impulse = (species === "shark" ? 2.4 : 3.1) * diff.dash;
+        hunter.vx += Math.cos(dashAng) * impulse;
+        hunter.vy += Math.sin(dashAng) * impulse;
       }
     }
     // Ghosts short-blink closer instead of a hard dash.
@@ -3347,9 +3401,9 @@ function updateHunters(dt) {
       const dLife3 = dist(hunter.x, hunter.y, state.life.x, state.life.y);
       if (dLife3 > 90 && dLife3 < 210) {
         const blinkAng = Math.atan2(state.life.y - hunter.y, state.life.x - hunter.x);
-        hunter.x += Math.cos(blinkAng) * 34;
-        hunter.y += Math.sin(blinkAng) * 34;
-        hunter.dashCd = rand(1.8, 2.8);
+        hunter.x += Math.cos(blinkAng) * (28 * diff.dash);
+        hunter.y += Math.sin(blinkAng) * (28 * diff.dash);
+        hunter.dashCd = rand(1.8, 2.8) / Math.max(0.75, diff.dash);
         hunter.warn = Math.max(hunter.warn, 0.55);
       }
     }
@@ -3499,7 +3553,7 @@ function updateRun(dt) {
   const calmMul = activeEventId() === "calm" ? 0.55 : 1;
   const diveMul = inInkDive() ? 0.72 : 1;
   if (state.life) {
-    state.hunger -= HUNGER_DRAIN_PER_SEC * dt * (hasMut("cool") ? 0.7 : 1) * stillPenalty * calmMul * diveMul * (inOpening() ? 0.72 : 1);
+    state.hunger -= HUNGER_DRAIN_PER_SEC * dt * (hasMut("cool") ? 0.7 : 1) * stillPenalty * calmMul * diveMul * (inOpening() ? 0.72 : 1) * playerDifficulty().hunger;
     state.hunger = Math.max(0, state.hunger);
   }
   updateHungerUi();
