@@ -401,79 +401,64 @@ body {
 
 /* —— Start menu —— */
 .screen-menu {
-  justify-content: flex-start;
+  justify-content: space-between;
   gap: 0;
   padding:
-    calc(12px + var(--safe-top)) 0
-    calc(10px + var(--safe-bottom));
-  overflow: hidden;
+    calc(14px + var(--safe-top)) 22px
+    calc(12px + var(--safe-bottom));
+  overflow-x: hidden;
+  overflow-y: auto;
   touch-action: manipulation;
+  -webkit-overflow-scrolling: touch;
 }
 
-.menu-sea {
+.menu-veil {
   position: absolute;
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(120% 70% at 50% -10%, rgba(90, 180, 210, 0.28), transparent 55%),
-    linear-gradient(180deg, #123a58 0%, #0a243c 42%, #061422 100%);
+    linear-gradient(180deg, rgba(6, 22, 38, 0.28) 0%, rgba(6, 22, 38, 0.12) 38%, rgba(4, 14, 26, 0.78) 72%, rgba(3, 10, 18, 0.92) 100%);
 }
 
-.menu-sea-glow {
+.menu-veil-light {
   position: absolute;
-  inset: -20% 10% auto;
-  height: 55%;
-  background: radial-gradient(ellipse at 50% 40%, rgba(255, 214, 140, 0.16), transparent 70%);
-  animation: menu-drift 7s ease-in-out infinite alternate;
+  inset: -15% 8% auto;
+  height: 48%;
+  background: radial-gradient(ellipse at 50% 35%, rgba(255, 220, 150, 0.14), transparent 68%);
+  animation: menu-drift 8s ease-in-out infinite alternate;
 }
 
-.menu-sea-caustic {
-  position: absolute;
-  inset: 0;
-  opacity: 0.35;
-  background:
-    radial-gradient(circle at 20% 30%, rgba(255,255,255,0.12) 0 2px, transparent 3px),
-    radial-gradient(circle at 70% 55%, rgba(255,255,255,0.1) 0 1.5px, transparent 3px),
-    radial-gradient(circle at 40% 75%, rgba(122, 255, 212, 0.12) 0 2px, transparent 4px);
-  background-size: 180px 180px, 220px 220px, 160px 160px;
-  animation: menu-caustic 12s linear infinite;
-}
-
-.menu-sea-depth {
+.menu-veil-depth {
   position: absolute;
   inset: auto 0 0;
-  height: 42%;
-  background: linear-gradient(180deg, transparent, rgba(2, 10, 20, 0.72));
+  height: 55%;
+  background:
+    radial-gradient(80% 60% at 50% 100%, rgba(40, 140, 160, 0.16), transparent 70%),
+    linear-gradient(180deg, transparent, rgba(2, 10, 18, 0.55));
 }
 
 @keyframes menu-drift {
-  from { transform: translateY(0) scale(1); }
-  to { transform: translateY(12px) scale(1.04); }
+  from { transform: translateY(0) scale(1); opacity: 0.85; }
+  to { transform: translateY(14px) scale(1.05); opacity: 1; }
 }
 
-@keyframes menu-caustic {
-  from { transform: translate3d(0, 0, 0); }
-  to { transform: translate3d(-40px, 18px, 0); }
-}
-
-.menu-top,
-.menu-hero,
-.menu-dock {
+.menu-bar,
+.menu-main,
+.menu-more {
   position: relative;
   z-index: 1;
-  padding-left: 22px;
-  padding-right: 22px;
+  width: 100%;
 }
 
-.menu-top {
+.menu-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 6px;
+  min-height: 28px;
 }
 
-.menu-stats {
+.menu-meta {
   margin: 0;
   display: flex;
   align-items: baseline;
@@ -482,113 +467,297 @@ body {
   font-family: "Instrument Sans", sans-serif;
   font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--mute);
+  color: color-mix(in srgb, var(--foam) 55%, transparent);
 }
 
-.menu-stats strong,
+.menu-meta strong,
 #marks-start {
   font-family: "Syne", sans-serif;
   font-weight: 800;
-  color: var(--gold);
+  color: var(--foam);
 }
 
-.menu-settings {
-  width: auto;
-  margin: 0;
-  gap: 6px;
+.menu-sep {
+  opacity: 0.45;
+}
+
+.menu-toggles {
+  display: flex;
+  gap: 14px;
   flex-shrink: 0;
 }
 
-.set-chip {
+.menu-toggle {
   appearance: none;
-  border: 1px solid color-mix(in srgb, var(--foam) 14%, transparent);
-  background: color-mix(in srgb, #0c2034 45%, transparent);
-  color: var(--mute);
+  border: 0;
+  background: transparent;
+  color: color-mix(in srgb, var(--foam) 42%, transparent);
   font-family: "Instrument Sans", sans-serif;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  padding: 8px 10px;
-  border-radius: 9px;
-  min-height: 34px;
+  padding: 6px 0;
+  min-height: 32px;
   cursor: pointer;
 }
 
-.set-chip.on {
+.menu-toggle.on {
   color: var(--foam);
-  border-color: color-mix(in srgb, var(--accent-b) 40%, transparent);
-  background: color-mix(in srgb, var(--accent-b) 12%, transparent);
 }
 
-.menu-hero {
-  margin-top: 10px;
+.menu-main {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 8px 0 18px;
   animation: menu-rise 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
 .menu-brand {
-  font-size: clamp(72px, 20vw, 104px);
-  line-height: 0.8;
-  letter-spacing: -0.06em;
+  font-size: clamp(76px, 22vw, 112px);
+  line-height: 0.78;
+  letter-spacing: -0.07em;
+  max-width: 100%;
 }
 
-.menu-line {
-  margin-top: 12px;
-  max-width: 12ch;
+.menu-title {
+  margin-top: 18px;
   font-family: "Syne", sans-serif;
-  font-size: clamp(18px, 4.8vw, 22px);
+  font-size: clamp(22px, 6vw, 28px);
   font-weight: 700;
-  line-height: 1.15;
-  letter-spacing: -0.03em;
-  color: var(--sand);
-  animation: menu-rise 0.65s 0.08s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+  color: var(--foam);
+  animation: menu-rise 0.65s 0.06s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
-.menu-dock {
-  margin-top: auto;
+.menu-lead {
+  margin-top: 8px;
+  max-width: 18ch;
+  font-family: "Instrument Sans", sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.35;
+  color: color-mix(in srgb, var(--foam) 72%, #8ec8d8);
+  animation: menu-rise 0.7s 0.1s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.menu-play {
+  width: min(100%, 360px);
+  margin-top: 28px;
+  animation: menu-rise 0.75s 0.14s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.btn-play {
+  min-height: 70px;
+  border-radius: 4px;
+  align-items: center;
+  text-align: center;
+  animation: menu-cta 2.8s ease-in-out infinite;
+}
+
+.btn-play .btn-main {
+  font-size: 22px;
+  letter-spacing: -0.03em;
+}
+
+.btn-play .btn-sub {
+  opacity: 0.62;
+}
+
+.menu-more {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding-top: 18px;
-  animation: menu-rise 0.75s 0.16s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  padding-top: 8px;
+  animation: menu-rise 0.8s 0.18s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
-.menu-choose {
+.menu-heroes {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.menu-quest {
-  margin: 0;
-  padding: 8px 12px;
-  border-radius: 10px;
-  border: 1px solid color-mix(in srgb, var(--foam) 12%, transparent);
-  background: color-mix(in srgb, #0c2034 50%, transparent);
+.menu-heroes-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.menu-heroes-hint {
+  font-family: "Instrument Sans", sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--foam) 70%, transparent);
+}
+
+.menu-link {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: color-mix(in srgb, var(--life) 85%, var(--foam));
   font-family: "Instrument Sans", sans-serif;
   font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 4px 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.menu-link:active {
+  color: var(--foam);
+}
+
+.btn-donate-main {
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+}
+
+.btn-donate-sub {
+  color: color-mix(in srgb, var(--foam) 45%, transparent);
   font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--sand);
-  text-align: center;
+  text-transform: none;
+  letter-spacing: 0;
 }
 
-.menu-quest.done {
-  color: var(--life);
-  border-color: color-mix(in srgb, var(--life) 35%, transparent);
-}
-
-.menu-gift-next {
+.hero-rail {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  padding: 2px 0;
   margin: 0;
-  text-align: center;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--mute);
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  touch-action: pan-x;
 }
 
-.menu-gift-next.hidden {
+.hero-rail::-webkit-scrollbar { display: none; }
+
+.hero-tile {
+  appearance: none;
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 56px;
+  scroll-snap-align: start;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: color-mix(in srgb, var(--foam) 45%, transparent);
+  padding: 6px 4px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.hero-tile:active { transform: scale(0.96); }
+
+.hero-tile.on {
+  color: var(--foam);
+  border-bottom-color: var(--life);
+}
+
+.hero-glyph {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, #061420 55%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--foam) 16%, transparent);
+  font-family: "Syne", sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: inherit;
+}
+
+.hero-tile.on .hero-glyph {
+  background: color-mix(in srgb, var(--life) 22%, #061420 78%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--life) 55%, transparent);
+  color: var(--foam);
+}
+
+.hero-tile-name {
+  font-family: "Instrument Sans", sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-align: center;
+  line-height: 1.15;
+}
+
+.hero-ability { display: none; }
+
+.diff-row {
+  display: flex;
+  gap: 0;
+  width: 100%;
+  border-top: 1px solid color-mix(in srgb, var(--foam) 12%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--foam) 12%, transparent);
+}
+
+.diff-chip {
+  appearance: none;
+  flex: 1 1 0;
+  min-height: 40px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: color-mix(in srgb, var(--foam) 42%, transparent);
+  font-family: "Instrument Sans", sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.diff-chip.on {
+  color: var(--foam);
+  background: color-mix(in srgb, var(--foam) 8%, transparent);
+}
+
+.menu-note {
+  margin: 0;
+  min-height: 0;
+  font-family: "Instrument Sans", sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: color-mix(in srgb, var(--foam) 70%, transparent);
+  text-align: left;
+}
+
+.menu-note:empty {
+  display: none;
+}
+
+.menu-note.done {
+  color: var(--life);
+}
+
+.menu-note.quiet {
+  font-size: 12px;
+  color: color-mix(in srgb, var(--foam) 45%, transparent);
+}
+
+.menu-note.hidden {
   display: none;
 }
 
@@ -599,15 +768,6 @@ body {
 
 .menu-gifts.hidden {
   display: none;
-}
-
-.gift-tile.gift-all {
-  background: color-mix(in srgb, var(--life) 16%, #123048 84%);
-  border-color: color-mix(in srgb, var(--life) 45%, transparent);
-}
-
-.gift-tile.gift-all .gift-tile-meta {
-  color: var(--life);
 }
 
 .gift-rail {
@@ -621,12 +781,13 @@ body {
 .gift-tile {
   appearance: none;
   width: 100%;
-  min-height: 48px;
-  border: 1px solid color-mix(in srgb, var(--gold) 50%, transparent);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--gold) 18%, #123048 82%);
+  min-height: 44px;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--gold) 45%, transparent);
+  border-radius: 0;
+  background: transparent;
   color: var(--foam);
-  padding: 10px 14px;
+  padding: 10px 0;
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -634,13 +795,17 @@ body {
   gap: 10px;
   text-align: left;
   cursor: pointer;
-  transition: transform 0.15s ease, filter 0.15s ease;
+  transition: opacity 0.15s ease, transform 0.15s ease;
 }
 
-.gift-tile:active { transform: scale(0.98); }
+.gift-tile:active { transform: scale(0.99); opacity: 0.85; }
 
 .gift-tile.ready {
-  animation: menu-gift-pulse 1.8s ease-in-out infinite;
+  animation: menu-gift-pulse 2s ease-in-out infinite;
+}
+
+.gift-tile.gift-all {
+  border-bottom-color: color-mix(in srgb, var(--life) 50%, transparent);
 }
 
 .gift-tile-kicker {
@@ -664,195 +829,29 @@ body {
   white-space: nowrap;
 }
 
-.menu-choose-head {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: baseline;
-  gap: 10px;
+.gift-tile.gift-all .gift-tile-meta {
+  color: var(--life);
 }
 
-.menu-hero-hint {
+.menu-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px 14px;
+  padding-top: 2px;
+}
+
+.menu-foot a {
+  color: color-mix(in srgb, var(--foam) 48%, transparent);
+  text-decoration: none;
   font-family: "Instrument Sans", sans-serif;
   font-size: 12px;
   font-weight: 600;
-  color: color-mix(in srgb, var(--gold) 75%, var(--mute));
-  letter-spacing: 0.02em;
 }
 
-.menu-draw-link {
-  appearance: none;
-  border: 0;
-  background: transparent;
-  color: var(--accent-b);
-  font-family: "Instrument Sans", sans-serif;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  padding: 4px 0;
-  cursor: pointer;
-}
-
-.hero-rail {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  scroll-snap-type: x mandatory;
-  padding: 2px 0 4px;
-  margin: 0;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-  touch-action: pan-x;
-}
-
-.hero-rail::-webkit-scrollbar { display: none; }
-
-.hero-tile {
-  appearance: none;
-  flex: 0 0 auto;
-  width: 72px;
-  scroll-snap-align: start;
-  border: 1px solid color-mix(in srgb, var(--foam) 14%, transparent);
-  border-radius: 12px;
-  background: color-mix(in srgb, #10283f 72%, transparent);
-  color: var(--mute);
-  padding: 10px 6px 8px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
-}
-
-.hero-tile:active { transform: scale(0.97); }
-
-.hero-tile.on {
+.menu-foot a:active {
   color: var(--foam);
-  border-color: color-mix(in srgb, var(--gold) 55%, transparent);
-  background: color-mix(in srgb, var(--gold) 16%, #123048 84%);
-}
-
-.hero-glyph {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  display: grid;
-  place-items: center;
-  background: color-mix(in srgb, #081828 55%, transparent);
-  font-family: "Syne", sans-serif;
-  font-size: 16px;
-  font-weight: 800;
-  letter-spacing: -0.04em;
-  color: var(--foam);
-}
-
-.hero-tile.on .hero-glyph {
-  background: color-mix(in srgb, var(--gold) 22%, transparent);
-  color: #1a140c;
-}
-
-.hero-tile-name {
-  font-family: "Syne", sans-serif;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  text-align: center;
-  line-height: 1.15;
-}
-
-.hero-ability { display: none; }
-
-.menu-diff {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
-.diff-row {
-  display: flex;
-  gap: 6px;
-  width: 100%;
-}
-
-.diff-chip {
-  appearance: none;
-  flex: 1 1 0;
-  min-height: 38px;
-  border: 1px solid color-mix(in srgb, var(--foam) 14%, transparent);
-  border-radius: 10px;
-  background: color-mix(in srgb, #0c2034 45%, transparent);
-  color: var(--mute);
-  font-family: "Syne", sans-serif;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-}
-
-.diff-chip.on {
-  color: #1a140c;
-  border-color: color-mix(in srgb, var(--gold) 60%, transparent);
-  background: color-mix(in srgb, var(--gold) 82%, #fff3d0);
-}
-
-.menu-actions {
-  width: 100%;
-}
-
-.btn-play {
-  min-height: 68px;
-  border-radius: 14px;
-  animation: menu-cta 2.4s ease-in-out infinite;
-}
-
-.menu-support-row {
-  display: flex;
-  justify-content: center;
-}
-
-.btn-donate {
-  appearance: none;
-  border: 1px solid color-mix(in srgb, var(--gold) 40%, transparent);
-  background: color-mix(in srgb, var(--gold) 12%, #10283f 88%);
-  color: var(--foam);
-  border-radius: 12px;
-  min-height: 44px;
-  padding: 8px 16px;
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-  transition: transform 0.15s ease, filter 0.15s ease;
-}
-
-.btn-donate:active { transform: scale(0.97); }
-
-.btn-donate-main {
-  font-family: "Syne", sans-serif;
-  font-size: 13px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--gold);
-}
-
-.btn-donate-sub {
-  font-family: "Instrument Sans", sans-serif;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--mute);
-}
-
-.menu-legal {
-  margin-top: 0;
-  justify-content: center;
-  opacity: 0.55;
-  font-size: 11px;
 }
 
 #screen-donate {
@@ -1405,7 +1404,7 @@ body {
 }
 
 .screen.screen-menu {
-  justify-content: flex-start;
+  justify-content: space-between;
 }
 
 .screen.hidden,

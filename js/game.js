@@ -2537,12 +2537,12 @@ function renderDailyQuest() {
     return;
   }
   if (state.meta.dailyDone) {
-    quest.className = "menu-quest done";
-    quest.textContent = `ежедневка · ${daily.title} · готово`;
+    quest.className = "menu-note done";
+    quest.textContent = `Сегодня · ${daily.title} · готово`;
     return;
   }
-  quest.className = "menu-quest";
-  quest.textContent = `сегодня · ${daily.title} · +15 следов`;
+  quest.className = "menu-note";
+  quest.textContent = `Сегодня · ${daily.title} · +15 следов`;
 }
 
 function renderDaily() {
@@ -2639,7 +2639,7 @@ function renderGifts() {
     all.className = "gift-tile ready gift-all";
     all.innerHTML = `
       <span class="gift-tile-title">Забрать все</span>
-      <span class="gift-tile-meta">${readyGifts.length} шт</span>
+      <span class="gift-tile-meta">${readyGifts.length}</span>
     `;
     all.addEventListener("click", () => claimAllReadyGifts());
     list.appendChild(all);
@@ -2650,8 +2650,8 @@ function renderGifts() {
     btn.className = "gift-tile ready";
     const amountText = gift.amountLabel?.(state.meta, now) || `+${gift.amount}`;
     btn.innerHTML = `
-      <span class="gift-tile-title">Подарок · ${gift.title}</span>
-      <span class="gift-tile-meta">забрать ${amountText}</span>
+      <span class="gift-tile-title">${gift.title}</span>
+      <span class="gift-tile-meta">${amountText}</span>
     `;
     btn.setAttribute("aria-label", `Забрать подарок ${gift.title} ${amountText}`);
     btn.addEventListener("click", () => claimGift(gift.id));
@@ -2661,7 +2661,7 @@ function renderGifts() {
     const next = readyGifts.length ? null : nextGiftWait(now);
     if (next) {
       nextEl.classList.remove("hidden");
-      nextEl.textContent = `следующий подарок · ${next.gift.title.toLowerCase()} · ${formatWait(next.wait)}`;
+      nextEl.textContent = `Подарок через ${formatWait(next.wait)}`;
     } else {
       nextEl.classList.add("hidden");
       nextEl.textContent = "";

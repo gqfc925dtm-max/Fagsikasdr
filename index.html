@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=60" />
+  <link rel="stylesheet" href="css/style.css?v=61" />
   <link rel="preload" href="assets/fish-evil.png?v=5" as="image" />
   <title>ОТТИСК</title>
 </head>
@@ -54,70 +54,63 @@
     </footer>
 
     <div id="screen-start" class="screen screen-menu">
-      <div class="menu-sea" aria-hidden="true">
-        <div class="menu-sea-glow"></div>
-        <div class="menu-sea-caustic"></div>
-        <div class="menu-sea-depth"></div>
+      <div class="menu-veil" aria-hidden="true">
+        <div class="menu-veil-light"></div>
+        <div class="menu-veil-depth"></div>
       </div>
 
-      <header class="menu-top">
-        <p class="menu-stats" aria-label="Прогресс">
+      <header class="menu-bar">
+        <p class="menu-meta" aria-label="Прогресс">
           <span>рекорд <strong id="best-start">0</strong></span>
-          <span aria-hidden="true">·</span>
+          <span class="menu-sep" aria-hidden="true">·</span>
           <span id="marks-start">0 следов</span>
         </p>
-        <div class="settings-row menu-settings" role="group" aria-label="Настройки">
-          <button id="btn-sound" class="set-chip on" type="button" aria-pressed="true" aria-label="Звук">звук</button>
-          <button id="btn-haptics" class="set-chip on" type="button" aria-pressed="true" aria-label="Вибрация">вибро</button>
+        <div class="menu-toggles" role="group" aria-label="Настройки">
+          <button id="btn-sound" class="menu-toggle on" type="button" aria-pressed="true" aria-label="Звук">звук</button>
+          <button id="btn-haptics" class="menu-toggle on" type="button" aria-pressed="true" aria-label="Вибрация">вибро</button>
         </div>
       </header>
 
-      <div class="menu-hero">
+      <div class="menu-main">
         <p class="brand menu-brand">ОТТИСК</p>
-        <h1 class="menu-line">Удерживай палец</h1>
-      </div>
+        <h1 class="menu-title">Удерживай палец</h1>
+        <p class="menu-lead">Существо живёт только в касании</p>
 
-      <div class="menu-dock">
-        <section class="menu-choose" aria-label="Выбор героя">
-          <div class="menu-choose-head">
-            <span class="meta-label">герой</span>
-            <span id="hero-ability-hint" class="menu-hero-hint">рывок</span>
-            <button id="btn-draw-hero" class="menu-draw-link" type="button">нарисовать</button>
-          </div>
-          <div id="hero-list" class="hero-rail" role="listbox" aria-label="Выбор героя"></div>
-        </section>
-
-        <p id="daily-quest" class="menu-quest" aria-live="polite">ежедневка</p>
-
-        <section id="menu-gifts" class="menu-gifts hidden" aria-label="Подарки">
-          <div id="gift-list" class="gift-rail" role="list"></div>
-        </section>
-        <p id="gift-next" class="menu-gift-next hidden" aria-live="polite"></p>
-
-        <div class="actions menu-actions">
+        <div class="actions menu-play">
           <button id="btn-start" class="btn btn-primary btn-play" type="button">
             <span class="btn-main">Играть</span>
             <span class="btn-sub">удерживай кнопку</span>
           </button>
           <div class="hold-meter" aria-hidden="true"><i id="hold-fill"></i></div>
         </div>
+      </div>
 
-        <section class="menu-diff" aria-label="Сложность">
-          <div id="difficulty-list" class="diff-row" role="group"></div>
+      <div class="menu-more">
+        <section class="menu-heroes" aria-label="Выбор героя">
+          <div class="menu-heroes-head">
+            <span id="hero-ability-hint" class="menu-heroes-hint">рывок</span>
+            <button id="btn-draw-hero" class="menu-link" type="button">нарисовать</button>
+          </div>
+          <div id="hero-list" class="hero-rail" role="listbox" aria-label="Выбор героя"></div>
         </section>
 
-        <div class="menu-support-row">
-          <button id="btn-donate" class="btn-donate" type="button">
-            <span class="btn-donate-main">Донат</span>
-            <span id="donate-thanks" class="btn-donate-sub">поддержать игру</span>
-          </button>
-        </div>
+        <div id="difficulty-list" class="diff-row" role="group" aria-label="Сложность"></div>
 
-        <p class="legal-links menu-legal">
+        <p id="daily-quest" class="menu-note" aria-live="polite"></p>
+
+        <section id="menu-gifts" class="menu-gifts hidden" aria-label="Подарки">
+          <div id="gift-list" class="gift-rail" role="list"></div>
+        </section>
+        <p id="gift-next" class="menu-note quiet hidden" aria-live="polite"></p>
+
+        <nav class="menu-foot" aria-label="Дополнительно">
+          <button id="btn-donate" class="menu-link" type="button">
+            <span class="btn-donate-main">Донат</span>
+            <span id="donate-thanks" class="btn-donate-sub">поддержать</span>
+          </button>
           <a href="./privacy.html">Конфиденциальность</a>
-          <span aria-hidden="true">·</span>
           <a href="./support.html">Поддержка</a>
-        </p>
+        </nav>
       </div>
 
       <!-- kept for JS economy hooks; hidden on start -->
@@ -237,7 +230,7 @@
   </div>
   <script>
     (async () => {
-      const stamp = "ottisk-force-v60";
+      const stamp = "ottisk-force-v61";
       if (localStorage.getItem(stamp)) return;
       localStorage.setItem(stamp, "1");
       try {
@@ -251,11 +244,11 @@
         }
       } catch (_) {}
       const url = new URL(location.href);
-      url.searchParams.set("v", "60");
+      url.searchParams.set("v", "61");
       location.replace(url.toString());
     })();
   </script>
   <script src="js/native.js" type="module"></script>
-  <script src="js/game.js?v=60" type="module"></script>
+  <script src="js/game.js?v=61" type="module"></script>
 </body>
 </html>
