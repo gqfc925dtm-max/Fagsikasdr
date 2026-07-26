@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=menu53" />
+  <link rel="stylesheet" href="css/style.css?v=wave54" />
   <link rel="preload" href="assets/fish-evil.png?v=5" as="image" />
   <title>ОТТИСК</title>
 </head>
@@ -209,7 +209,7 @@
   </div>
   <script>
     (async () => {
-      const stamp = "ottisk-force-v53";
+      const stamp = "ottisk-force-v54";
       if (localStorage.getItem(stamp)) return;
       localStorage.setItem(stamp, "1");
       try {
@@ -223,11 +223,11 @@
         }
       } catch (_) {}
       const url = new URL(location.href);
-      url.searchParams.set("v", "53");
+      url.searchParams.set("v", "54");
       location.replace(url.toString());
     })();
   </script>
   <script src="js/native.js" type="module"></script>
-  <script src="js/game.js?v=menu53" type="module"></script>
+  <script src="js/game.js?v=wave54" type="module"></script>
 </body>
 </html>
