@@ -2035,6 +2035,13 @@ function setActiveHero(id) {
   showToast(`герой · ${activeHero().name}`);
 }
 
+function updateHeroAbilityHint() {
+  const hint = document.getElementById("hero-ability-hint");
+  if (!hint) return;
+  const hero = activeHero();
+  hint.textContent = hero?.ability || "";
+}
+
 function renderHeroPicker() {
   if (!heroListEl) return;
   heroListEl.textContent = "";
@@ -2043,16 +2050,16 @@ function renderHeroPicker() {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = `hero-tile${hero.id === current ? " on" : ""}`;
-    const label = hero.id === "custom" && !state.meta?.customHero ? "нарисуй" : hero.name;
-    const ability = hero.ability ? `<span class="hero-ability">${hero.ability}</span>` : "";
-    btn.innerHTML = `<span class="hero-glyph" aria-hidden="true">${hero.glyph || "•"}</span><span class="hero-tile-name">${label}</span>${ability}`;
+    const label = hero.id === "custom" && !state.meta?.customHero ? "свой" : hero.name;
+    btn.innerHTML = `<span class="hero-glyph" aria-hidden="true">${hero.glyph || "•"}</span><span class="hero-tile-name">${label}</span>`;
     btn.setAttribute("role", "option");
     btn.setAttribute("aria-label", hero.ability ? `${label}, ${hero.ability}` : label);
     btn.setAttribute("aria-selected", hero.id === current ? "true" : "false");
     btn.addEventListener("click", () => setActiveHero(hero.id));
     heroListEl.appendChild(btn);
   }
-  if (btnDrawHero) btnDrawHero.textContent = state.meta?.customHero ? "перерисовать" : "нарисовать";
+  updateHeroAbilityHint();
+  if (btnDrawHero) btnDrawHero.textContent = state.meta?.customHero ? "изменить" : "нарисовать";
 }
 
 function touchPlayDay() {
@@ -2146,29 +2153,22 @@ function claimGift(giftId) {
 
 function renderGifts() {
   const list = document.getElementById("gift-list");
+  const wrap = document.getElementById("menu-gifts");
   if (!list || !state.meta) return;
   const now = Date.now();
+  const readyGifts = GIFTS.filter((gift) => giftReady(gift, now));
   list.textContent = "";
-  for (const gift of GIFTS) {
-    const ready = giftReady(gift, now);
-    const locked = gift.lockedLabel?.(state.meta, now) || "";
+  if (wrap) wrap.classList.toggle("hidden", readyGifts.length === 0);
+  for (const gift of readyGifts) {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = `gift-tile${ready ? " ready" : ""}`;
-    btn.disabled = !ready;
+    btn.className = "gift-tile ready";
     const amountText = gift.amountLabel?.(state.meta, now) || `+${gift.amount}`;
-    let metaText = ready ? `забрать ${amountText}` : (locked || formatWait(gift.waitMs(state.meta, now)));
-    if (!ready && gift.id === "streak" && (state.meta.streak || 0) < 2) {
-      metaText = "нужно 2 дня";
-    }
-    if (!ready && gift.id === "return") {
-      metaText = locked || "после паузы 20ч";
-    }
     btn.innerHTML = `
-      <span class="gift-tile-kicker">${gift.kicker}</span>
-      <span class="gift-tile-title">${gift.title}</span>
-      <span class="gift-tile-meta">${metaText}</span>
+      <span class="gift-tile-title">Подарок · ${gift.title}</span>
+      <span class="gift-tile-meta">забрать ${amountText}</span>
     `;
+    btn.setAttribute("aria-label", `Забрать подарок ${gift.title} ${amountText}`);
     btn.addEventListener("click", () => claimGift(gift.id));
     list.appendChild(btn);
   }
@@ -2209,7 +2209,7 @@ function setDifficulty(id) {
   const diff = playerDifficulty();
   showToast(`сложность · ${diff.name}`);
   const sub = document.querySelector("#btn-start .btn-sub");
-  if (sub) sub.textContent = `${diff.name} · удерживай`;
+  if (sub) sub.textContent = "удерживай кнопку";
 }
 
 function renderDifficultyPicker() {
@@ -2227,7 +2227,7 @@ function renderDifficultyPicker() {
     list.appendChild(btn);
   }
   const sub = document.querySelector("#btn-start .btn-sub");
-  if (sub) sub.textContent = `${playerDifficulty().name} · удерживай`;
+  if (sub) sub.textContent = "удерживай кнопку";
 }
 
 function evaluateWeekly(score) {
@@ -5742,7 +5742,7 @@ function boot() {
   const nativeShell = !!window.OttiskNative?.isNative;
   if ("serviceWorker" in navigator && !nativeShell) {
     navigator.serviceWorker
-      .register("./sw.js?v=52")
+      .register("./sw.js?v=53")
       .then((reg) => reg.update())
       .catch(() => {});
   }
