@@ -1924,7 +1924,8 @@ function heroAuraSlowMul(hunter) {
 
 function tryHeroDash(dx, dy, moved) {
   if (!heroCanDash() || !state.life || state.heroDashCd > 0 || inOpening()) return false;
-  if (moved < 22) return false;
+  if ((state.holdLifeTime || 0) < 0.35) return false;
+  if (moved < 26) return false;
   const len = Math.hypot(dx, dy) || 1;
   const nx = dx / len;
   const ny = dy / len;
