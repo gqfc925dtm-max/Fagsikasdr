@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=64" />
+  <link rel="stylesheet" href="css/style.css?v=65" />
   <link rel="preload" href="assets/fish-evil.png?v=5" as="image" />
   <title>ОТТИСК</title>
 </head>
@@ -166,6 +166,10 @@
             <span class="btn-main">+60 следов</span>
             <span class="btn-sub" id="shop-pack-sub">пак · App Store / донат</span>
           </button>
+          <button id="btn-shop-sub" class="btn btn-secondary shop-sub-btn" type="button">
+            <span class="btn-main" id="shop-sub-main">Подводный корабль · 99 ₽</span>
+            <span class="btn-sub" id="shop-sub-sub">пушки · 3 жизни · App Store</span>
+          </button>
         </div>
         <p class="shop-section-label">Косметика</p>
         <div id="shop-cosmetics" class="shop-cosmetics" role="list"></div>
@@ -280,7 +284,7 @@
   </div>
   <script>
     (async () => {
-      const stamp = "ottisk-force-v64";
+      const stamp = "ottisk-force-v65";
       if (localStorage.getItem(stamp)) return;
       localStorage.setItem(stamp, "1");
       try {
@@ -294,11 +298,11 @@
         }
       } catch (_) {}
       const url = new URL(location.href);
-      url.searchParams.set("v", "64");
+      url.searchParams.set("v", "65");
       location.replace(url.toString());
     })();
   </script>
   <script src="js/native.js" type="module"></script>
-  <script src="js/game.js?v=64" type="module"></script>
+  <script src="js/game.js?v=65" type="module"></script>
 </body>
 </html>
