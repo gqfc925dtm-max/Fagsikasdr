@@ -978,7 +978,7 @@ function eatSparkBlast(spark, opening = false) {
   if (spark.type === "super") {
     state.shake = Math.max(state.shake, 26);
     state.flash = Math.max(state.flash, 1.25);
-    floatText(x, y - 26, "СУПЕР", gold, 22);
+    floatText(x, y - 26, "СУПЕР", "#ff2f45", 22);
     buzz([14, 20, 14, 28]);
   }
 }
@@ -3711,7 +3711,7 @@ function boot() {
   const nativeShell = !!window.OttiskNative?.isNative;
   if ("serviceWorker" in navigator && !nativeShell) {
     navigator.serviceWorker
-      .register("./sw.js?v=34")
+      .register("./sw.js?v=35")
       .then((reg) => reg.update())
       .catch(() => {});
   }
