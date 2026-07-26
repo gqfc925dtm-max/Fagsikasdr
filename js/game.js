@@ -207,7 +207,7 @@ const WAVES = [
   },
   {
     id: "darts",
-    at: 22,
+    at: 45,
     name: "стрелки",
     species: "dart",
     maxBonus: 1,
@@ -217,7 +217,7 @@ const WAVES = [
   },
   {
     id: "jellies",
-    at: 48,
+    at: 100,
     name: "медузы",
     species: "jelly",
     maxBonus: 1,
@@ -227,7 +227,7 @@ const WAVES = [
   },
   {
     id: "eels",
-    at: 80,
+    at: 170,
     name: "угри",
     species: "eel",
     maxBonus: 1,
@@ -237,7 +237,7 @@ const WAVES = [
   },
   {
     id: "sharks",
-    at: 130,
+    at: 260,
     name: "акулы",
     species: "shark",
     maxBonus: 1,
@@ -247,7 +247,7 @@ const WAVES = [
   },
   {
     id: "leviathan",
-    at: 155,
+    at: 360,
     name: "левиафан",
     species: "boss",
     maxBonus: 0,
@@ -258,7 +258,7 @@ const WAVES = [
   },
   {
     id: "rays",
-    at: 185,
+    at: 440,
     name: "скаты",
     species: "ray",
     maxBonus: 1,
@@ -268,7 +268,7 @@ const WAVES = [
   },
   {
     id: "ghosts",
-    at: 230,
+    at: 540,
     name: "призраки",
     species: "ghost",
     maxBonus: 2,
@@ -278,7 +278,7 @@ const WAVES = [
   },
   {
     id: "abyss",
-    at: 280,
+    at: 660,
     name: "бездна",
     species: "mix",
     maxBonus: 2,
@@ -1399,17 +1399,17 @@ function difficultyScale() {
   return skillSoftScale() * playerDifficulty().speed;
 }
 
-/** Ease the mid-run spike so objects feel a bit slower around 20–110 score. */
+/** Ease the mid-run spike across the longer wave ladder. */
 function midgamePace() {
   const s = state.score || 0;
   let pace = 1;
-  if (s < 18) pace = 1;
-  else if (s < 40) pace = 0.88;
-  else if (s < 70) pace = 0.82;
-  else if (s < 110) pace = 0.85;
-  else if (s < 150) pace = 0.92;
-  else if (s < 220) pace = 0.94;
-  else if (s < 280) pace = 0.96;
+  if (s < 30) pace = 1;
+  else if (s < 80) pace = 0.88;
+  else if (s < 150) pace = 0.82;
+  else if (s < 240) pace = 0.85;
+  else if (s < 340) pace = 0.9;
+  else if (s < 460) pace = 0.93;
+  else if (s < 600) pace = 0.96;
   else pace = 1;
   // Easy stays gentler late; hard keeps more pressure.
   if (playerDifficulty().id === "easy") pace *= 0.94;
@@ -1512,32 +1512,47 @@ function syncWave(announce = true) {
     updateWaveUi(false);
     return wave;
   }
+  const prevId = state.waveId;
   state.waveId = wave.id;
   state.waveIndex = WAVES.indexOf(wave);
   if (wave.boss) {
+    // Boss arena: clear the field once, then only Leviathan.
     state.hunters = state.hunters.filter((h) => h.shadow);
     spawnBoss();
   } else {
-    for (const hunter of state.hunters) {
+    // Soft handoff: keep positions, swap species gradually, no mass teleport.
+    for (let i = state.hunters.length - 1; i >= 0; i -= 1) {
+      const hunter = state.hunters[i];
       if (hunter.shadow || hunter.demo) continue;
-      if (hunter.boss) {
-        // Boss leaves when the wave ends — push off-screen cleanup via splice later.
-        hunter.boss = false;
-        hunter.species = wave.species;
+      if (hunter.boss || hunter.species === "boss") {
+        state.hunters.splice(i, 1);
+        continue;
       }
-      applySpeciesToHunter(hunter, wave.species);
-      hunter.warn = 1;
-      placeHunterOnEdge(hunter);
-      hunter.grace = Math.max(hunter.grace || 0, 0.75);
+      // Stagger conversion so the field does not flip in one frame.
+      if (Math.random() < 0.55) {
+        applySpeciesToHunter(hunter, wave.species);
+        hunter.warn = Math.max(hunter.warn, 0.7);
+        hunter.grace = Math.max(hunter.grace || 0, 1.1);
+        hunter.vx *= 0.4;
+        hunter.vy *= 0.4;
+      } else {
+        // Leave old species; next spawn / later sync will catch up.
+        hunter.pendingSpecies = wave.species;
+        hunter.grace = Math.max(hunter.grace || 0, 0.7);
+      }
+    }
+    // If we just left the boss and the field is empty, seed one new hunter.
+    if (prevId === "leviathan" && !state.hunters.some((h) => !h.shadow)) {
+      spawnHunter(true);
     }
   }
   updateWaveUi(true);
   if (announce && state.running && !inOpening()) {
-    tipOnce(`wave-${wave.id}`, wave.label, 1700);
+    tipOnce(`wave-${wave.id}`, wave.label, 1900);
     showCombo(wave.label, true);
     buzz([12, 18, 12]);
     sfxWaveShift();
-    state.flash = Math.max(state.flash, 0.16);
+    state.flash = Math.max(state.flash, 0.12);
   }
   return wave;
 }
@@ -3770,17 +3785,17 @@ function updateHunters(dt) {
   const diff = playerDifficulty();
   const wave = syncWave(true);
   // Fish from the start: only one slow hunter early, then ramp with score.
-  const early = state.elapsed < OPENING_SEC + 8 || state.score < 12;
+  const early = state.elapsed < OPENING_SEC + 8 || state.score < 18;
   const opening = inOpening();
   let maxHunters = early || opening
     ? 1
-    : Math.min(7, Math.max(1, Math.floor((1 + Math.floor(state.score / 22) + wave.maxBonus) * soft * diff.hunters)));
+    : Math.min(6, Math.max(1, Math.floor((1 + Math.floor(state.score / 55) + wave.maxBonus) * soft * diff.hunters)));
   if (wave.boss) maxHunters = 1;
   state.hunterAcc += dt;
-  let interval = (Math.max(1.35, 4.1 - state.score * 0.018) * wave.intervalMul * diff.spawn) / Math.max(0.55, soft);
+  let interval = (Math.max(1.55, 4.4 - state.score * 0.008) * wave.intervalMul * diff.spawn) / Math.max(0.55, soft);
   interval /= Math.max(0.75, midgamePace());
   // Mid-game: spawn a bit less often so the field stays readable.
-  if (state.score >= 22 && state.score < 110) interval *= 1.12;
+  if (state.score >= 40 && state.score < 220) interval *= 1.14;
   if (opening) interval = Math.max(interval, 2.8);
   if (!state.slowHunterSeen) interval = Math.max(interval, 1.1);
   const firstHunterAt = 0.45;
@@ -3813,6 +3828,12 @@ function updateHunters(dt) {
     hunter.grace = Math.max(0, (hunter.grace || 0) - dt);
     hunter.dashCd = Math.max(0, (hunter.dashCd || 0) - dt);
     hunter.dashT = Math.max(0, (hunter.dashT || 0) - dt);
+    if (hunter.pendingSpecies && !hunter.boss && hunter.grace <= 0 && Math.random() < dt * 0.9) {
+      applySpeciesToHunter(hunter, hunter.pendingSpecies);
+      hunter.pendingSpecies = "";
+      hunter.warn = Math.max(hunter.warn, 0.55);
+      hunter.grace = Math.max(hunter.grace || 0, 0.55);
+    }
     if (species === "ghost") {
       // Soft blink: briefly hard to read, but never fully invisible for fairness.
       hunter.phaseAlpha = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(hunter.pulse * 1.4));
@@ -3874,7 +3895,7 @@ function updateHunters(dt) {
       ty = state.echo.y;
     }
     const ang = Math.atan2(ty - hunter.y, tx - hunter.x);
-    let speed = (0.88 + state.score * 0.0085) * hunter.anger * wave.speedMul * midgamePace() * diff.speed;
+    let speed = (0.88 + Math.min(1.55, state.score * 0.0032)) * hunter.anger * wave.speedMul * midgamePace() * diff.speed;
     if (hunter.shadow) speed *= 0.88;
     if (hunter.slow) speed *= 0.68;
     if (hasMut("cool") && state.hunger < 50) speed *= 0.85;
