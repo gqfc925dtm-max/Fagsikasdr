@@ -716,6 +716,20 @@ body {
   line-height: 1.2;
 }
 
+.hero-ability {
+  font-family: "Instrument Sans", sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  color: color-mix(in srgb, var(--gold) 70%, var(--mute));
+  line-height: 1.1;
+}
+
+.hero-tile.on .hero-ability {
+  color: color-mix(in srgb, var(--gold) 88%, #fff);
+}
+
 .menu-dock {
   margin-top: 10px;
   display: flex;
