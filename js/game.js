@@ -164,12 +164,12 @@ const WAVES = [
   },
   {
     id: "sharks",
-    at: 120,
+    at: 130,
     name: "акулы",
     species: "shark",
-    maxBonus: 2,
-    speedMul: 1.18,
-    intervalMul: 0.72,
+    maxBonus: 1,
+    speedMul: 0.95,
+    intervalMul: 0.92,
     label: "ВОЛНА 5 · АКУЛЫ",
   },
 ];
@@ -1266,14 +1266,14 @@ function updateWaveUi(flash = false) {
 
 function applySpeciesToHunter(hunter, species) {
   hunter.species = species;
-  hunter.dashCd = species === "dart" ? rand(0.4, 1.1) : species === "shark" ? rand(1.2, 2.2) : 0;
+  hunter.dashCd = species === "dart" ? rand(0.4, 1.1) : species === "shark" ? rand(2.2, 3.4) : 0;
   hunter.dashT = 0;
   hunter.pulse = Math.random() * Math.PI * 2;
   hunter.weave = Math.random() * Math.PI * 2;
   if (species === "dart") hunter.r = rand(11, 14);
   else if (species === "jelly") hunter.r = rand(18, 24);
   else if (species === "eel") hunter.r = rand(13, 16);
-  else if (species === "shark") hunter.r = rand(20, 26);
+  else if (species === "shark") hunter.r = rand(16, 20);
   else hunter.r = rand(15, 19);
 }
 
@@ -3173,7 +3173,7 @@ function hunterReachMul(hunter) {
     return 1.7 * swell;
   }
   if (species === "eel") return 1.9;
-  if (species === "shark") return 1.85;
+  if (species === "shark") return 1.45;
   return 1.55;
 }
 
@@ -3266,17 +3266,17 @@ function updateHunters(dt) {
     if (activeEventId() === "raid") speed *= 1.08;
     if (inInkDive()) speed *= 0.35;
     if (species === "dart" && hunter.dashT > 0) speed *= 2.05;
-    if (species === "shark" && hunter.dashT > 0) speed *= 2.4;
+    if (species === "shark" && hunter.dashT > 0) speed *= 1.75;
 
     // Periodic lunges for dart/shark waves.
     if (state.life && hunter.dashCd <= 0 && hunter.dashT <= 0 && (species === "dart" || species === "shark")) {
       const dLife = dist(hunter.x, hunter.y, state.life.x, state.life.y);
-      if (dLife < (species === "shark" ? 220 : 170) && dLife > 48) {
-        hunter.dashT = species === "shark" ? 0.42 : 0.22;
-        hunter.dashCd = species === "shark" ? rand(1.8, 2.8) : rand(0.7, 1.3);
+      if (dLife < (species === "shark" ? 160 : 170) && dLife > 56) {
+        hunter.dashT = species === "shark" ? 0.24 : 0.22;
+        hunter.dashCd = species === "shark" ? rand(2.8, 4.2) : rand(0.7, 1.3);
         const dashAng = Math.atan2(state.life.y - hunter.y, state.life.x - hunter.x);
-        hunter.vx += Math.cos(dashAng) * (species === "shark" ? 4.2 : 3.1);
-        hunter.vy += Math.sin(dashAng) * (species === "shark" ? 4.2 : 3.1);
+        hunter.vx += Math.cos(dashAng) * (species === "shark" ? 2.4 : 3.1);
+        hunter.vy += Math.sin(dashAng) * (species === "shark" ? 2.4 : 3.1);
       }
     }
 
@@ -3298,7 +3298,7 @@ function updateHunters(dt) {
         hunter.vy += ((hunter.y - other.y) / gap) * push;
       }
     }
-    const damp = species === "shark" && hunter.dashT > 0 ? 0.985 : 0.955;
+    const damp = species === "shark" && hunter.dashT > 0 ? 0.94 : 0.955;
     hunter.vx *= damp;
     hunter.vy *= damp;
     hunter.x += hunter.vx * dt * 60;
