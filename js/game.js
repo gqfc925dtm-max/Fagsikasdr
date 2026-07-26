@@ -906,6 +906,224 @@ function updateHum() {
   state.humNode.noiseFilter.frequency.setTargetAtTime(220 + hunterBoost * 700 + urgency * 260, t, 0.14);
 }
 
+function inMainMenu() {
+  return (
+    !state.running &&
+    !!screenStartEl &&
+    !screenStartEl.classList.contains("hidden") &&
+    (!screenOnboardEl || screenOnboardEl.classList.contains("hidden"))
+  );
+}
+
+function playMenuNote(ac, dest, freq, gain, dur, when) {
+  try {
+    const osc = ac.createOscillator();
+    const harm = ac.createOscillator();
+    const amp = ac.createGain();
+    const filt = ac.createBiquadFilter();
+    osc.type = "sine";
+    harm.type = "triangle";
+    osc.frequency.setValueAtTime(freq, when);
+    harm.frequency.setValueAtTime(freq * 2.01, when);
+    filt.type = "lowpass";
+    filt.frequency.setValueAtTime(Math.min(2200, freq * 2.6), when);
+    filt.Q.value = 0.8;
+    amp.gain.setValueAtTime(0.0001, when);
+    amp.gain.linearRampToValueAtTime(gain, when + 0.05);
+    amp.gain.linearRampToValueAtTime(gain * 0.55, when + dur * 0.45);
+    amp.gain.linearRampToValueAtTime(0.0001, when + dur);
+    const hg = ac.createGain();
+    hg.gain.value = 0.35;
+    osc.connect(filt);
+    harm.connect(hg);
+    hg.connect(filt);
+    filt.connect(amp);
+    amp.connect(dest);
+    osc.start(when);
+    harm.start(when);
+    osc.stop(when + dur + 0.04);
+    harm.stop(when + dur + 0.04);
+  } catch (_) {
+    // ignore
+  }
+}
+
+function playMenuBass(ac, dest, freq, when) {
+  try {
+    const osc = ac.createOscillator();
+    const amp = ac.createGain();
+    const filt = ac.createBiquadFilter();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(freq, when);
+    osc.frequency.linearRampToValueAtTime(freq * 0.92, when + 0.9);
+    filt.type = "lowpass";
+    filt.frequency.value = 240;
+    amp.gain.setValueAtTime(0.0001, when);
+    amp.gain.linearRampToValueAtTime(0.034, when + 0.08);
+    amp.gain.linearRampToValueAtTime(0.0001, when + 1.05);
+    osc.connect(filt);
+    filt.connect(amp);
+    amp.connect(dest);
+    osc.start(when);
+    osc.stop(when + 1.1);
+  } catch (_) {
+    // ignore
+  }
+}
+
+function stopMenuMusic(fade = 0.4) {
+  const mm = state.menuMusic;
+  if (!mm) return;
+  mm.alive = false;
+  if (mm.timer) {
+    clearTimeout(mm.timer);
+    mm.timer = 0;
+  }
+  const ac = state.audio;
+  if (ac && mm.master) {
+    const t = ac.currentTime;
+    try {
+      mm.master.gain.cancelScheduledValues(t);
+      mm.master.gain.setTargetAtTime(0.0001, t, Math.max(0.04, fade * 0.22));
+    } catch (_) {
+      // ignore
+    }
+    const stopAt = t + fade + 0.08;
+    for (const osc of mm.oscs || []) {
+      try {
+        osc.stop(stopAt);
+      } catch (_) {
+        // already stopped
+      }
+    }
+    try {
+      mm.noise?.stop(stopAt);
+    } catch (_) {
+      // already stopped
+    }
+  }
+  state.menuMusic = null;
+}
+
+/** Soft underwater loop for the title screen — starts after a user gesture unlocks audio. */
+function startMenuMusic() {
+  if (!soundEnabled() || state.running || state.menuMusic || !inMainMenu()) return;
+  unlockAudio();
+  const bus = audioOut();
+  if (!bus) return;
+  const { ac, out } = bus;
+
+  const master = ac.createGain();
+  master.gain.value = 0.0001;
+  master.connect(out);
+
+  const padGain = ac.createGain();
+  padGain.gain.value = 0.05;
+  const padFilter = ac.createBiquadFilter();
+  padFilter.type = "lowpass";
+  padFilter.frequency.value = 620;
+  padFilter.Q.value = 0.75;
+  padGain.connect(padFilter);
+  padFilter.connect(master);
+
+  const padFreqs = [73.42, 110, 146.83, 174.61]; // D2 · A2 · D3 · F3
+  const oscs = [];
+  for (const f of padFreqs) {
+    const o = ac.createOscillator();
+    o.type = f < 100 ? "sine" : "triangle";
+    o.frequency.value = f;
+    const g = ac.createGain();
+    g.gain.value = f < 100 ? 0.58 : 0.26;
+    o.connect(g);
+    g.connect(padGain);
+    o.start();
+    oscs.push(o);
+  }
+
+  const lfo = ac.createOscillator();
+  const lfoG = ac.createGain();
+  lfo.type = "sine";
+  lfo.frequency.value = 0.06;
+  lfoG.gain.value = 160;
+  lfo.connect(lfoG);
+  lfoG.connect(padFilter.frequency);
+  lfo.start();
+  oscs.push(lfo);
+
+  let noise = null;
+  const buffer = getNoiseBuffer();
+  if (buffer) {
+    noise = ac.createBufferSource();
+    noise.buffer = buffer;
+    noise.loop = true;
+    const nf = ac.createBiquadFilter();
+    nf.type = "bandpass";
+    nf.frequency.value = 380;
+    nf.Q.value = 0.55;
+    const ng = ac.createGain();
+    ng.gain.value = 0.016;
+    noise.connect(nf);
+    nf.connect(ng);
+    ng.connect(master);
+    noise.start();
+  }
+
+  const leadBus = ac.createGain();
+  leadBus.gain.value = 1;
+  leadBus.connect(master);
+
+  master.gain.setTargetAtTime(1, ac.currentTime, 0.9);
+
+  const melody = [293.66, 349.23, 392.0, 440.0, 349.23, 293.66, 261.63, 220.0];
+  const bass = [73.42, 65.41, 87.31, 73.42];
+  const mm = {
+    alive: true,
+    master,
+    oscs,
+    noise,
+    timer: 0,
+    nextT: ac.currentTime + 0.35,
+    step: 0,
+  };
+  state.menuMusic = mm;
+
+  const tick = () => {
+    if (!state.menuMusic || state.menuMusic !== mm || !mm.alive) return;
+    if (!soundEnabled() || !inMainMenu()) {
+      stopMenuMusic();
+      return;
+    }
+    const now = ac.currentTime;
+    while (mm.nextT < now + 0.4) {
+      const i = mm.step;
+      const freq = melody[i % melody.length];
+      const accent = i % 4 === 0;
+      playMenuNote(ac, leadBus, freq, accent ? 0.026 : 0.016, accent ? 0.78 : 0.48, mm.nextT);
+      if (i % 4 === 0) playMenuBass(ac, leadBus, bass[(i / 4) % bass.length], mm.nextT);
+      if (i % 8 === 5) {
+        playNoise({
+          gain: 0.01,
+          dur: 0.12,
+          delay: Math.max(0, mm.nextT - now),
+          filterFreq: 1600,
+          endFilter: 500,
+          filterType: "bandpass",
+          filterQ: 1.2,
+        });
+      }
+      mm.nextT += 0.64;
+      mm.step += 1;
+    }
+    mm.timer = setTimeout(tick, 160);
+  };
+  tick();
+}
+
+function syncMenuMusic() {
+  if (inMainMenu() && soundEnabled()) startMenuMusic();
+  else stopMenuMusic();
+}
+
 function sfxBubblePop(pitch = 1) {
   playNoise({
     gain: 0.028,
@@ -2544,6 +2762,7 @@ function showOnboard() {
   refreshOnboardUi();
   screenStartEl.classList.add("hidden");
   screenOnboardEl.classList.remove("hidden");
+  stopMenuMusic();
 }
 
 function refreshOnboardUi() {
@@ -2570,6 +2789,7 @@ function advanceOnboard() {
   screenStartEl.classList.remove("hidden");
   updateEconomyLabels();
   renderDaily();
+  syncMenuMusic();
 }
 
 function isNativeShop() {
@@ -3072,6 +3292,7 @@ function bindHoldButton(button, target) {
     e.preventDefault();
     if (state.running) return;
     unlockAudio();
+    syncMenuMusic();
     state.hold = { target, pointerId: e.pointerId, progress: 0 };
     setHoldVisual("0%", target);
     sfxUiTap(0);
@@ -3178,6 +3399,7 @@ function finalizeGameOver(reason) {
   screenContinueEl?.classList.add("hidden");
   screenOverEl.classList.remove("hidden");
   clearHold();
+  stopMenuMusic();
   if (isNewBest) {
     goalChime();
     buzz([12, 20, 12]);
@@ -3829,6 +4051,7 @@ function resetDemo() {
 
 function startGame() {
   unlockAudio();
+  stopMenuMusic(0.25);
   hum(false);
   touchPlayDay();
   refreshDaily();
@@ -3883,6 +4106,7 @@ function goToMenu() {
   renderGifts();
   resetDemo();
   sfxUiTap(0);
+  syncMenuMusic();
 }
 
 function finishRun(reason) {
@@ -6439,6 +6663,15 @@ function boot() {
   bindDrawHeroUi();
   bindHoldButton(btnStart, "start");
   bindHoldButton(btnRetry, "retry");
+  screenStartEl?.addEventListener(
+    "pointerdown",
+    () => {
+      if (!inMainMenu() || !soundEnabled()) return;
+      unlockAudio();
+      syncMenuMusic();
+    },
+    { passive: true }
+  );
   document.getElementById("btn-menu")?.addEventListener("click", (e) => {
     e.preventDefault();
     goToMenu();
@@ -6471,10 +6704,12 @@ function boot() {
     state.meta.sound = !(state.meta.sound !== false);
     if (!state.meta.sound) {
       hum(false);
+      stopMenuMusic(0.15);
       state.audioUnlocked = false;
     } else {
       unlockAudio();
       sfxUiTap(2);
+      syncMenuMusic();
     }
     saveMeta();
     renderSettings();
@@ -6499,6 +6734,7 @@ function boot() {
       state.touchActive = false;
       state.pointerId = null;
     }
+    stopMenuMusic(0.12);
     if (state.running && !state.pendingDeathReason) {
       state.life = null;
       state.echo = null;
@@ -6515,6 +6751,8 @@ function boot() {
       state.paused = false;
       state.safeUntil = performance.now() + 1200;
       showToast("удерживай снова");
+    } else {
+      syncMenuMusic();
     }
   };
   document.addEventListener("visibilitychange", () => {
