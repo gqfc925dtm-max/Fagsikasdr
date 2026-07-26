@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=hud1" />
+  <link rel="stylesheet" href="css/style.css?v=gift1" />
   <link rel="preload" href="assets/fish-evil.png?v=5" as="image" />
   <title>ОТТИСК</title>
 </head>
@@ -80,6 +80,14 @@
         <div id="hero-list" class="hero-rail" role="listbox" aria-label="Выбор героя"></div>
       </section>
 
+      <section class="menu-gifts" aria-label="Подарки">
+        <div class="menu-choose-head">
+          <span class="meta-label">подарки</span>
+          <span id="marks-start" class="menu-marks">0 следов</span>
+        </div>
+        <div id="gift-list" class="gift-rail" role="list"></div>
+      </section>
+
       <div class="menu-dock">
         <section class="menu-diff" aria-label="Сложность">
           <span class="meta-label">сложность</span>
@@ -105,7 +113,6 @@
 
       <!-- kept for JS economy hooks; hidden on start -->
       <span id="streak-start" class="hidden">0 дн</span>
-      <span id="marks-start" class="hidden">0</span>
       <span id="skin-name" class="hidden">чернь</span>
       <div id="daily-card" class="hidden"></div>
       <div id="weekly-card" class="hidden"></div>
@@ -203,7 +210,7 @@
   </div>
   <script>
     (async () => {
-      const stamp = "ottisk-force-v49";
+      const stamp = "ottisk-force-v50";
       if (localStorage.getItem(stamp)) return;
       localStorage.setItem(stamp, "1");
       try {
@@ -217,11 +224,11 @@
         }
       } catch (_) {}
       const url = new URL(location.href);
-      url.searchParams.set("v", "49");
+      url.searchParams.set("v", "50");
       location.replace(url.toString());
     })();
   </script>
   <script src="js/native.js" type="module"></script>
-  <script src="js/game.js?v=hud1" type="module"></script>
+  <script src="js/game.js?v=gift1" type="module"></script>
 </body>
 </html>

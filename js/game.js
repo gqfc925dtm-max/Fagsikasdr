@@ -126,6 +126,73 @@ const DIFFICULTIES = [
   { id: "hard", name: "сложный", speed: 1.2, spawn: 0.8, hunters: 1.22, hunger: 1.18, dash: 1.18 },
 ];
 
+const HOUR_MS = 60 * 60 * 1000;
+const GIFTS = [
+  {
+    id: "hourly",
+    kicker: "каждый час",
+    title: "Часовой",
+    amount: 8,
+    ready: (meta, now) => now >= (meta.hourlyGiftAt || 0),
+    waitMs: (meta, now) => Math.max(0, (meta.hourlyGiftAt || 0) - now),
+    claim: (meta, now) => {
+      meta.hourlyGiftAt = now + HOUR_MS;
+      return 8;
+    },
+  },
+  {
+    id: "daily",
+    kicker: "раз в день",
+    title: "Дневной",
+    amount: 22,
+    ready: (meta) => meta.dailyGiftDay !== localDayKey(),
+    waitMs: () => msUntilNextLocalDay(),
+    claim: (meta) => {
+      meta.dailyGiftDay = localDayKey();
+      return 22;
+    },
+  },
+  {
+    id: "weekly",
+    kicker: "раз в неделю",
+    title: "Недельный",
+    amount: 60,
+    ready: (meta) => meta.weeklyGiftWeek !== weekKey(),
+    waitMs: () => msUntilNextWeek(),
+    claim: (meta) => {
+      meta.weeklyGiftWeek = weekKey();
+      return 60;
+    },
+  },
+  {
+    id: "streak",
+    kicker: "за серию",
+    title: "Серия",
+    amount: 0,
+    ready: (meta) => (meta.streak || 0) >= 2 && meta.streakGiftDay !== localDayKey(),
+    waitMs: (meta) => ((meta.streak || 0) >= 2 ? msUntilNextLocalDay() : 0),
+    claim: (meta) => {
+      meta.streakGiftDay = localDayKey();
+      return 6 + Math.min(14, Math.max(0, (meta.streak || 0) - 1) * 3);
+    },
+    amountLabel: (meta) => `+${6 + Math.min(14, Math.max(0, (meta.streak || 0) - 1) * 3)}`,
+    lockedLabel: (meta) => ((meta.streak || 0) < 2 ? "нужно 2 дня" : ""),
+  },
+  {
+    id: "return",
+    kicker: "возвращение",
+    title: "С возвращением",
+    amount: 16,
+    ready: (meta) => meta.returnAvailableDay === localDayKey() && meta.returnGiftAt !== localDayKey(),
+    waitMs: () => msUntilNextLocalDay(),
+    claim: (meta) => {
+      meta.returnGiftAt = localDayKey();
+      return 16;
+    },
+    lockedLabel: () => "зайди завтра",
+  },
+];
+
 /** Difficulty waves: each tier swaps predator species + pacing. */
 const WAVES = [
   {
@@ -1577,6 +1644,30 @@ function localDayKey(date = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
+function msUntilNextLocalDay(now = Date.now()) {
+  const d = new Date(now);
+  const next = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1, 0, 0, 0, 0);
+  return Math.max(0, next.getTime() - now);
+}
+
+function msUntilNextWeek(now = Date.now()) {
+  const d = new Date(now);
+  const day = d.getDay(); // 0 Sun
+  const daysToMon = day === 0 ? 1 : 8 - day;
+  const next = new Date(d.getFullYear(), d.getMonth(), d.getDate() + daysToMon, 0, 0, 0, 0);
+  return Math.max(0, next.getTime() - now);
+}
+
+function formatWait(ms) {
+  const total = Math.max(0, Math.ceil(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  if (h > 0) return `${h}ч ${String(m).padStart(2, "0")}м`;
+  if (m > 0) return `${m}м ${String(s).padStart(2, "0")}с`;
+  return `${s}с`;
+}
+
 function parseDayKey(dayKey) {
   if (!dayKey || !/^\d{4}-\d{2}-\d{2}$/.test(dayKey)) return null;
   const [year, month, day] = dayKey.split("-").map(Number);
@@ -1665,6 +1756,13 @@ function loadMeta() {
     activeHero: HEROES.some((h) => h.id === raw?.activeHero) ? raw.activeHero : "octopus",
     customHero: typeof raw?.customHero === "string" && raw.customHero.startsWith("data:image") ? raw.customHero : "",
     difficulty: DIFFICULTIES.some((d) => d.id === raw?.difficulty) ? raw.difficulty : "normal",
+    hourlyGiftAt: Math.max(0, Number(raw?.hourlyGiftAt || 0)),
+    dailyGiftDay: typeof raw?.dailyGiftDay === "string" ? raw.dailyGiftDay : "",
+    weeklyGiftWeek: typeof raw?.weeklyGiftWeek === "string" ? raw.weeklyGiftWeek : "",
+    streakGiftDay: typeof raw?.streakGiftDay === "string" ? raw.streakGiftDay : "",
+    returnGiftAt: typeof raw?.returnGiftAt === "string" ? raw.returnGiftAt : "",
+    returnAvailableDay: typeof raw?.returnAvailableDay === "string" ? raw.returnAvailableDay : "",
+    lastVisitAt: Math.max(0, Number(raw?.lastVisitAt || 0)),
   };
 }
 
@@ -1778,7 +1876,7 @@ function refreshDaily() {
 
 function updateEconomyLabels() {
   if (!state.meta) return;
-  if (marksStartEl) marksStartEl.textContent = String(state.meta.marks);
+  if (marksStartEl) marksStartEl.textContent = `${state.meta.marks || 0} следов`;
   const streakText = `${Math.max(0, state.meta.streak || 0)} дн`;
   if (streakStartEl) streakStartEl.textContent = streakText;
   if (streakOverEl) streakOverEl.textContent = String(Math.max(0, state.meta.streak || 0));
@@ -1795,6 +1893,74 @@ function renderDaily() {
   if (dailyCardEl) dailyCardEl.textContent = `ежедневка · ${daily.title} · ${dailyProgressText(daily)}`;
   renderWeekly();
   renderSettings();
+  renderGifts();
+}
+
+function giftReady(gift, now = Date.now()) {
+  if (!state.meta) return false;
+  return !!gift.ready(state.meta, now);
+}
+
+function touchVisitClock() {
+  if (!state.meta) return;
+  const now = Date.now();
+  const prev = state.meta.lastVisitAt || 0;
+  if (prev && now - prev >= HOUR_MS * 20) {
+    state.meta.returnAvailableDay = localDayKey();
+  }
+  state.meta.lastVisitAt = now;
+  saveMeta();
+}
+
+function claimGift(giftId) {
+  if (!state.meta) return;
+  const gift = GIFTS.find((g) => g.id === giftId);
+  if (!gift) return;
+  const now = Date.now();
+  if (!giftReady(gift, now)) {
+    const locked = gift.lockedLabel?.(state.meta, now);
+    showToast(locked || "ещё рано");
+    return;
+  }
+  const amount = gift.claim(state.meta, now);
+  saveMeta();
+  awardMarks(amount, { metaOnly: true });
+  goalChime();
+  buzz([10, 18, 10]);
+  showToast(`${gift.title.toLowerCase()} · +${amount} следов`);
+  renderGifts();
+  updateEconomyLabels();
+}
+
+function renderGifts() {
+  const list = document.getElementById("gift-list");
+  if (!list || !state.meta) return;
+  const now = Date.now();
+  list.textContent = "";
+  for (const gift of GIFTS) {
+    const ready = giftReady(gift, now);
+    const locked = gift.lockedLabel?.(state.meta, now) || "";
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `gift-tile${ready ? " ready" : ""}`;
+    btn.disabled = !ready;
+    const amountText = gift.amountLabel?.(state.meta, now) || `+${gift.amount}`;
+    let metaText = ready ? `забрать ${amountText}` : (locked || formatWait(gift.waitMs(state.meta, now)));
+    if (!ready && gift.id === "streak" && (state.meta.streak || 0) < 2) {
+      metaText = "нужно 2 дня";
+    }
+    if (!ready && gift.id === "return") {
+      metaText = locked || "после паузы 20ч";
+    }
+    btn.innerHTML = `
+      <span class="gift-tile-kicker">${gift.kicker}</span>
+      <span class="gift-tile-title">${gift.title}</span>
+      <span class="gift-tile-meta">${metaText}</span>
+    `;
+    btn.addEventListener("click", () => claimGift(gift.id));
+    list.appendChild(btn);
+  }
+  updateEconomyLabels();
 }
 
 function renderWeekly() {
@@ -4993,12 +5159,14 @@ function boot() {
   saveMeta();
   loadCustomHeroImage(state.meta.customHero || "");
   touchPlayDay();
+  touchVisitClock();
   refreshDaily();
   state.best = state.meta.best;
   updateBestLabels();
   renderDaily();
   renderSkinMeta();
   renderHeroPicker();
+  renderGifts();
   updateEconomyLabels();
   resize();
   applyThemeFromScore(false);
@@ -5010,6 +5178,10 @@ function boot() {
   bindDrawHeroUi();
   bindHoldButton(btnStart, "start");
   bindHoldButton(btnRetry, "retry");
+  setInterval(() => {
+    if (!screenStartEl || screenStartEl.classList.contains("hidden")) return;
+    renderGifts();
+  }, 15000);
   canvas.addEventListener("pointerdown", onCanvasDown, { passive: false });
   canvas.addEventListener("pointermove", onCanvasMove, { passive: false });
   canvas.addEventListener("pointerup", onCanvasUp, { passive: false });
@@ -5070,6 +5242,8 @@ function boot() {
   const resumeFromBackground = () => {
     state.lastTs = performance.now();
     if (soundEnabled()) unlockAudio();
+    touchVisitClock();
+    if (!screenStartEl?.classList.contains("hidden")) renderGifts();
     if (state.paused && state.running) {
       state.paused = false;
       state.safeUntil = performance.now() + 1200;
@@ -5093,7 +5267,7 @@ function boot() {
   const nativeShell = !!window.OttiskNative?.isNative;
   if ("serviceWorker" in navigator && !nativeShell) {
     navigator.serviceWorker
-      .register("./sw.js?v=38")
+      .register("./sw.js?v=50")
       .then((reg) => reg.update())
       .catch(() => {});
   }
