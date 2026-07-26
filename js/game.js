@@ -145,10 +145,23 @@ const HEROES = [
   { id: "jellyfish", name: "медуза", glyph: "Ме", ability: "аура", tip: "АУРА ЗАМЕДЛЯЕТ" },
   { id: "turtle", name: "черепаха", glyph: "Че", ability: "панцирь", tip: "ПАНЦИРЬ ДЕРЖИТ ДОЛЬШЕ" },
   { id: "crab", name: "краб", glyph: "Кр", ability: "щит", tip: "ЩИТ НА 1 УДАР" },
-  { id: "manta", name: "скат", glyph: "Ск", ability: "рывок", tip: "РЕЗКИЙ СВАЙП — РЫВОК", premium: true, cost: 45 },
-  { id: "angler", name: "удильщик", glyph: "Уд", ability: "аура", tip: "АУРА ЗАМЕДЛЯЕТ", premium: true, cost: 80 },
-  { id: "nautilus", name: "наутилус", glyph: "На", ability: "щит", tip: "ЩИТ НА 1 УДАР", premium: true, cost: 120 },
+  { id: "manta", name: "скат", glyph: "Ск", ability: "крыло", tip: "ДЛИННЫЙ РЫВОК-КРЫЛО", premium: true, cost: 45 },
+  { id: "angler", name: "удильщик", glyph: "Уд", ability: "манок", tip: "АУРА ТЯНЕТ СВЕТ", premium: true, cost: 80 },
+  { id: "nautilus", name: "наутилус", glyph: "На", ability: "раковина", tip: "ЩИТ ВОССТАНАВЛИВАЕТСЯ", premium: true, cost: 120 },
   { id: "custom", name: "свой", glyph: "✦", ability: "рывок", tip: "РЕЗКИЙ СВАЙП — РЫВОК" },
+];
+
+const TRAILS = [
+  { id: "plain", name: "чистый", sub: "без эффекта", cost: 0 },
+  { id: "gold", name: "золотой", sub: "тёплый след", cost: 35, color: "#ffe08a" },
+  { id: "foam", name: "пена", sub: "светлая лента", cost: 55, color: "#d8f6ff" },
+  { id: "ember", name: "жар", sub: "огненные искры", cost: 75, color: "#ff9a62" },
+];
+
+const FRAMES = [
+  { id: "none", name: "без рамки", sub: "по умолчанию", cost: 0 },
+  { id: "ring", name: "кольцо", sub: "мягкий ореол", cost: 40 },
+  { id: "hex", name: "грань", sub: "геометрия вокруг", cost: 65 },
 ];
 
 const CONTROL_MODES = [
@@ -522,7 +535,9 @@ const state = {
   waveIndex: 0,
   heroDashCd: 0,
   heroShield: true,
+  heroShieldCd: 0,
   bestAtStart: 0,
+  shopReturn: "home",
   tipFlags: {
     move: false,
     hunter: false,
@@ -2366,6 +2381,14 @@ function loadMeta() {
       ? raw.unlockedHeroes.filter((id) => HEROES.some((h) => h.id === id && h.premium))
       : [],
     controlMode: CONTROL_MODES.some((m) => m.id === raw?.controlMode) ? raw.controlMode : "hand",
+    unlockedTrails: Array.isArray(raw?.unlockedTrails)
+      ? ["plain", ...raw.unlockedTrails.filter((id) => TRAILS.some((t) => t.id === id && t.cost > 0))]
+      : ["plain"],
+    activeTrail: TRAILS.some((t) => t.id === raw?.activeTrail) ? raw.activeTrail : "plain",
+    unlockedFrames: Array.isArray(raw?.unlockedFrames)
+      ? ["none", ...raw.unlockedFrames.filter((id) => FRAMES.some((f) => f.id === id && f.cost > 0))]
+      : ["none"],
+    activeFrame: FRAMES.some((f) => f.id === raw?.activeFrame) ? raw.activeFrame : "none",
     difficulty: DIFFICULTIES.some((d) => d.id === raw?.difficulty) ? raw.difficulty : "normal",
     hourlyGiftAt: Math.max(0, Number(raw?.hourlyGiftAt || 0)),
     dailyGiftDay: typeof raw?.dailyGiftDay === "string" ? raw.dailyGiftDay : "",
@@ -2474,10 +2497,11 @@ function heroHasShield() {
 
 function heroAuraSlowMul(hunter) {
   if (!heroHasAura() || !state.life || !hunter) return 1;
-  const reach = 118 + Math.sin(state.time * 2.4) * 6;
+  const reach = (activeHeroId() === "angler" ? 138 : 118) + Math.sin(state.time * 2.4) * 6;
   const d = dist(hunter.x, hunter.y, state.life.x, state.life.y);
   if (d > reach) return 1;
-  return 0.52 + 0.28 * clamp(d / reach, 0, 1);
+  const deep = activeHeroId() === "angler" ? 0.42 : 0.52;
+  return deep + 0.28 * clamp(d / reach, 0, 1);
 }
 
 function tryHeroDash(dx, dy, moved) {
@@ -2487,36 +2511,38 @@ function tryHeroDash(dx, dy, moved) {
   const len = Math.hypot(dx, dy) || 1;
   const nx = dx / len;
   const ny = dy / len;
-  const boost = 56;
+  const manta = activeHeroId() === "manta";
+  const boost = manta ? 84 : 56;
   state.life.x += nx * boost;
   state.life.y += ny * boost;
   clampLife();
   state.life.aim = Math.atan2(ny, nx);
-  state.heroDashCd = 2.6;
-  state.safeUntil = performance.now() + 320;
+  state.heroDashCd = manta ? 1.85 : 2.6;
+  state.safeUntil = performance.now() + (manta ? 480 : 320);
+  const pushR = manta ? 128 : 96;
   for (const hunter of state.hunters) {
     if (hunter.boss) continue;
     const d = dist(hunter.x, hunter.y, state.life.x, state.life.y);
-    if (d > 96 || d < 0.1) continue;
-    const push = ((96 - d) / 96) * 7.5;
+    if (d > pushR || d < 0.1) continue;
+    const push = ((pushR - d) / pushR) * (manta ? 10.5 : 7.5);
     hunter.vx += ((hunter.x - state.life.x) / d) * push;
     hunter.vy += ((hunter.y - state.life.y) / d) * push;
     hunter.warn = Math.max(hunter.warn, 0.7);
     hunter.grace = Math.max(hunter.grace || 0, 0.35);
   }
-  for (let i = 0; i < 10; i += 1) {
+  for (let i = 0; i < (manta ? 16 : 10); i += 1) {
     pushParticle({
       x: state.life.x - nx * i * 4,
       y: state.life.y - ny * i * 4,
       vx: -nx * rand(1.2, 2.8),
       vy: -ny * rand(1.2, 2.8),
       size: rand(2, 4.5),
-      color: cssVar("--life", "#7affd4"),
+      color: manta ? cssVar("--accent-b", "#7affd4") : cssVar("--life", "#7affd4"),
       kind: "streak",
       decay: rand(0.04, 0.07),
     });
   }
-  floatText(state.life.x, state.life.y - 22, "рывок", cssVar("--life", "#7affd4"), 15);
+  floatText(state.life.x, state.life.y - 22, manta ? "крыло" : "рывок", cssVar("--life", "#7affd4"), 15);
   tipOnce("ability", activeHero().tip || "РЫВОК", 1400);
   sfxPulse();
   buzz([8, 14, 8]);
@@ -2527,20 +2553,22 @@ function tryHeroDash(dx, dy, moved) {
 function tryCrabShield(hunter) {
   if (!heroHasShield() || !state.heroShield || !state.life) return false;
   state.heroShield = false;
+  const nautilus = activeHeroId() === "nautilus";
+  if (nautilus) state.heroShieldCd = 12;
   buzz([12, 20, 12]);
   sfxPulse();
-  burst(state.life.x, state.life.y, cssVar("--accent-a", "#ff9a62"), 22, 5.2);
-  floatText(state.life.x, state.life.y - 20, "щит", cssVar("--accent-a", "#ff9a62"), 16);
-  tipOnce("ability", "ЩИТ СЛОМАН", 1400);
+  burst(state.life.x, state.life.y, cssVar("--accent-a", "#ff9a62"), nautilus ? 28 : 22, nautilus ? 6 : 5.2);
+  floatText(state.life.x, state.life.y - 20, nautilus ? "раковина" : "щит", cssVar("--accent-a", "#ff9a62"), 16);
+  tipOnce("ability", nautilus ? "РАКОВИНА СЛОМАНА" : "ЩИТ СЛОМАН", 1400);
   if (hunter) {
     const ang = Math.atan2(hunter.y - state.life.y, hunter.x - state.life.x) || 0;
-    hunter.vx += Math.cos(ang) * 9;
-    hunter.vy += Math.sin(ang) * 9;
+    hunter.vx += Math.cos(ang) * (nautilus ? 12 : 9);
+    hunter.vy += Math.sin(ang) * (nautilus ? 12 : 9);
     hunter.warn = 1;
-    hunter.grace = Math.max(hunter.grace || 0, 0.55);
+    hunter.grace = Math.max(hunter.grace || 0, nautilus ? 0.75 : 0.55);
     if (!hunter.boss) placeHunterOnEdge(hunter);
   }
-  state.safeUntil = performance.now() + 900;
+  state.safeUntil = performance.now() + (nautilus ? 1400 : 900);
   return true;
 }
 
@@ -2629,6 +2657,7 @@ function tryUnlockHero(id) {
 function updateHeroAbilityHint() {
   const hint = document.getElementById("hero-ability-hint");
   const lock = document.getElementById("hero-lock-hint");
+  const buyBtn = document.getElementById("btn-buy-marks-hero");
   const selectedId = state.meta?.activeHero || "octopus";
   const hero = HEROES.find((h) => h.id === selectedId) || activeHero();
   const owned = isHeroOwned(hero.id);
@@ -2642,11 +2671,19 @@ function updateHeroAbilityHint() {
   if (lock) {
     if (hero?.premium && !owned) {
       lock.classList.remove("hidden");
-      lock.textContent = `Закрыт · ${hero.cost} следов · тапни ещё раз чтобы купить`;
+      const have = state.meta?.marks || 0;
+      const need = Math.max(0, hero.cost - have);
+      lock.textContent = need > 0
+        ? `Закрыт · ${hero.cost} следов · не хватает ${need}`
+        : `Можно открыть · ${hero.cost} следов · тапни героя`;
     } else {
       lock.classList.add("hidden");
       lock.textContent = "";
     }
+  }
+  if (buyBtn) {
+    const show = !!(hero?.premium && !owned && (state.meta?.marks || 0) < hero.cost);
+    buyBtn.classList.toggle("hidden", !show);
   }
 }
 
@@ -2744,6 +2781,7 @@ function updateEconomyLabels() {
   const streakText = `${Math.max(0, state.meta.streak || 0)} дн`;
   if (streakStartEl) streakStartEl.textContent = streakText;
   if (streakOverEl) streakOverEl.textContent = String(Math.max(0, state.meta.streak || 0));
+  renderShopProgress();
 }
 
 function dailyProgressText(daily = currentDailyDef()) {
@@ -3069,17 +3107,148 @@ function renderDonateOptions() {
   updateDonateThanks();
 }
 
-function openDonate() {
+function nextLockedPremiumHero() {
+  return HEROES.find((h) => h.premium && !isHeroOwned(h.id)) || null;
+}
+
+function renderShopProgress() {
+  const el = document.getElementById("shop-progress");
+  if (!el || !state.meta) return;
+  const target = nextLockedPremiumHero();
+  if (!target) {
+    el.innerHTML = "";
+    return;
+  }
+  const have = state.meta.marks || 0;
+  const need = target.cost;
+  const pct = Math.round(clamp(have / need, 0, 1) * 100);
+  el.innerHTML = `До героя «${target.name}» · ${Math.min(have, need)}/${need} следов<div class="progress-bar" aria-hidden="true"><i style="width:${pct}%"></i></div>`;
+}
+
+function activeTrail() {
+  const id = state.meta?.activeTrail || "plain";
+  return TRAILS.find((t) => t.id === id) || TRAILS[0];
+}
+
+function activeFrame() {
+  const id = state.meta?.activeFrame || "none";
+  return FRAMES.find((f) => f.id === id) || FRAMES[0];
+}
+
+function isTrailOwned(id) {
+  const item = TRAILS.find((t) => t.id === id);
+  if (!item) return false;
+  if (!item.cost) return true;
+  return (state.meta?.unlockedTrails || []).includes(id);
+}
+
+function isFrameOwned(id) {
+  const item = FRAMES.find((f) => f.id === id);
+  if (!item) return false;
+  if (!item.cost) return true;
+  return (state.meta?.unlockedFrames || []).includes(id);
+}
+
+function buyCosmetic(kind, id) {
+  if (!state.meta) return;
+  const list = kind === "trail" ? TRAILS : FRAMES;
+  const item = list.find((x) => x.id === id);
+  if (!item) return;
+  const owned = kind === "trail" ? isTrailOwned(id) : isFrameOwned(id);
+  if (owned) {
+    if (kind === "trail") state.meta.activeTrail = id;
+    else state.meta.activeFrame = id;
+    saveMeta();
+    renderShop();
+    showToast(`${item.name} · выбран`);
+    return;
+  }
+  if ((state.meta.marks || 0) < item.cost) {
+    showToast(`нужно ${item.cost} следов`);
+    return;
+  }
+  state.meta.marks = Math.max(0, (state.meta.marks || 0) - item.cost);
+  if (kind === "trail") {
+    state.meta.unlockedTrails = [...new Set([...(state.meta.unlockedTrails || ["plain"]), id])];
+    state.meta.activeTrail = id;
+  } else {
+    state.meta.unlockedFrames = [...new Set([...(state.meta.unlockedFrames || ["none"]), id])];
+    state.meta.activeFrame = id;
+  }
+  saveMeta();
+  updateEconomyLabels();
+  renderShop();
+  renderShopProgress();
+  goalChime();
+  showToast(`куплен · ${item.name}`);
+}
+
+function renderShopCosmetics() {
+  const list = document.getElementById("shop-cosmetics");
+  if (!list || !state.meta) return;
+  list.textContent = "";
+  const addItem = (kind, item) => {
+    const owned = kind === "trail" ? isTrailOwned(item.id) : isFrameOwned(item.id);
+    const active = kind === "trail" ? activeTrail().id === item.id : activeFrame().id === item.id;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `shop-item${active ? " on" : ""}`;
+    const meta = owned ? (active ? "выбран" : "выбрать") : `${item.cost}`;
+    btn.innerHTML = `<span><span class="shop-item-title">${item.name}</span><span class="shop-item-sub">${item.sub}</span></span><span class="shop-item-meta">${meta}</span>`;
+    btn.addEventListener("click", () => buyCosmetic(kind, item.id));
+    list.appendChild(btn);
+  };
+  for (const item of TRAILS) addItem("trail", item);
+  for (const item of FRAMES) addItem("frame", item);
+}
+
+function openShop(returnTo = "home") {
   unlockAudio();
   sfxUiTap(1);
-  renderDonateOptions();
+  state.shopReturn = returnTo || "home";
   hideFlowScreens();
+  screenOverEl?.classList.add("hidden");
+  screenContinueEl?.classList.add("hidden");
+  renderShop();
   document.getElementById("screen-donate")?.classList.remove("hidden");
+}
+
+function openDonate() {
+  openShop("home");
 }
 
 function closeDonate() {
   document.getElementById("screen-donate")?.classList.add("hidden");
-  if (!state.running) showHomeMenu();
+  if (state.running) return;
+  const back = state.shopReturn || "home";
+  if (back === "hero") showHeroPick();
+  else if (back === "continue") {
+    screenContinueEl?.classList.remove("hidden");
+    refreshContinueUi();
+  } else if (back === "over") {
+    screenOverEl?.classList.remove("hidden");
+  } else {
+    showHomeMenu();
+  }
+  updateDonateThanks();
+  renderShopProgress();
+}
+
+function renderShop() {
+  if (!state.meta) return;
+  const bal = document.getElementById("shop-balance");
+  if (bal) bal.textContent = `${state.meta.marks || 0} следов`;
+  const goal = document.getElementById("shop-hero-goal");
+  const target = nextLockedPremiumHero();
+  if (goal) {
+    goal.textContent = target
+      ? `Следующий герой · ${target.name} · ещё ${Math.max(0, target.cost - (state.meta.marks || 0))} следов`
+      : "Все платные герои открыты. Можно взять косметику или поддержать игру.";
+  }
+  const packSub = document.getElementById("shop-pack-sub");
+  if (packSub) packSub.textContent = isNativeShop() ? "пак · покупка в App Store" : "пак · страница доната";
+  renderShopCosmetics();
+  renderDonateOptions();
   updateDonateThanks();
 }
 
@@ -3128,6 +3297,10 @@ async function purchaseMarksPack() {
       saveMeta();
       awardMarks(MARKS_PACK_AMOUNT, { metaOnly: true });
       showToast(`+${MARKS_PACK_AMOUNT} следов`);
+      renderShop();
+      renderShopProgress();
+      refreshContinueUi();
+      updateHeroAbilityHint();
       return;
     }
     showToast(result?.message || "покупка отменена");
@@ -3563,6 +3736,7 @@ function canOfferContinue() {
 
 function refreshContinueUi() {
   const offer = continueOffer();
+  const shopBtn = document.getElementById("btn-continue-shop");
   if (continueLabelEl) continueLabelEl.textContent = offer.label;
   if (continueSubEl) continueSubEl.textContent = offer.sub;
   if (continueHintEl) {
@@ -3570,9 +3744,16 @@ function refreshContinueUi() {
       ? "Один бесплатный шанс за забег. Счёт сохранится."
       : offer.ok
         ? `Дополнительный шанс за ${MARKS_CONTINUE_COST} следов.`
-        : `Нужно ${MARKS_CONTINUE_COST} следов. Сыграй ещё — копи следы.`;
+        : `Нужно ${MARKS_CONTINUE_COST} следов. Купи пак — и сразу продолжи.`;
   }
-  if (btnContinue) btnContinue.disabled = !offer.ok;
+  if (btnContinue) {
+    btnContinue.disabled = !offer.ok;
+    btnContinue.classList.toggle("hidden", offer.kind === "marks" && !offer.ok);
+  }
+  if (shopBtn) {
+    const showShop = offer.kind === "marks" && !offer.ok;
+    shopBtn.classList.toggle("hidden", !showShop);
+  }
 }
 
 function showContinueScreen(reason) {
@@ -4207,6 +4388,7 @@ function resetRun() {
   state.waveIndex = 0;
   state.heroDashCd = 0;
   state.heroShield = true;
+  state.heroShieldCd = 0;
   state.bestAtStart = Math.max(state.best || 0, state.meta?.best || 0);
   app.classList.remove("ink-dive");
   setDiveMeter(0);
@@ -4410,7 +4592,43 @@ function applyLifeMove(prevX, prevY) {
     state.lastVeinX = state.life.x;
     state.lastVeinY = state.life.y;
   }
+  if (moved > 3) spawnTrailParticles(prevX, prevY, state.life.x, state.life.y, moved);
   if (moved > 0.5) tryHeroDash(state.life.x - prevX, state.life.y - prevY, moved);
+}
+
+function spawnTrailParticles(x0, y0, x1, y1, moved) {
+  const trail = activeTrail();
+  if (!trail || trail.id === "plain") return;
+  const n = trail.id === "ember" ? 3 : 2;
+  for (let i = 0; i < n; i += 1) {
+    const t = (i + 1) / (n + 1);
+    pushParticle({
+      x: x0 + (x1 - x0) * t,
+      y: y0 + (y1 - y0) * t,
+      vx: rand(-0.4, 0.4),
+      vy: rand(-0.4, 0.4),
+      size: rand(1.6, trail.id === "foam" ? 3.4 : 2.8),
+      color: trail.color || cssVar("--gold", "#ffe898"),
+      kind: trail.id === "ember" ? "streak" : "dot",
+      decay: rand(0.035, 0.06),
+      life: 0.85,
+    });
+  }
+  if (moved > 10 && Math.random() < 0.35) {
+    pushVein((x0 + x1) * 0.5, (y0 + y1) * 0.5);
+  }
+}
+
+function updateAnglerLure(dt) {
+  if (activeHeroId() !== "angler" || !state.life) return;
+  const reach = 150;
+  for (const spark of state.sparks) {
+    const d = dist(spark.x, spark.y, state.life.x, state.life.y);
+    if (d > reach || d < 8) continue;
+    const pull = (1 - d / reach) * 28 * dt;
+    spark.vx += ((state.life.x - spark.x) / d) * pull * 0.08;
+    spark.vy += ((state.life.y - spark.y) / d) * pull * 0.08;
+  }
 }
 
 function stickVector() {
@@ -4970,6 +5188,7 @@ function updateRun(dt) {
   if (state.life) {
     state.holdLifeTime += dt;
     updateJoystickMove(dt);
+    updateAnglerLure(dt);
     const prevX = state.life.px ?? state.life.x;
     const prevY = state.life.py ?? state.life.y;
     const moved = dist(state.life.x, state.life.y, prevX, prevY);
@@ -5001,6 +5220,14 @@ function updateRun(dt) {
   const diveMul = inInkDive() ? 0.72 : 1;
   if (state.life) {
     state.heroDashCd = Math.max(0, (state.heroDashCd || 0) - dt);
+    if (!state.heroShield && activeHeroId() === "nautilus") {
+      state.heroShieldCd = Math.max(0, (state.heroShieldCd || 0) - dt);
+      if (state.heroShieldCd <= 0) {
+        state.heroShield = true;
+        floatText(state.life.x, state.life.y - 24, "раковина", cssVar("--accent-a", "#ff9a62"), 14);
+        buzz(6);
+      }
+    }
     state.hunger -= HUNGER_DRAIN_PER_SEC * dt * (hasMut("cool") ? 0.7 : 1) * stillPenalty * calmMul * diveMul * (inOpening() ? 0.72 : 1) * playerDifficulty().hunger * heroHungerMul();
     state.hunger = Math.max(0, state.hunger);
   }
@@ -5186,10 +5413,11 @@ function drawSymbiote() {
 }
 
 function drawVeins() {
+  const trail = activeTrail();
   for (const vein of state.veins) {
     ctx.save();
     ctx.globalAlpha = 0.16 * vein.life;
-    ctx.strokeStyle = cssVar("--life", "#6fd9b0");
+    ctx.strokeStyle = trail.id !== "plain" && trail.color ? trail.color : cssVar("--life", "#6fd9b0");
     ctx.lineWidth = 1.2;
     ctx.setLineDash([2, 4]);
     ctx.beginPath();
@@ -5197,6 +5425,34 @@ function drawVeins() {
     ctx.stroke();
     ctx.restore();
   }
+}
+
+function drawHeroFrame(body) {
+  const frame = activeFrame();
+  if (!frame || frame.id === "none" || !body) return;
+  ctx.save();
+  ctx.translate(body.x, body.y);
+  ctx.globalAlpha = 0.35 + Math.sin(state.time * 3) * 0.08;
+  ctx.strokeStyle = cssVar("--gold", "#ffe898");
+  ctx.lineWidth = 1.8;
+  if (frame.id === "ring") {
+    ctx.beginPath();
+    ctx.arc(0, 0, body.r * 1.7, 0, Math.PI * 2);
+    ctx.stroke();
+  } else if (frame.id === "hex") {
+    const r = body.r * 1.75;
+    ctx.beginPath();
+    for (let i = 0; i < 6; i += 1) {
+      const a = (Math.PI / 3) * i + state.time * 0.4;
+      const x = Math.cos(a) * r;
+      const y = Math.sin(a) * r;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function drawLightOrb(x, y, r, color, pulse, alpha = 1, kind = "normal") {
@@ -6238,7 +6494,7 @@ function drawBossHunter(hunter, alpha = 1) {
 function drawHeroAura() {
   if (!state.life || !state.running) return;
   if (heroHasAura()) {
-    const reach = 118 + Math.sin(state.time * 2.4) * 6;
+    const reach = (activeHeroId() === "angler" ? 138 : 118) + Math.sin(state.time * 2.4) * 6;
     ctx.save();
     ctx.globalAlpha = 0.16 + Math.sin(state.time * 3) * 0.04;
     ctx.strokeStyle = cssVar("--accent-b", "#7affd4");
@@ -6968,6 +7224,7 @@ function draw() {
   drawGuide();
   if (state.life) {
     drawSafeShield();
+    drawHeroFrame(state.life);
     drawLifeBody(state.life);
     drawSymbiote();
   } else if (state.running && !state.hasTouchedCanvas) {
@@ -7144,8 +7401,15 @@ function boot() {
   btnMarksPack?.addEventListener("click", () => {
     purchaseMarksPack().catch(() => showToast("покупка недоступна"));
   });
-  document.getElementById("btn-donate")?.addEventListener("click", () => openDonate());
+  document.getElementById("btn-shop")?.addEventListener("click", () => openShop("home"));
+  document.getElementById("btn-donate")?.addEventListener("click", () => openShop("home"));
   document.getElementById("btn-donate-close")?.addEventListener("click", () => closeDonate());
+  document.getElementById("btn-shop-pack")?.addEventListener("click", () => {
+    purchaseMarksPack().catch(() => showToast("покупка недоступна"));
+  });
+  document.getElementById("btn-buy-marks")?.addEventListener("click", () => openShop("over"));
+  document.getElementById("btn-buy-marks-hero")?.addEventListener("click", () => openShop("hero"));
+  document.getElementById("btn-continue-shop")?.addEventListener("click", () => openShop("continue"));
   window.addEventListener("resize", resize);
   const pauseForBackground = () => {
     if (state.touchActive) {
@@ -7190,7 +7454,7 @@ function boot() {
   const nativeShell = !!window.OttiskNative?.isNative;
   if ("serviceWorker" in navigator && !nativeShell) {
     navigator.serviceWorker
-            .register("./sw.js?v=63")
+            .register("./sw.js?v=64")
       .then((reg) => reg.update())
       .catch(() => {});
   }
