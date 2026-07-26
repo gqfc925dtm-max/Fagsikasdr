@@ -2902,11 +2902,6 @@ function drawSymbiote() {
   ctx.beginPath();
   ctx.arc(x, y, 4.2, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = "rgba(156,240,208,0.45)";
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.arc(state.life.x, state.life.y, state.life.r + 14, ang - 0.4, ang + 0.4);
-  ctx.stroke();
   ctx.restore();
 }
 
