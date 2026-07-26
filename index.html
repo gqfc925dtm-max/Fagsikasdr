@@ -166,10 +166,7 @@
             <span class="btn-main">+60 следов</span>
             <span class="btn-sub" id="shop-pack-sub">пак · App Store / донат</span>
           </button>
-          <button id="btn-shop-sub" class="btn btn-secondary shop-sub-btn" type="button">
-            <span class="btn-main" id="shop-sub-main">Подводный корабль · 99 ₽</span>
-            <span class="btn-sub" id="shop-sub-sub">пушки · 3 жизни · App Store</span>
-          </button>
+          <div id="shop-iap-heroes" class="shop-iap-heroes"></div>
         </div>
         <p class="shop-section-label">Косметика</p>
         <div id="shop-cosmetics" class="shop-cosmetics" role="list"></div>
@@ -226,10 +223,14 @@
         <p class="over-label">Ещё один след</p>
         <p class="brand over-brand">ВТОРОЙ ШАНС</p>
         <p id="continue-reason" class="death-reason"></p>
-        <p id="continue-hint" class="hint continue-hint">Один бесплатный шанс за забег. Дальше — за следы.</p>
+        <p id="continue-hint" class="hint continue-hint">Один бесплатный шанс за забег. Дальше — за следы или 10 ₽.</p>
         <button id="btn-continue" class="btn btn-primary" type="button">
           <span class="btn-main" id="continue-label">Продолжить</span>
           <span class="btn-sub" id="continue-sub">бесплатно · 1 раз</span>
+        </button>
+        <button id="btn-continue-iap" class="btn btn-secondary hidden" type="button">
+          <span class="btn-main">Продолжить · 10 ₽</span>
+          <span class="btn-sub">App Store / донат</span>
         </button>
         <button id="btn-continue-shop" class="btn btn-secondary hidden" type="button">
           <span class="btn-main">Купить следы</span>
@@ -284,7 +285,7 @@
   </div>
   <script>
     (async () => {
-      const stamp = "ottisk-force-v70";
+      const stamp = "ottisk-force-v71";
       if (localStorage.getItem(stamp)) return;
       localStorage.setItem(stamp, "1");
       try {
@@ -303,6 +304,6 @@
     })();
   </script>
   <script src="js/native.js" type="module"></script>
-  <script src="js/game.js?v=65" type="module"></script>
+  <script src="js/game.js?v=71" type="module"></script>
 </body>
 </html>

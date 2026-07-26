@@ -1109,6 +1109,12 @@ body {
   gap: 10px;
 }
 
+.shop-iap-heroes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .shop-section-label {
   margin: 12px 0 6px;
   font-family: "Instrument Sans", sans-serif;

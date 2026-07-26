@@ -62,18 +62,29 @@ npx cap open ios
 ## Монетизация
 
 - 1 бесплатный continue за забег
-- Доп. continue за следы
+- Доп. continue за следы **или 10 ₽** (`ottisk_continue_10rub`, до 3 продолжений за забег)
 - Косметика за следы / рекорд
-- Кнопка `Донат` в меню → tip packs + пак следов
+- Кнопка `Донат` / `Магазин` → tip packs + пак следов + IAP-герои
 - `OttiskNative.purchase('ottisk_marks_60')` — пак следов
-- `OttiskNative.purchase('ottisk_submarine')` — подводный корабль · 99 ₽ (пушки · 3 жизни)
+- `OttiskNative.purchase('ottisk_continue_10rub')` — продолжение · 10 ₽
+- IAP-герои (Non-Consumable):
+  - `ottisk_submarine` — корабль · 99 ₽ (пушки · 3 жизни)
+  - `ottisk_hero_eel` — угорь · 99 ₽ (разряд)
+  - `ottisk_hero_squid` — кальмар · 99 ₽ (чернила)
+  - `ottisk_hero_seahorse` — конёк · 129 ₽ (откат)
+  - `ottisk_hero_whale` — кит · 149 ₽ (сонар)
 - `ottisk_tip_small` / `ottisk_tip_mid` / `ottisk_tip_big` — донаты с благодарностью в следах
 
 ### StoreKit позже
 
 1. App Store Connect → Consumable / Non-Consumable:
    - `ottisk_marks_60` (Consumable)
-   - `ottisk_submarine` (Non-Consumable · 99 ₽) — герой «корабль»
+   - `ottisk_continue_10rub` (Consumable · 10 ₽)
+   - `ottisk_submarine` (Non-Consumable · 99 ₽)
+   - `ottisk_hero_eel` (Non-Consumable · 99 ₽)
+   - `ottisk_hero_squid` (Non-Consumable · 99 ₽)
+   - `ottisk_hero_seahorse` (Non-Consumable · 129 ₽)
+   - `ottisk_hero_whale` (Non-Consumable · 149 ₽)
    - `ottisk_tip_small`
    - `ottisk_tip_mid`
    - `ottisk_tip_big`
