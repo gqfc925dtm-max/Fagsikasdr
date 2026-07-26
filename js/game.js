@@ -6237,8 +6237,7 @@ function drawBossHunter(hunter, alpha = 1) {
 
 function drawHeroAura() {
   if (!state.life || !state.running) return;
-  const hero = activeHeroId();
-  if (hero === "jellyfish") {
+  if (heroHasAura()) {
     const reach = 118 + Math.sin(state.time * 2.4) * 6;
     ctx.save();
     ctx.globalAlpha = 0.16 + Math.sin(state.time * 3) * 0.04;
