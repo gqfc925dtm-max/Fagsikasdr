@@ -19,7 +19,7 @@ const THEME_COUNT = 6;
 const ONBOARD_STEPS = [
   "Удерживай палец — существо живёт только в касании.",
   "Лови живой свет — он прыгает и крутится.",
-  "Счёт растёт — волны меняют хищников: стая, стрелки, медузы…",
+  "Счёт растёт — волны меняют хищников: стая, стрелки… и дальше до бездны.",
 ];
 const SECRET_WORD = "ЯЕЩЁЗДЕСЬ";
 const SCORE_MILESTONES = [
@@ -172,7 +172,39 @@ const WAVES = [
     intervalMul: 0.92,
     label: "ВОЛНА 5 · АКУЛЫ",
   },
+  {
+    id: "rays",
+    at: 175,
+    name: "скаты",
+    species: "ray",
+    maxBonus: 1,
+    speedMul: 0.88,
+    intervalMul: 0.95,
+    label: "ВОЛНА 6 · СКАТЫ",
+  },
+  {
+    id: "ghosts",
+    at: 220,
+    name: "призраки",
+    species: "ghost",
+    maxBonus: 2,
+    speedMul: 1.05,
+    intervalMul: 0.88,
+    label: "ВОЛНА 7 · ПРИЗРАКИ",
+  },
+  {
+    id: "abyss",
+    at: 270,
+    name: "бездна",
+    species: "mix",
+    maxBonus: 2,
+    speedMul: 1.08,
+    intervalMul: 0.82,
+    label: "ВОЛНА 8 · БЕЗДНА",
+  },
 ];
+
+const MIX_SPECIES = ["fish", "dart", "jelly", "eel", "shark", "ray", "ghost"];
 
 const customHeroImage = { img: null, src: "", ready: false };
 
@@ -1240,6 +1272,8 @@ function midgamePace() {
   if (s < 70) return 0.82;
   if (s < 110) return 0.85;
   if (s < 150) return 0.92;
+  if (s < 220) return 0.94;
+  if (s < 280) return 0.96;
   return 1;
 }
 
@@ -1264,16 +1298,27 @@ function updateWaveUi(flash = false) {
   }
 }
 
+function rollHunterSpecies(waveSpecies) {
+  if (waveSpecies === "mix") {
+    return MIX_SPECIES[Math.floor(Math.random() * MIX_SPECIES.length)];
+  }
+  return waveSpecies || "fish";
+}
+
 function applySpeciesToHunter(hunter, species) {
-  hunter.species = species;
-  hunter.dashCd = species === "dart" ? rand(0.4, 1.1) : species === "shark" ? rand(2.2, 3.4) : 0;
+  const kind = rollHunterSpecies(species);
+  hunter.species = kind;
+  hunter.dashCd = kind === "dart" ? rand(0.4, 1.1) : kind === "shark" ? rand(2.2, 3.4) : kind === "ghost" ? rand(1.4, 2.4) : 0;
   hunter.dashT = 0;
   hunter.pulse = Math.random() * Math.PI * 2;
   hunter.weave = Math.random() * Math.PI * 2;
-  if (species === "dart") hunter.r = rand(11, 14);
-  else if (species === "jelly") hunter.r = rand(18, 24);
-  else if (species === "eel") hunter.r = rand(13, 16);
-  else if (species === "shark") hunter.r = rand(16, 20);
+  hunter.phaseAlpha = 1;
+  if (kind === "dart") hunter.r = rand(11, 14);
+  else if (kind === "jelly") hunter.r = rand(18, 24);
+  else if (kind === "eel") hunter.r = rand(13, 16);
+  else if (kind === "shark") hunter.r = rand(16, 20);
+  else if (kind === "ray") hunter.r = rand(18, 23);
+  else if (kind === "ghost") hunter.r = rand(13, 17);
   else hunter.r = rand(15, 19);
 }
 
@@ -3174,6 +3219,8 @@ function hunterReachMul(hunter) {
   }
   if (species === "eel") return 1.9;
   if (species === "shark") return 1.45;
+  if (species === "ray") return 1.7;
+  if (species === "ghost") return 1.2;
   return 1.55;
 }
 
@@ -3208,14 +3255,20 @@ function updateHunters(dt) {
   for (let i = state.hunters.length - 1; i >= 0; i -= 1) {
     const hunter = state.hunters[i];
     const species = hunter.species || wave.species || "fish";
-    hunter.phase += dt * (species === "dart" ? 8 : species === "jelly" ? 3.2 : 5);
-    hunter.pulse = (hunter.pulse || 0) + dt * (species === "jelly" ? 2.4 : 1.6);
-    hunter.weave = (hunter.weave || 0) + dt * (species === "eel" ? 3.6 : 1.2);
+    hunter.phase += dt * (species === "dart" ? 8 : species === "jelly" ? 3.2 : species === "ray" ? 2.6 : 5);
+    hunter.pulse = (hunter.pulse || 0) + dt * (species === "jelly" ? 2.4 : species === "ghost" ? 3.1 : 1.6);
+    hunter.weave = (hunter.weave || 0) + dt * (species === "eel" ? 3.6 : species === "ray" ? 1.8 : 1.2);
     if (hunter.shadow) hunter.wobble = (hunter.wobble || 0) + dt * 5.5;
     hunter.warn = Math.max(0, hunter.warn - dt * 1.45);
     hunter.grace = Math.max(0, (hunter.grace || 0) - dt);
     hunter.dashCd = Math.max(0, (hunter.dashCd || 0) - dt);
     hunter.dashT = Math.max(0, (hunter.dashT || 0) - dt);
+    if (species === "ghost") {
+      // Soft blink: briefly hard to read, but never fully invisible for fairness.
+      hunter.phaseAlpha = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(hunter.pulse * 1.4));
+    } else {
+      hunter.phaseAlpha = 1;
+    }
     if (hunter.parade || hunter.demo) {
       // Convert showcase fish safely: always re-enter from a far edge.
       placeHunterOnEdge(hunter);
@@ -3246,6 +3299,13 @@ function updateHunters(dt) {
         const lane = 70 + Math.sin(hunter.weave) * 50;
         tx = state.life.x + Math.cos(angOff) * lane;
         ty = state.life.y + Math.sin(angOff * 1.4) * lane * 0.7;
+      } else if (species === "ray") {
+        // Broad lateral sweep across the player.
+        tx = state.life.x + Math.sin(hunter.weave) * 120;
+        ty = state.life.y + Math.cos(hunter.weave * 0.7) * 28;
+      } else if (species === "ghost") {
+        tx = state.life.x + Math.cos(angOff) * (orbitR * 0.7);
+        ty = state.life.y + Math.sin(angOff * 1.2) * (orbitR * 0.7);
       } else if (dLife > 160) {
         tx = state.life.x;
         ty = state.life.y;
@@ -3267,16 +3327,28 @@ function updateHunters(dt) {
     if (inInkDive()) speed *= 0.35;
     if (species === "dart" && hunter.dashT > 0) speed *= 2.05;
     if (species === "shark" && hunter.dashT > 0) speed *= 1.75;
+    if (species === "ray") speed *= 0.92;
 
     // Periodic lunges for dart/shark waves.
     if (state.life && hunter.dashCd <= 0 && hunter.dashT <= 0 && (species === "dart" || species === "shark")) {
-      const dLife = dist(hunter.x, hunter.y, state.life.x, state.life.y);
-      if (dLife < (species === "shark" ? 160 : 170) && dLife > 56) {
+      const dLife2 = dist(hunter.x, hunter.y, state.life.x, state.life.y);
+      if (dLife2 < (species === "shark" ? 160 : 170) && dLife2 > 56) {
         hunter.dashT = species === "shark" ? 0.24 : 0.22;
         hunter.dashCd = species === "shark" ? rand(2.8, 4.2) : rand(0.7, 1.3);
         const dashAng = Math.atan2(state.life.y - hunter.y, state.life.x - hunter.x);
         hunter.vx += Math.cos(dashAng) * (species === "shark" ? 2.4 : 3.1);
         hunter.vy += Math.sin(dashAng) * (species === "shark" ? 2.4 : 3.1);
+      }
+    }
+    // Ghosts short-blink closer instead of a hard dash.
+    if (state.life && species === "ghost" && hunter.dashCd <= 0) {
+      const dLife3 = dist(hunter.x, hunter.y, state.life.x, state.life.y);
+      if (dLife3 > 90 && dLife3 < 210) {
+        const blinkAng = Math.atan2(state.life.y - hunter.y, state.life.x - hunter.x);
+        hunter.x += Math.cos(blinkAng) * 34;
+        hunter.y += Math.sin(blinkAng) * 34;
+        hunter.dashCd = rand(1.8, 2.8);
+        hunter.warn = Math.max(hunter.warn, 0.55);
       }
     }
 
@@ -3285,6 +3357,10 @@ function updateHunters(dt) {
     if (species === "eel") {
       hunter.vx += Math.cos(hunter.weave * 2.2) * 0.55;
       hunter.vy += Math.sin(hunter.weave * 1.7) * 0.55;
+    }
+    if (species === "ray") {
+      hunter.vx += Math.cos(hunter.weave) * 0.7;
+      hunter.vy += Math.sin(hunter.weave * 0.5) * 0.25;
     }
     // Keep fish apart so they don't pile into one blob.
     for (let j = 0; j < state.hunters.length; j += 1) {
@@ -4185,6 +4261,64 @@ function drawSharkHunter(hunter, alpha = 1) {
   ctx.restore();
 }
 
+function drawRayHunter(hunter, alpha = 1) {
+  const angle = Math.atan2(hunter.vy || 0.001, hunter.vx || 0.001);
+  const r = hunter.r;
+  const flap = Math.sin(hunter.weave || 0) * 0.18;
+  ctx.save();
+  ctx.translate(hunter.x, hunter.y);
+  ctx.rotate(angle);
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = "#5ec4c0";
+  ctx.beginPath();
+  ctx.moveTo(r * 1.5, 0);
+  ctx.quadraticCurveTo(r * 0.2, -r * (1.35 + flap), -r * 1.1, -r * 0.15);
+  ctx.lineTo(-r * 1.55, 0);
+  ctx.lineTo(-r * 1.1, r * 0.15);
+  ctx.quadraticCurveTo(r * 0.2, r * (1.35 + flap), r * 1.5, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#d8fffb";
+  ctx.beginPath();
+  ctx.ellipse(r * 0.35, 0, r * 0.55, r * 0.22, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#0c2030";
+  ctx.beginPath();
+  ctx.arc(r * 0.85, -r * 0.08, r * 0.1, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawGhostHunter(hunter, alpha = 1) {
+  const angle = Math.atan2(hunter.vy || 0.001, hunter.vx || 0.001);
+  const r = hunter.r;
+  const a = alpha * (hunter.phaseAlpha ?? 0.7);
+  ctx.save();
+  ctx.translate(hunter.x, hunter.y);
+  ctx.rotate(angle);
+  ctx.globalAlpha = a;
+  ctx.fillStyle = "rgba(190, 210, 255, 0.85)";
+  ctx.beginPath();
+  ctx.ellipse(0, 0, r * 1.2, r * 0.7, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(230, 240, 255, 0.7)";
+  ctx.lineWidth = 1.6;
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.ellipse(0, 0, r * 1.35, r * 0.85, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = "#f7fbff";
+  ctx.beginPath();
+  ctx.arc(r * 0.45, -r * 0.1, r * 0.18, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#203050";
+  ctx.beginPath();
+  ctx.arc(r * 0.5, -r * 0.08, r * 0.08, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
 function drawHunter(hunter) {
   const alpha = inInkDive() ? 0.28 : 1;
   if (hunter.shadow) {
@@ -4198,11 +4332,18 @@ function drawHunter(hunter) {
   else if (species === "jelly") drawJellyHunter(hunter, alpha);
   else if (species === "eel") drawEelHunter(hunter, alpha);
   else if (species === "shark") drawSharkHunter(hunter, alpha);
+  else if (species === "ray") drawRayHunter(hunter, alpha);
+  else if (species === "ghost") drawGhostHunter(hunter, alpha);
   else drawEvilFish(hunter, alpha, false);
   if (hunter.warn > 0 && !inInkDive()) {
     ctx.save();
     ctx.globalAlpha = hunter.warn * 0.5;
-    ctx.strokeStyle = species === "eel" ? "#3cffb0" : species === "jelly" ? "#ff7ab8" : cssVar("--danger", "#ff6888");
+    ctx.strokeStyle =
+      species === "eel" ? "#3cffb0"
+      : species === "jelly" ? "#ff7ab8"
+      : species === "ray" ? "#7ef0ea"
+      : species === "ghost" ? "#c8d8ff"
+      : cssVar("--danger", "#ff6888");
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.arc(hunter.x, hunter.y, hunter.r * (hunterReachMul(hunter) + (1 - hunter.warn) * 1.2), 0, Math.PI * 2);
