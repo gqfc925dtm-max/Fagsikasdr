@@ -19,8 +19,10 @@ async function openGame(page, overrides = {}) {
     ...overrides,
   };
   await page.addInitScript(({ meta, forceKey }) => {
-    localStorage.setItem("ottisk-meta-v1", JSON.stringify(meta));
-    localStorage.setItem("ottisk-best-v2", String(meta.best || 0));
+    if (!localStorage.getItem("ottisk-meta-v1")) {
+      localStorage.setItem("ottisk-meta-v1", JSON.stringify(meta));
+      localStorage.setItem("ottisk-best-v2", String(meta.best || 0));
+    }
     localStorage.setItem(forceKey, "1");
   }, { meta, forceKey: FORCE_KEY });
   await page.goto("/index.html", { waitUntil: "domcontentloaded" });
