@@ -654,6 +654,36 @@ body {
   animation: menu-rise 0.8s 0.18s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
+.access-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  width: min(100%, 360px);
+  margin-top: 4px;
+}
+
+.access-row .menu-toggle {
+  font-size: 10px;
+}
+
+.data-tools {
+  width: min(100%, 360px);
+  padding: 12px 0;
+  border-top: 1px solid color-mix(in srgb, var(--foam) 12%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--foam) 12%, transparent);
+}
+
+.data-tools-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 8px;
+}
+
+.data-tools-row .menu-link {
+  color: var(--gold);
+}
+
 .menu-section-label {
   margin: 0 0 8px;
   font-size: 11px;
@@ -1437,6 +1467,45 @@ body {
 
 .shop-progress:empty {
   display: none;
+}
+
+#app.high-contrast {
+  --bg0: #000814;
+  --bg1: #073b63;
+  --bg2: #001f35;
+  --foam: #ffffff;
+  --sand: #f5e7d6;
+  --mute: #d8d8d8;
+  --gold: #ffe45c;
+  --life: #57ffd1;
+  --danger: #ff5375;
+  --line: rgba(255, 255, 255, 0.52);
+}
+
+#app.high-contrast .menu-toggle,
+#app.high-contrast .btn,
+#app.high-contrast .shop-item {
+  border-color: var(--line);
+}
+
+#app.reduce-motion *,
+#app.reduce-motion *::before,
+#app.reduce-motion *::after {
+  scroll-behavior: auto !important;
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #app *,
+  #app *::before,
+  #app *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }
 
 .progress-bar {

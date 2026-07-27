@@ -19,6 +19,9 @@
     { id: "coop", title: "Два пальца", sub: "сыграй в дуэте", check: (ctx) => !!ctx.meta?.trophyCoop },
     { id: "daily", title: "День общий", sub: "забег дня", check: (ctx) => !!ctx.meta?.trophyDaily },
     { id: "ghost", title: "Свой призрак", sub: "столкнись с призраком", check: (ctx) => !!ctx.meta?.trophyGhost },
+    { id: "leviathan_clear", title: "За кольцом", sub: "переживи левиафана", check: (ctx) => (ctx.meta?.bossClears?.leviathan || 0) > 0 },
+    { id: "kraken_clear", title: "Чернильный след", sub: "переживи кракена", check: (ctx) => (ctx.meta?.bossClears?.kraken || 0) > 0 },
+    { id: "weekly", title: "Испытание недели", sub: "заверши недельное задание", check: (ctx) => !!ctx.meta?.weekRewardTaken },
   ];
 
   function daySeed(dayKey) {
