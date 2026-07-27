@@ -6,7 +6,10 @@ globalThis.localStorage = {
   getItem: (key) => values.get(key) ?? null,
   setItem: (key, value) => values.set(key, String(value)),
 };
-globalThis.navigator = { language: "ru-RU" };
+Object.defineProperty(globalThis, "navigator", {
+  configurable: true,
+  value: { language: "ru-RU" },
+});
 globalThis.dispatchEvent = () => true;
 globalThis.CustomEvent = class CustomEvent {
   constructor(type, options) {
