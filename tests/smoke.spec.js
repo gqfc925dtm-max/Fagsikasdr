@@ -59,7 +59,7 @@ test("backup code restores portable progress", async ({ page }) => {
     const parsed = window.OttiskBackup.parse(value);
     localStorage.setItem("ottisk-meta-v1", JSON.stringify(parsed));
   }, code);
-  const restored = await page.evaluate(() => JSON.parse(localStorage.getItem(META_KEY) || "{}"));
+  const restored = await page.evaluate((key) => JSON.parse(localStorage.getItem(key) || "{}"), META_KEY);
   expect(restored.marks).toBe(73);
   expect(restored.best).toBe(144);
 });
