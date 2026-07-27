@@ -3697,6 +3697,7 @@ function updateEconomyLabels() {
   const streakText = `${Math.max(0, state.meta.streak || 0)} дн`;
   if (streakStartEl) streakStartEl.textContent = streakText;
   if (streakOverEl) streakOverEl.textContent = String(Math.max(0, state.meta.streak || 0));
+  updateDonateThanks();
   renderShopProgress();
 }
 
@@ -3977,9 +3978,12 @@ function isNativeShop() {
 
 function updateDonateThanks() {
   const el = document.getElementById("donate-thanks");
-  if (!el || !state.meta) return;
-  const n = state.meta.donateCount || 0;
-  el.textContent = n > 0 ? `спасибо · ${n}` : "поддержать игру";
+  if (el && state.meta) {
+    const n = state.meta.donateCount || 0;
+    el.textContent = n > 0 ? `спасибо · ${n} · герои и следы` : "герои · следы · донат";
+  }
+  const marksEl = document.getElementById("shop-top-marks");
+  if (marksEl && state.meta) marksEl.textContent = String(state.meta.marks || 0);
 }
 
 function renderDonateOptions() {
@@ -4207,15 +4211,15 @@ function renderShop() {
   if (goal) {
     if (iapLocked.length) {
       const next = iapLocked[0];
-      goal.textContent = `Премиум · ${next.name} · ${next.priceLabel} · ${next.blurb || next.ability}`;
+      goal.textContent = `Дальше по героям · ${next.name} · ${next.priceLabel} · ${next.blurb || next.ability}`;
     } else if (target) {
-      goal.textContent = `Следующий герой · ${target.name} · ещё ${Math.max(0, target.cost - (state.meta.marks || 0))} следов`;
+      goal.textContent = `До героя «${target.name}» · ещё ${Math.max(0, target.cost - (state.meta.marks || 0))} следов`;
     } else {
       goal.textContent = "Все платные герои открыты. Можно взять косметику или поддержать игру.";
     }
   }
   const packSub = document.getElementById("shop-pack-sub");
-  if (packSub) packSub.textContent = isNativeShop() ? "пак · покупка в App Store" : "пак · страница доната";
+  if (packSub) packSub.textContent = isNativeShop() ? "купить следы · App Store" : "купить следы · страница доната";
   const starterBtn = document.getElementById("btn-shop-starter");
   if (starterBtn) {
     const owned = !!state.meta.starterPackBought;
@@ -4240,7 +4244,7 @@ function renderShopIapHeroes() {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = `btn btn-secondary shop-sub-btn${owned ? " owned" : ""}`;
-    btn.innerHTML = `<span class="btn-main">${hero.name} · ${owned ? "твой" : (hero.priceLabel || "")}</span><span class="btn-sub">${owned ? `${hero.blurb || hero.ability} · выбран` : `${hero.blurb || hero.ability} · ${isNativeShop() ? "App Store" : "App Store / донат"}`}</span>`;
+    btn.innerHTML = `<span class="btn-main">${hero.name} · ${owned ? "твой" : (hero.priceLabel || "")}</span><span class="btn-sub">${owned ? `${hero.blurb || hero.ability} · нажми, чтобы выбрать` : `${hero.blurb || hero.ability} · ${isNativeShop() ? "купить в App Store" : "App Store / донат"}`}</span>`;
     btn.addEventListener("click", () => {
       if (owned) {
         state.meta.activeHero = hero.id;
@@ -9963,7 +9967,7 @@ function boot() {
   const nativeShell = !!window.OttiskNative?.isNative;
   if ("serviceWorker" in navigator && !nativeShell) {
     navigator.serviceWorker
-      .register("./sw.js?v=74")
+      .register("./sw.js?v=75")
       .then((reg) => reg.update())
       .catch(() => {});
   }

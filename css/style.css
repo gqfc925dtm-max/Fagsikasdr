@@ -466,6 +466,69 @@ body {
   min-height: 28px;
 }
 
+.btn-shop-top {
+  appearance: none;
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 64px;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--gold) 42%, transparent);
+  border-radius: 4px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--gold) 22%, transparent), color-mix(in srgb, #10283f 70%, transparent) 55%),
+    color-mix(in srgb, #12324a 88%, transparent);
+  color: var(--foam);
+  text-align: left;
+  cursor: pointer;
+  animation: menu-rise 0.55s 0.04s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.btn-shop-top:active {
+  transform: scale(0.985);
+}
+
+.btn-shop-top-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.btn-shop-top-main {
+  font-family: "Syne", sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: var(--gold);
+}
+
+.btn-shop-top-sub {
+  font-family: "Instrument Sans", sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--foam) 68%, transparent);
+}
+
+.btn-shop-top-marks {
+  flex-shrink: 0;
+  min-width: 2.4ch;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--gold) 35%, transparent);
+  font-family: "Syne", sans-serif;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--gold);
+  background: color-mix(in srgb, #081828 55%, transparent);
+}
+
 .menu-meta {
   margin: 0;
   display: flex;
@@ -1144,11 +1207,90 @@ body {
   width: min(100%, 420px);
 }
 
+.shop-card {
+  width: min(100%, 420px);
+  gap: 0;
+}
+
+.shop-head {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.shop-lead {
+  margin: 0 0 12px;
+  max-width: 28ch;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: color-mix(in srgb, var(--foam) 72%, transparent);
+}
+
+.shop-balance-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  margin: 0 0 6px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--foam) 12%, transparent);
+}
+
+.shop-balance {
+  margin: 0;
+  font-family: "Syne", sans-serif;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: var(--gold);
+}
+
+.shop-balance-hint {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--mute);
+}
+
+.shop-goal {
+  min-height: 1.35em;
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--life);
+}
+
+.shop-goal:empty {
+  display: none;
+}
+
+.shop-block {
+  width: 100%;
+  margin: 14px 0 4px;
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--foam) 12%, transparent);
+}
+
+.shop-section-hint {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: color-mix(in srgb, var(--foam) 55%, transparent);
+}
+
+.shop-restore {
+  margin-top: 8px;
+  width: 100%;
+}
+
 .donate-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin: 14px 0 10px;
+  margin: 0 0 10px;
 }
 
 .donate-tip {
@@ -1210,17 +1352,8 @@ body {
   color: var(--sand);
 }
 
-.shop-balance {
-  margin: 4px 0 8px;
-  font-family: "Syne", sans-serif;
-  font-size: 22px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  color: var(--gold);
-}
-
 .shop-section {
-  margin: 10px 0 14px;
+  margin: 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -1233,13 +1366,13 @@ body {
 }
 
 .shop-section-label {
-  margin: 12px 0 6px;
+  margin: 0 0 4px;
   font-family: "Instrument Sans", sans-serif;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--foam) 48%, transparent);
+  color: color-mix(in srgb, var(--foam) 58%, transparent);
 }
 
 .shop-cosmetics {
@@ -1252,12 +1385,11 @@ body {
 .shop-item {
   appearance: none;
   width: 100%;
-  border: 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--foam) 14%, transparent);
-  border-radius: 0;
-  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--foam) 12%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, #10283f 55%, transparent);
   color: var(--foam);
-  padding: 12px 2px;
+  padding: 12px 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1267,7 +1399,8 @@ body {
 }
 
 .shop-item.on {
-  border-bottom-color: color-mix(in srgb, var(--life) 45%, transparent);
+  border-color: color-mix(in srgb, var(--life) 45%, transparent);
+  background: color-mix(in srgb, #14384f 70%, transparent);
 }
 
 .shop-item.locked {
@@ -1588,15 +1721,6 @@ body {
 
 .daily-card.done {
   border-color: color-mix(in srgb, var(--life) 40%, transparent);
-}
-
-.shop-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-  border-top: 1px solid var(--line);
-  padding-top: 8px;
 }
 
 .skin-unlocks {
