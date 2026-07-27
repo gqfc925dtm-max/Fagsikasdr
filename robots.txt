@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://gqfc925dtm-max.github.io/Fagsikasdr/sitemap.xml

@@ -91,6 +91,16 @@ body {
   --ember: #ffe858; --gold: #fff8c8; --life: #ecff98; --danger: #ffaa62;
   --panel: #383020; --accent-a: #ffe858; --accent-b: #ffaa62;
 }
+#app[data-theme="6"] {
+  --bg0: #071d2c; --bg1: #0d4558; --bg2: #126b70;
+  --ember: #67e8f9; --gold: #d9fffb; --life: #64ffda; --danger: #ff6f91;
+  --panel: #0b3040; --accent-a: #64ffda; --accent-b: #67e8f9;
+}
+#app[data-theme="7"] {
+  --bg0: #190c2b; --bg1: #3f1760; --bg2: #70234f;
+  --ember: #ff78bc; --gold: #ffe0a8; --life: #b8a4ff; --danger: #ff5f72;
+  --panel: #30143f; --accent-a: #ff78bc; --accent-b: #b8a4ff;
+}
 
 .stage {
   order: 1;
@@ -654,6 +664,18 @@ body {
   animation: menu-rise 0.8s 0.18s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
+.run-mode-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  width: min(100%, 360px);
+  margin-top: 8px;
+}
+
+.run-mode-btn.on {
+  color: var(--gold);
+}
+
 .access-row {
   display: flex;
   flex-wrap: wrap;
@@ -681,6 +703,23 @@ body {
 }
 
 .data-tools-row .menu-link {
+  color: var(--gold);
+}
+
+.cloud-tools {
+  margin-top: 12px;
+}
+
+.cloud-leaderboard {
+  width: 100%;
+  margin: 10px 0;
+  padding-left: 26px;
+  color: var(--foam);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.cloud-leaderboard li::marker {
   color: var(--gold);
 }
 

@@ -8,13 +8,14 @@
   <meta name="apple-mobile-web-app-title" content="ОТТИСК" />
   <meta name="theme-color" content="#081830" />
   <meta name="description" content="ОТТИСК — удерживай палец: существо живёт только в касании." />
+  <meta name="ottisk-cloud-api" content="" />
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=76" />
+  <link rel="stylesheet" href="css/style.css?v=77" />
   <link rel="preload" href="assets/fish-evil.png?v=5" as="image" />
   <title>ОТТИСК</title>
 </head>
@@ -61,45 +62,52 @@
 
       <header class="menu-bar">
         <p class="menu-meta" aria-label="Прогресс">
-          <span>рекорд <strong id="best-start">0</strong></span>
+          <span><span data-i18n="record">рекорд</span> <strong id="best-start">0</strong></span>
           <span class="menu-sep" aria-hidden="true">·</span>
           <span id="marks-start">0 следов</span>
         </p>
         <div class="menu-toggles" role="group" aria-label="Настройки">
           <button id="btn-sound" class="menu-toggle on" type="button" aria-pressed="true" aria-label="Звук">звук</button>
           <button id="btn-haptics" class="menu-toggle on" type="button" aria-pressed="true" aria-label="Вибрация">вибро</button>
+          <button id="btn-lang" class="menu-toggle" type="button" aria-label="Switch to English">EN</button>
         </div>
       </header>
 
       <button id="btn-shop" class="btn-shop-top" type="button" aria-label="Открыть магазин">
         <span class="btn-shop-top-copy">
-          <span class="btn-shop-top-main">Магазин</span>
-          <span id="donate-thanks" class="btn-shop-top-sub">герои · следы · донат</span>
+          <span class="btn-shop-top-main" data-i18n="shop">Магазин</span>
+          <span id="donate-thanks" class="btn-shop-top-sub" data-i18n="shop_sub">герои · следы · донат</span>
         </span>
         <span class="btn-shop-top-marks" id="shop-top-marks" aria-hidden="true">0</span>
       </button>
 
       <div class="menu-main">
         <p class="brand menu-brand">ОТТИСК</p>
-        <h1 class="menu-title">Удерживай палец</h1>
-        <p class="menu-lead">Существо живёт только в касании</p>
+        <h1 class="menu-title" data-i18n="hold_title">Удерживай палец</h1>
+        <p class="menu-lead" data-i18n="hold_lead">Существо живёт только в касании</p>
 
         <div class="actions menu-play">
           <button id="btn-start" class="btn btn-primary btn-play" type="button">
-            <span class="btn-main">Играть</span>
+            <span class="btn-main" data-i18n="play">Играть</span>
             <span class="btn-sub" id="btn-start-sub">первый забег сразу</span>
           </button>
         </div>
 
         <div id="control-list" class="control-row" role="group" aria-label="Управление"></div>
         <div class="mode-row" role="group" aria-label="Режимы">
-          <button id="btn-mode-daily" class="menu-toggle" type="button" aria-pressed="false">день</button>
-          <button id="btn-mode-coop" class="menu-toggle" type="button" aria-pressed="false">дуэт</button>
+          <button id="btn-mode-daily" class="menu-toggle" type="button" aria-pressed="false" data-i18n="daily">день</button>
+          <button id="btn-mode-coop" class="menu-toggle" type="button" aria-pressed="false" data-i18n="coop">дуэт</button>
+        </div>
+        <div class="run-mode-row" role="group" aria-label="Тип забега">
+          <button class="menu-toggle run-mode-btn" data-run-mode="endless" type="button" aria-pressed="false" data-i18n="endless">бесконечный</button>
+          <button class="menu-toggle run-mode-btn" data-run-mode="boss" type="button" aria-pressed="false" data-i18n="boss_rush">боссы</button>
+          <button class="menu-toggle run-mode-btn" data-run-mode="calm" type="button" aria-pressed="false" data-i18n="calm">спокойный</button>
         </div>
         <p id="mode-note" class="menu-note quiet">обычный забег</p>
         <div class="access-row" role="group" aria-label="Доступность">
-          <button id="btn-reduce-motion" class="menu-toggle" type="button" aria-pressed="false">меньше движения</button>
-          <button id="btn-high-contrast" class="menu-toggle" type="button" aria-pressed="false">контраст</button>
+          <button id="btn-reduce-motion" class="menu-toggle" type="button" aria-pressed="false" data-i18n="less_motion">меньше движения</button>
+          <button id="btn-high-contrast" class="menu-toggle" type="button" aria-pressed="false" data-i18n="contrast">контраст</button>
+          <button id="btn-quality" class="menu-toggle" type="button" aria-pressed="false" data-i18n="quality_auto">качество · авто</button>
         </div>
       </div>
 
@@ -107,7 +115,7 @@
         <p id="daily-quest" class="menu-note" aria-live="polite"></p>
         <p id="weekly-card" class="menu-note weekly-card" aria-live="polite"></p>
         <section id="menu-trophies" class="menu-trophies" aria-label="Трофеи">
-          <p class="menu-section-label">Трофеи</p>
+          <p class="menu-section-label" data-i18n="trophies">Трофеи</p>
           <div id="trophy-list" class="trophy-list" role="list"></div>
         </section>
 
@@ -118,14 +126,26 @@
         <p id="shop-progress" class="menu-note shop-progress" aria-live="polite"></p>
 
         <section class="data-tools" aria-label="Перенос прогресса">
-          <p class="menu-section-label">Прогресс</p>
-          <p class="menu-note quiet">Сохрани файл или перенеси код на другое устройство.</p>
+          <p class="menu-section-label" data-i18n="progress">Прогресс</p>
+          <p class="menu-note quiet" data-i18n="progress_help">Сохрани файл или перенеси код на другое устройство.</p>
           <div class="data-tools-row">
-            <button id="btn-backup-export" class="menu-link" type="button">Сохранить</button>
-            <button id="btn-backup-code" class="menu-link" type="button">Код переноса</button>
-            <button id="btn-backup-import" class="menu-link" type="button">Загрузить</button>
+            <button id="btn-backup-export" class="menu-link" type="button" data-i18n="save">Сохранить</button>
+            <button id="btn-backup-code" class="menu-link" type="button" data-i18n="transfer_code">Код переноса</button>
+            <button id="btn-backup-import" class="menu-link" type="button" data-i18n="load">Загрузить</button>
           </div>
           <input id="backup-file" class="hidden" type="file" accept="application/json,.json" />
+        </section>
+
+        <section class="data-tools cloud-tools" aria-label="Облачный прогресс">
+          <p class="menu-section-label" data-i18n="cloud">Облако и рейтинг</p>
+          <p id="cloud-status" class="menu-note quiet">не подключено · игра работает офлайн</p>
+          <div class="data-tools-row">
+            <button id="btn-cloud-account" class="menu-link" type="button" data-i18n="cloud_setup">Подключить</button>
+            <button id="btn-cloud-sync" class="menu-link" type="button" data-i18n="cloud_sync">Синхронизировать</button>
+            <button id="btn-cloud-board" class="menu-link" type="button" data-i18n="leaderboard">Рейтинг дня</button>
+          </div>
+          <ol id="cloud-leaderboard" class="cloud-leaderboard hidden" aria-live="polite"></ol>
+          <button id="btn-crash-reports" class="menu-toggle" type="button" aria-pressed="false" data-i18n="crashes">отчёты об ошибках</button>
         </section>
 
         <nav class="menu-foot" aria-label="Дополнительно">
@@ -133,9 +153,9 @@
             <span class="btn-donate-main">Донат</span>
             <span class="btn-donate-sub">поддержать игру</span>
           </button>
-          <a href="./landing.html">О игре</a>
-          <a href="./privacy.html">Конфиденциальность</a>
-          <a href="./support.html">Поддержка</a>
+          <a href="./landing.html" data-i18n="about">О игре</a>
+          <a href="./privacy.html" data-i18n="privacy">Конфиденциальность</a>
+          <a href="./support.html" data-i18n="support">Поддержка</a>
         </nav>
       </div>
 
@@ -308,10 +328,10 @@
     <div id="screen-over" class="screen hidden">
       <div class="screen-bg dim" aria-hidden="true"></div>
       <div class="over-card">
-        <p class="over-label">След оборвался</p>
+        <p class="over-label" data-i18n="run_broken">След оборвался</p>
         <p class="brand over-brand">ОТТИСК</p>
         <p id="final-score" class="final-score">0</p>
-        <p class="over-sub">света</p>
+        <p class="over-sub" data-i18n="light">света</p>
         <p id="run-summary" class="run-summary"></p>
         <p id="death-reason" class="death-reason"></p>
         <p id="mut-summary" class="mut-summary"></p>
@@ -328,7 +348,7 @@
             <span class="btn-sub">если след понравился</span>
           </button>
           <button id="btn-share" class="btn btn-secondary" type="button">
-            <span class="btn-main">Поделиться</span>
+            <span class="btn-main" data-i18n="share">Поделиться</span>
             <span class="btn-sub">Stories · волна и герой</span>
           </button>
           <button id="btn-buy-marks" class="btn btn-secondary" type="button">
@@ -336,11 +356,11 @@
             <span class="btn-sub">герои · косметика · continue</span>
           </button>
           <button id="btn-retry" class="btn btn-primary" type="button">
-            <span class="btn-main">Ещё раз</span>
+            <span class="btn-main" data-i18n="retry">Ещё раз</span>
             <span class="btn-sub">новый забег</span>
           </button>
           <button id="btn-menu" class="btn btn-ghost" type="button">
-            <span class="btn-main">В меню</span>
+            <span class="btn-main" data-i18n="menu">В меню</span>
           </button>
         </div>
       </div>
@@ -354,7 +374,7 @@
   </div>
   <script>
     (async () => {
-      const stamp = "ottisk-force-v76";
+      const stamp = "ottisk-force-v77";
       if (localStorage.getItem(stamp)) return;
       localStorage.setItem(stamp, "1");
       try {
@@ -368,13 +388,17 @@
         }
       } catch (_) {}
       const url = new URL(location.href);
-      url.searchParams.set("v", "76");
+      url.searchParams.set("v", "77");
       location.replace(url.toString());
     })();
   </script>
   <script src="js/analytics.js"></script>
   <script src="js/backup.js"></script>
+  <script src="js/i18n.js"></script>
+  <script src="js/cloud.js"></script>
+  <script src="js/perf.js"></script>
+  <script src="js/balance-tuner.js"></script>
   <script src="js/native.js" type="module"></script>
-  <script src="js/game.js?v=76" type="module"></script>
+  <script src="js/game.js?v=77" type="module"></script>
 </body>
 </html>

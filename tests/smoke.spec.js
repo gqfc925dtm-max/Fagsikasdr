@@ -75,3 +75,29 @@ test("returning player reaches a live run", async ({ page }) => {
   await expect(page.locator("#app")).toHaveClass(/in-run/);
   await expect(page.locator("#status")).toBeVisible();
 });
+
+test("new run modes persist and boss rush starts with a boss", async ({ page }) => {
+  await openGame(page);
+  await page.locator('[data-run-mode="boss"]').click();
+  await expect(page.locator('[data-run-mode="boss"]')).toHaveAttribute("aria-pressed", "true");
+  await page.locator("#btn-start").click();
+  await page.locator("#btn-hero-next").click();
+  await page.locator(".diff-pick-btn", { hasText: "лёгкий" }).click();
+  await expect(page.locator("#wave-label")).toContainText("левиафан");
+});
+
+test("English menu persists across reload", async ({ page }) => {
+  await openGame(page);
+  await page.locator("#btn-lang").click();
+  await expect(page.locator(".btn-shop-top-main")).toHaveText("Shop");
+  await expect(page.locator("#btn-start .btn-main")).toHaveText("Play");
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(page.locator(".btn-shop-top-main")).toHaveText("Shop");
+});
+
+test("promotional page exposes SEO metadata and play link", async ({ page }) => {
+  await page.goto("/landing.html", { waitUntil: "domcontentloaded" });
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", /Fagsikasdr/);
+  await expect(page.locator('script[type="application/ld\\+json"]')).toHaveCount(1);
+  await expect(page.getByRole("link", { name: /Играть|Play/i }).first()).toHaveAttribute("href", "./index.html");
+});

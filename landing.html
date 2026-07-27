@@ -6,6 +6,62 @@
   <meta name="theme-color" content="#090b18" />
   <title>ОТТИСК — существо живёт под пальцем</title>
   <meta name="description" content="ОТТИСК — атмосферная игра на выживание для телефона. Удерживай палец, собирай свет и оставь след в бездне." />
+  <link rel="canonical" href="https://gqfc925dtm-max.github.io/Fagsikasdr/landing.html" />
+  <link rel="alternate" hreflang="ru" href="https://gqfc925dtm-max.github.io/Fagsikasdr/landing.html" />
+  <link rel="alternate" hreflang="x-default" href="https://gqfc925dtm-max.github.io/Fagsikasdr/landing.html" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="ОТТИСК" />
+  <meta property="og:locale" content="ru_RU" />
+  <meta property="og:title" content="ОТТИСК — мобильная игра на выживание" />
+  <meta property="og:description" content="Удерживай существо под пальцем, собирай свет и переживи охоту хищников в живой бездне." />
+  <meta property="og:url" content="https://gqfc925dtm-max.github.io/Fagsikasdr/landing.html" />
+  <meta property="og:image" content="https://gqfc925dtm-max.github.io/Fagsikasdr/icons/icon-512.png" />
+  <meta property="og:image:width" content="512" />
+  <meta property="og:image:height" content="512" />
+  <meta property="og:image:alt" content="Значок игры ОТТИСК" />
+  <meta property="og:video" content="https://gqfc925dtm-max.github.io/Fagsikasdr/ottisk-ad-ru-15s.mp4" />
+  <meta property="og:video:secure_url" content="https://gqfc925dtm-max.github.io/Fagsikasdr/ottisk-ad-ru-15s.mp4" />
+  <meta property="og:video:type" content="video/mp4" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="ОТТИСК — мобильная игра на выживание" />
+  <meta name="twitter:description" content="Удерживай существо, собирай свет и оставь свой след в бездне." />
+  <meta name="twitter:image" content="https://gqfc925dtm-max.github.io/Fagsikasdr/icons/icon-512.png" />
+  <meta name="twitter:image:alt" content="Значок игры ОТТИСК" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "VideoGame",
+    "@id": "https://gqfc925dtm-max.github.io/Fagsikasdr/#game",
+    "name": "ОТТИСК",
+    "url": "https://gqfc925dtm-max.github.io/Fagsikasdr/",
+    "description": "Атмосферная игра на выживание: удерживайте существо под пальцем, собирайте свет, обманывайте хищников и оставьте след в бездне.",
+    "image": "https://gqfc925dtm-max.github.io/Fagsikasdr/icons/icon-512.png",
+    "genre": ["Survival", "Arcade"],
+    "gamePlatform": ["Web browser", "Android", "iOS"],
+    "operatingSystem": "Android, iOS, any modern web browser",
+    "applicationCategory": "GameApplication",
+    "playMode": "SinglePlayer",
+    "inLanguage": "ru",
+    "isAccessibleForFree": true,
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "RUB",
+      "availability": "https://schema.org/InStock",
+      "url": "https://gqfc925dtm-max.github.io/Fagsikasdr/"
+    },
+    "trailer": {
+      "@type": "VideoObject",
+      "name": "ОТТИСК — игровой трейлер",
+      "description": "15-секундный трейлер мобильной игры ОТТИСК.",
+      "contentUrl": "https://gqfc925dtm-max.github.io/Fagsikasdr/ottisk-ad-ru-15s.mp4",
+      "thumbnailUrl": "https://gqfc925dtm-max.github.io/Fagsikasdr/icons/icon-512.png",
+      "uploadDate": "2026-07-27T06:57:17+00:00",
+      "duration": "PT15S",
+      "inLanguage": "ru"
+    }
+  }
+  </script>
   <style>
     :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #050711; color: #fffdf8; }
     * { box-sizing: border-box; }
@@ -26,6 +82,11 @@
     .feature { padding: 22px; border: 1px solid #ffffff20; border-radius: 20px; background: #ffffff08; }
     .feature strong { display: block; color: #ffe898; margin-bottom: 8px; }
     .feature p { margin: 0; color: #bfc3d8; line-height: 1.5; }
+    .details { max-width: 760px; margin-top: 56px; }
+    .details h2 { font-size: clamp(30px, 5vw, 48px); margin-bottom: 14px; }
+    .details p { color: #c9ccdc; font-size: 18px; line-height: 1.65; }
+    .skip-link { position: absolute; left: 16px; top: -80px; z-index: 1; padding: 12px 16px; background: #7affd4; color: #071516; }
+    .skip-link:focus { top: 16px; }
     footer { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 70px; color: #9298ae; font-size: 14px; }
     @media (max-width: 720px) {
       .hero { grid-template-columns: 1fr; }
@@ -36,29 +97,36 @@
   </style>
 </head>
 <body>
-  <main>
-    <nav>
+  <a class="skip-link" href="#content">Перейти к содержанию</a>
+  <main id="content">
+    <nav aria-label="Основная навигация">
       <span class="brand">ОТТИСК</span>
       <a href="./index.html">Играть</a>
     </nav>
-    <section class="hero">
+    <section class="hero" aria-labelledby="hero-title">
       <div>
         <p class="eyebrow">Мобильная игра на выживание</p>
-        <h1>Не отпускай.</h1>
+        <h1 id="hero-title">Не отпускай.</h1>
         <p class="lead">Существо живёт только под твоим пальцем. Собирай свет, обманывай хищников и оставь свой след в бездне.</p>
         <div class="actions">
           <a class="btn primary" href="./index.html">Играть бесплатно</a>
           <a class="btn" href="#trailer">Смотреть трейлер</a>
         </div>
       </div>
-      <video id="trailer" controls muted loop playsinline preload="metadata">
+      <video id="trailer" controls muted loop playsinline preload="metadata" aria-label="Трейлер игры ОТТИСК">
         <source src="./ottisk-ad-ru-15s.mp4" type="video/mp4" />
+        Ваш браузер не поддерживает видео. <a href="./ottisk-ad-ru-15s.mp4">Скачать трейлер</a>.
       </video>
     </section>
-    <section class="features" aria-label="Особенности">
+    <section class="features" aria-label="Особенности игры">
       <article class="feature"><strong>Одно касание</strong><p>Понятное управление, которое превращается в напряжённый танец.</p></article>
       <article class="feature"><strong>Живая бездна</strong><p>Волны, герои, мутации, левиафан и многофазный кракен.</p></article>
       <article class="feature"><strong>Твой след</strong><p>Забег дня, недельные испытания, трофеи и перенос прогресса.</p></article>
+    </section>
+    <section class="details" aria-labelledby="about-title">
+      <h2 id="about-title">Выживи в живой бездне</h2>
+      <p>ОТТИСК — бесплатная атмосферная аркада для коротких и напряжённых забегов. Прикоснись к экрану, чтобы дать существу жизнь, веди его к свету и вовремя меняй путь, когда из темноты выходят хищники.</p>
+      <p>Осваивай героев и мутации, встречай левиафана и многофазного кракена, участвуй в ежедневных забегах и недельных испытаниях. Играй прямо в браузере на телефоне или компьютере — регистрация не нужна.</p>
     </section>
     <footer>
       <span>© 2026 ОТТИСК</span>

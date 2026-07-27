@@ -10,6 +10,8 @@ const assets = [
   "donate.html",
   "landing.html",
   "ottisk-ad-ru-15s.mp4",
+  "robots.txt",
+  "sitemap.xml",
   "manifest.json",
   "sw.js",
   "css",
