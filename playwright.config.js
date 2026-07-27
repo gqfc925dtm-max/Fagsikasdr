@@ -9,6 +9,7 @@ export default defineConfig({
   use: {
     baseURL: "http://127.0.0.1:8765",
     ...devices["iPhone 13"],
+    browserName: "chromium",
     locale: "ru-RU",
     trace: "retain-on-failure",
   },
