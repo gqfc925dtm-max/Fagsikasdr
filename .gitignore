@@ -12,3 +12,5 @@ ios/DerivedData/
 *.xcworkspace/xcuserdata/
 *.xcodeproj/xcuserdata/
 .capacitor/
+test-results/
+playwright-report/

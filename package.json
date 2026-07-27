@@ -7,11 +7,16 @@
     "start": "npx --yes serve -l 8765 .",
     "serve": "npx --yes serve -l 8765 .",
     "build:www": "node scripts/build-www.mjs",
+    "test": "npm run test:unit && npm run test:smoke",
+    "test:unit": "node --test tests/unit/*.test.js",
+    "test:smoke": "playwright test",
     "cap:sync": "npm run build:www && npx cap sync",
     "cap:ios": "npm run build:www && npx cap open ios",
+    "cap:android": "npm run build:www && npx cap open android",
     "postinstall": "node scripts/build-www.mjs"
   },
   "dependencies": {
+    "@capacitor/android": "^7.6.8",
     "@capacitor/app": "^7.0.2",
     "@capacitor/core": "^7.4.2",
     "@capacitor/haptics": "^7.0.2",
@@ -21,6 +26,7 @@
     "@capacitor/status-bar": "^7.0.2"
   },
   "devDependencies": {
-    "@capacitor/cli": "^7.4.2"
+    "@capacitor/cli": "^7.4.2",
+    "@playwright/test": "^1.62.0"
   }
 }

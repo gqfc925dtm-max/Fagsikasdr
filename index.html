@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=75" />
+  <link rel="stylesheet" href="css/style.css?v=76" />
   <link rel="preload" href="assets/fish-evil.png?v=5" as="image" />
   <title>ОТТИСК</title>
 </head>
@@ -97,10 +97,15 @@
           <button id="btn-mode-coop" class="menu-toggle" type="button" aria-pressed="false">дуэт</button>
         </div>
         <p id="mode-note" class="menu-note quiet">обычный забег</p>
+        <div class="access-row" role="group" aria-label="Доступность">
+          <button id="btn-reduce-motion" class="menu-toggle" type="button" aria-pressed="false">меньше движения</button>
+          <button id="btn-high-contrast" class="menu-toggle" type="button" aria-pressed="false">контраст</button>
+        </div>
       </div>
 
       <div class="menu-more">
         <p id="daily-quest" class="menu-note" aria-live="polite"></p>
+        <p id="weekly-card" class="menu-note weekly-card" aria-live="polite"></p>
         <section id="menu-trophies" class="menu-trophies" aria-label="Трофеи">
           <p class="menu-section-label">Трофеи</p>
           <div id="trophy-list" class="trophy-list" role="list"></div>
@@ -112,11 +117,23 @@
         <p id="gift-next" class="menu-note quiet hidden" aria-live="polite"></p>
         <p id="shop-progress" class="menu-note shop-progress" aria-live="polite"></p>
 
+        <section class="data-tools" aria-label="Перенос прогресса">
+          <p class="menu-section-label">Прогресс</p>
+          <p class="menu-note quiet">Сохрани файл или перенеси код на другое устройство.</p>
+          <div class="data-tools-row">
+            <button id="btn-backup-export" class="menu-link" type="button">Сохранить</button>
+            <button id="btn-backup-code" class="menu-link" type="button">Код переноса</button>
+            <button id="btn-backup-import" class="menu-link" type="button">Загрузить</button>
+          </div>
+          <input id="backup-file" class="hidden" type="file" accept="application/json,.json" />
+        </section>
+
         <nav class="menu-foot" aria-label="Дополнительно">
           <button id="btn-donate" class="menu-link" type="button">
             <span class="btn-donate-main">Донат</span>
             <span class="btn-donate-sub">поддержать игру</span>
           </button>
+          <a href="./landing.html">О игре</a>
           <a href="./privacy.html">Конфиденциальность</a>
           <a href="./support.html">Поддержка</a>
         </nav>
@@ -126,7 +143,6 @@
       <span id="streak-start" class="hidden">0 дн</span>
       <span id="skin-name" class="hidden">чернь</span>
       <div id="daily-card" class="hidden"></div>
-      <div id="weekly-card" class="hidden"></div>
       <div id="skin-unlocks" class="hidden"></div>
       <button id="btn-marks-pack" class="hidden" type="button">+60 следов</button>
       <i id="hold-fill" class="hidden" aria-hidden="true"></i>
@@ -338,7 +354,7 @@
   </div>
   <script>
     (async () => {
-      const stamp = "ottisk-force-v75";
+      const stamp = "ottisk-force-v76";
       if (localStorage.getItem(stamp)) return;
       localStorage.setItem(stamp, "1");
       try {
@@ -352,11 +368,13 @@
         }
       } catch (_) {}
       const url = new URL(location.href);
-      url.searchParams.set("v", "75");
+      url.searchParams.set("v", "76");
       location.replace(url.toString());
     })();
   </script>
+  <script src="js/analytics.js"></script>
+  <script src="js/backup.js"></script>
   <script src="js/native.js" type="module"></script>
-  <script src="js/game.js?v=75" type="module"></script>
+  <script src="js/game.js?v=76" type="module"></script>
 </body>
 </html>
