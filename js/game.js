@@ -38,6 +38,8 @@ const uiCache = { hunger: -1, wave: "", dive: -1, diveShow: null, score: -1 };
 let humAcc = 0;
 let lastHumKey = "";
 let portraitSkip = 0;
+let perfMonitor = null;
+let cloudSaveTimer = null;
 const EEL_PRODUCT_ID = "ottisk_hero_eel";
 const SQUID_PRODUCT_ID = "ottisk_hero_squid";
 const SEAHORSE_PRODUCT_ID = "ottisk_hero_seahorse";
@@ -77,7 +79,7 @@ const DONATE_TIPS = [
     priceLabel: "499 ₽",
   },
 ];
-const THEME_COUNT = 6;
+const THEME_COUNT = 8;
 const ONBOARD_STEPS = [
   "Удерживай палец — существо живёт только в касании.",
   "Лови живой свет — он прыгает и крутится.",
@@ -165,6 +167,8 @@ const MUTATIONS = [
   { id: "veins", at: 20, name: "жилы" },
   { id: "fang", at: 30, name: "клык" },
   { id: "bloom", at: 42, name: "цвет" },
+  { id: "current", at: 60, name: "течение" },
+  { id: "renewal", at: 90, name: "обновление" },
 ];
 
 const SKINS = [
@@ -192,6 +196,8 @@ const HEROES = [
   { id: "jellyfish", name: "медуза", glyph: "Ме", ability: "аура", tip: "АУРА ЗАМЕДЛЯЕТ" },
   { id: "turtle", name: "черепаха", glyph: "Че", ability: "панцирь", tip: "ПАНЦИРЬ ДЕРЖИТ ДОЛЬШЕ" },
   { id: "crab", name: "краб", glyph: "Кр", ability: "щит", tip: "ЩИТ НА 1 УДАР" },
+  { id: "dolphin", name: "дельфин", glyph: "Де", ability: "быстрый рывок", tip: "РЫВОК ПЕРЕЗАРЯЖАЕТСЯ БЫСТРЕЕ" },
+  { id: "starfish", name: "морская звезда", glyph: "Зв", ability: "регенерация", tip: "ГОЛОД УХОДИТ МЕДЛЕННЕЕ" },
   { id: "manta", name: "скат", glyph: "Ск", ability: "крыло-шторм", tip: "РЫВОК РЕЖЕТ И ОСТАВЛЯЕТ СЛЕД", premium: true, cost: 60, blurb: "рывки рвут строй" },
   { id: "angler", name: "удильщик", glyph: "Уд", ability: "манок света", tip: "ФОНАРЬ ТЯНЕТ СВЕТ И ТОРМОЗИТ", premium: true, cost: 110, blurb: "свет плывёт к тебе" },
   { id: "nautilus", name: "наутилус", glyph: "На", ability: "2 раковины", tip: "ДВЕ РАКОВИНЫ · ПОТОМ ВОССТАНОВЛЕНИЕ", premium: true, cost: 170, blurb: "двойная броня" },
@@ -553,6 +559,8 @@ const RUN_EVENTS = [
   { id: "raid", title: "облава", dur: 3.2 },
   { id: "calm", title: "тишина", dur: 5.0 },
   { id: "comet", title: "комета", dur: 0.8 },
+  { id: "sanctuary", title: "светлый сад", dur: 5.2 },
+  { id: "blackout", title: "затмение", dur: 4.4 },
 ];
 
 const DAILY_DEFS = [
@@ -738,6 +746,9 @@ const state = {
   mechanicCard: null,
   tutorialRun: false,
   tutorialStep: 0,
+  runMode: "normal",
+  qualityTier: "high",
+  tuning: { hunterSpeed: 1, hungerDrain: 1, sparkInterval: 1 },
   tipFlags: {
     move: false,
     hunter: false,
@@ -791,6 +802,10 @@ function spawnOpeningRing(x, y) {
 
 function clamp(v, min, max) {
   return Math.max(min, Math.min(max, v));
+}
+
+function tr(key, fallback = "") {
+  return window.OttiskI18n?.t?.(key, fallback) ?? fallback;
 }
 
 function rand(min, max) {
@@ -1926,6 +1941,12 @@ function startRunEvent(def) {
   } else if (def.id === "rain") {
     state.eventRainAcc = 0;
     for (let i = 0; i < 2; i += 1) spawnSpark({ edge: true });
+  } else if (def.id === "sanctuary") {
+    state.eventRainAcc = 0;
+    for (let i = 0; i < 4; i += 1) spawnSpark({ edge: true, type: i === 0 ? "rare" : null });
+  } else if (def.id === "blackout") {
+    state.flash = Math.max(state.flash, 0.22);
+    spawnHunter(false);
   }
 }
 
@@ -1937,6 +1958,13 @@ function updateRunEvents(dt) {
       while (state.eventRainAcc >= 0.38) {
         state.eventRainAcc -= 0.38;
         spawnSpark({ edge: true, type: Math.random() < 0.18 ? "rare" : null });
+      }
+    }
+    if (state.event.id === "sanctuary") {
+      state.eventRainAcc += dt;
+      while (state.eventRainAcc >= 0.8) {
+        state.eventRainAcc -= 0.8;
+        spawnSpark({ edge: true, type: Math.random() < 0.22 ? "rare" : null });
       }
     }
     if (state.event.t <= 0) {
@@ -2219,6 +2247,41 @@ function midgamePace() {
 const waveLabelEl = document.getElementById("wave-label");
 
 function waveForScore(score = state.score) {
+  if (state.runMode === "boss") {
+    const stage = Math.max(0, Math.floor(score / 90));
+    const kraken = stage % 2 === 1;
+    return {
+      id: `rush-${kraken ? "kraken" : "leviathan"}-${stage}`,
+      at: stage * 90,
+      name: kraken ? "кракен" : "левиафан",
+      species: "boss",
+      maxBonus: 0,
+      speedMul: 0.9 + Math.min(0.35, stage * 0.035),
+      intervalMul: 8,
+      boss: true,
+      kraken,
+      index: stage,
+      label: `БОСС ${stage + 1} · ${kraken ? "КРАКЕН" : "ЛЕВИАФАН"}`,
+    };
+  }
+  if (state.runMode === "endless" && score >= 900) {
+    const stage = Math.floor((score - 900) / 120);
+    const boss = stage > 0 && stage % 4 === 0;
+    const kraken = boss && stage % 8 === 0;
+    return {
+      id: `endless-${boss ? (kraken ? "kraken" : "leviathan") : "deep"}-${stage}`,
+      at: 900 + stage * 120,
+      name: boss ? (kraken ? "кракен" : "левиафан") : `глубина ${stage + 1}`,
+      species: boss ? "boss" : "mix",
+      maxBonus: boss ? 0 : Math.min(7, 3 + Math.floor(stage / 2)),
+      speedMul: Math.min(1.55, 1.14 + stage * 0.035),
+      intervalMul: boss ? 8 : Math.max(0.5, 0.76 - stage * 0.018),
+      boss,
+      kraken,
+      index: WAVES.length + stage,
+      label: boss ? `БЕСКОНЕЧНЫЙ БОСС · ${kraken ? "КРАКЕН" : "ЛЕВИАФАН"}` : `БЕСКОНЕЧНОСТЬ · ${stage + 1}`,
+    };
+  }
   let current = WAVES[0];
   for (const wave of WAVES) {
     if (score >= wave.at) current = wave;
@@ -2226,10 +2289,15 @@ function waveForScore(score = state.score) {
   return current;
 }
 
+function waveNumber(wave = waveForScore()) {
+  return Math.max(1, Number.isFinite(wave.index) ? wave.index + 1 : WAVES.indexOf(wave) + 1);
+}
+
 function updateWaveUi(flash = false) {
   if (!waveLabelEl) return;
   const wave = waveForScore();
-  const text = `волна ${WAVES.indexOf(wave) + 1} · ${wave.name}`;
+  const number = waveNumber(wave);
+  const text = `волна ${number} · ${wave.name}`;
   if (uiCache.wave !== text) {
     uiCache.wave = text;
     waveLabelEl.textContent = text;
@@ -2273,7 +2341,8 @@ function applySpeciesToHunter(hunter, species) {
 
 function spawnBoss() {
   const point = hunterSpawnPointAwayFromPlayer();
-  const isKraken = state.waveId === "kraken";
+  const activeWave = waveForScore();
+  const isKraken = !!activeWave.kraken || state.waveId === "kraken" || state.waveId.includes("kraken");
   const boss = {
     x: point.x,
     y: point.y,
@@ -2324,17 +2393,19 @@ function spawnBoss() {
 }
 
 function grantBossClear(id) {
-  if (!state.running || !state.meta || !["leviathan", "kraken"].includes(id)) return;
-  const reward = id === "kraken" ? 25 : 12;
+  if (!state.running || !state.meta) return;
+  const kind = String(id).includes("kraken") ? "kraken" : String(id).includes("leviathan") ? "leviathan" : "";
+  if (!kind) return;
+  const reward = kind === "kraken" ? 25 : 12;
   state.meta.bossClears = state.meta.bossClears || { leviathan: 0, kraken: 0 };
-  state.meta.bossClears[id] = (state.meta.bossClears[id] || 0) + 1;
+  state.meta.bossClears[kind] = (state.meta.bossClears[kind] || 0) + 1;
   awardMarks(reward, {
     x: state.width * 0.5,
     y: state.height * 0.28,
     color: cssVar("--gold", "#ffe898"),
     size: 18,
   });
-  showCombo(`${id === "kraken" ? "КРАКЕН" : "ЛЕВИАФАН"} ПРОЙДЕН · +${reward}`, true);
+  showCombo(`${kind === "kraken" ? "КРАКЕН" : "ЛЕВИАФАН"} ПРОЙДЕН · +${reward}`, true);
   goalChime();
   saveMeta();
 }
@@ -2346,8 +2417,9 @@ function syncWave(announce = true) {
   }
   const prevId = state.waveId;
   state.waveId = wave.id;
-  state.waveIndex = WAVES.indexOf(wave);
+  state.waveIndex = Number.isFinite(wave.index) ? wave.index : WAVES.indexOf(wave);
   if (wave.boss) {
+    if (String(prevId).includes("leviathan") || String(prevId).includes("kraken")) grantBossClear(prevId);
     // Boss arena: clear the field once, then only Leviathan.
     state.hunters = state.hunters.filter((h) => h.shadow);
     spawnBoss();
@@ -2374,7 +2446,7 @@ function syncWave(announce = true) {
       }
     }
     // If we just left the boss and the field is empty, seed one new hunter.
-    if ((prevId === "leviathan" || prevId === "kraken") && !state.hunters.some((h) => !h.shadow)) {
+    if ((String(prevId).includes("leviathan") || String(prevId).includes("kraken")) && !state.hunters.some((h) => !h.shadow)) {
       grantBossClear(prevId);
       spawnHunter(true);
     }
@@ -2418,7 +2490,8 @@ function pushParticle(p) {
 }
 
 function burst(x, y, color, count = 12, speed = 3.5) {
-  const motionCount = state.meta?.reduceMotion ? Math.ceil(count * 0.35) : count;
+  const qualityScale = window.OttiskPerf?.TIERS?.[state.qualityTier]?.particleScale || 1;
+  const motionCount = Math.ceil((state.meta?.reduceMotion ? count * 0.35 : count) * qualityScale);
   const n = Math.min(motionCount, particleRoom());
   if (n <= 0) return;
   const accent = cssVar("--accent-b", cssVar("--gold", "#ffd27a"));
@@ -2776,6 +2849,9 @@ function loadMeta() {
       return "none";
     })(),
     difficulty: DIFFICULTIES.some((d) => d.id === raw?.difficulty) ? raw.difficulty : "normal",
+    runMode: ["normal", "endless", "boss", "calm"].includes(raw?.runMode) ? raw.runMode : "normal",
+    qualityMode: ["auto", "high", "medium", "low"].includes(raw?.qualityMode) ? raw.qualityMode : "auto",
+    cloudName: typeof raw?.cloudName === "string" ? raw.cloudName.slice(0, 24) : "",
     hourlyGiftAt: Math.max(0, Number(raw?.hourlyGiftAt || 0)),
     dailyGiftDay: typeof raw?.dailyGiftDay === "string" ? raw.dailyGiftDay : "",
     weeklyGiftWeek: typeof raw?.weeklyGiftWeek === "string" ? raw.weeklyGiftWeek : "",
@@ -2789,6 +2865,9 @@ function loadMeta() {
     trophyCoop: !!raw?.trophyCoop,
     trophyDaily: !!raw?.trophyDaily,
     trophyGhost: !!raw?.trophyGhost,
+    trophyEndless: !!raw?.trophyEndless,
+    trophyBossRush: !!raw?.trophyBossRush,
+    trophyCalm: !!raw?.trophyCalm,
     dailyBest: Math.max(0, Number(raw?.dailyBest || 0)),
     dailyBestDay: typeof raw?.dailyBestDay === "string" ? raw.dailyBestDay : "",
     ghostPath: Array.isArray(raw?.ghostPath)
@@ -2814,6 +2893,12 @@ function saveMeta() {
   if (!state.meta) return;
   localStorage.setItem(META_KEY, JSON.stringify(state.meta));
   localStorage.setItem(BEST_KEY, String(state.meta.best));
+  if (window.OttiskCloud?.isLinked?.()) {
+    clearTimeout(cloudSaveTimer);
+    cloudSaveTimer = setTimeout(() => {
+      window.OttiskCloud?.pushSave?.(state.meta).catch(() => {});
+    }, 2500);
+  }
 }
 
 function skinById(id) {
@@ -2870,8 +2955,8 @@ function updateControlCopy() {
   const title = document.querySelector(".menu-title");
   const lead = document.querySelector(".menu-lead");
   const joy = controlMode() === "joystick";
-  if (title) title.textContent = joy ? "Веди джойстиком" : "Удерживай палец";
-  if (lead) lead.textContent = joy ? "Держи стик — герой живёт, пока касание активно" : "Существо живёт только в касании";
+  if (title) title.textContent = tr(joy ? "joystick_title" : "hold_title", joy ? "Веди джойстиком" : "Удерживай палец");
+  if (lead) lead.textContent = tr(joy ? "joystick_lead" : "hold_lead", joy ? "Держи стик — герой живёт, пока касание активно" : "Существо живёт только в касании");
 }
 
 function renderControlPicker() {
@@ -2897,7 +2982,7 @@ function playerIsSafe() {
 
 function heroCanDash() {
   const id = activeHeroId();
-  return id === "octopus" || id === "custom" || id === "manta";
+  return id === "octopus" || id === "custom" || id === "manta" || id === "dolphin";
 }
 
 function heroHasAura() {
@@ -2906,7 +2991,10 @@ function heroHasAura() {
 }
 
 function heroHungerMul() {
-  return activeHeroId() === "turtle" ? 0.78 : 1;
+  const id = activeHeroId();
+  if (id === "turtle") return 0.78;
+  if (id === "starfish") return 0.72;
+  return 1;
 }
 
 function heroHasShield() {
@@ -2936,15 +3024,16 @@ function tryHeroDash(dx, dy, moved) {
   const nx = dx / len;
   const ny = dy / len;
   const manta = activeHeroId() === "manta";
+  const dolphin = activeHeroId() === "dolphin";
   const fromX = state.life.x;
   const fromY = state.life.y;
-  const boost = manta ? 108 : 56;
+  const boost = manta ? 108 : dolphin ? 74 : 56;
   state.life.x += nx * boost;
   state.life.y += ny * boost;
   clampLife();
   state.life.aim = Math.atan2(ny, nx);
-  state.heroDashCd = manta ? 1.35 : 2.6;
-  state.safeUntil = performance.now() + (manta ? 720 : 320);
+  state.heroDashCd = manta ? 1.35 : dolphin ? 1.55 : 2.6;
+  state.safeUntil = performance.now() + (manta ? 720 : dolphin ? 440 : 320);
   if (manta) {
     state.timeScale = 0.5;
     state.slowmoUntil = performance.now() + 320;
@@ -3944,6 +4033,29 @@ function applyAccessibilityPrefs() {
   refreshCssCache();
 }
 
+function applyQualityMode() {
+  const mode = state.meta?.qualityMode || "auto";
+  const next = mode === "auto" ? (perfMonitor?.snapshot?.().tier || state.qualityTier || "high") : mode;
+  const changed = next !== state.qualityTier;
+  state.qualityTier = next;
+  app.dataset.quality = next;
+  if (changed && state.width > 0) resize();
+}
+
+function setupPerformanceMonitor() {
+  if (!window.OttiskPerf?.createMonitor) return;
+  const android = /Android/i.test(navigator.userAgent || "") || window.OttiskNative?.platform === "android";
+  const modestCpu = Number(navigator.hardwareConcurrency || 8) <= 4;
+  perfMonitor = window.OttiskPerf.createMonitor({ initialTier: android && modestCpu ? "medium" : "high" });
+  perfMonitor.subscribe((snapshot) => {
+    if (state.meta?.qualityMode !== "auto") return;
+    state.qualityTier = snapshot.tier;
+    app.dataset.quality = snapshot.tier;
+    resize();
+  });
+  applyQualityMode();
+}
+
 function renderSettings() {
   if (!state.meta) return;
   if (btnSound) {
@@ -3965,6 +4077,16 @@ function renderSettings() {
   if (contrast) {
     contrast.classList.toggle("on", !!state.meta.highContrast);
     contrast.setAttribute("aria-pressed", state.meta.highContrast ? "true" : "false");
+  }
+  const quality = document.getElementById("btn-quality");
+  if (quality) {
+    const mode = state.meta.qualityMode || "auto";
+    const names = window.OttiskI18n?.locale === "en"
+      ? { auto: "quality · auto", high: "quality · high", medium: "quality · medium", low: "quality · low" }
+      : { auto: "качество · авто", high: "качество · высокое", medium: "качество · среднее", low: "качество · низкое" };
+    quality.textContent = names[mode];
+    quality.classList.toggle("on", mode !== "auto");
+    quality.setAttribute("aria-pressed", mode !== "auto" ? "true" : "false");
   }
   renderDifficultyPicker();
   renderControlPicker();
@@ -4083,7 +4205,10 @@ function updateDonateThanks() {
   const el = document.getElementById("donate-thanks");
   if (el && state.meta) {
     const n = state.meta.donateCount || 0;
-    el.textContent = n > 0 ? `спасибо · ${n} · герои и следы` : "герои · следы · донат";
+    const english = window.OttiskI18n?.locale === "en";
+    el.textContent = n > 0
+      ? (english ? `thank you · ${n} · heroes and trails` : `спасибо · ${n} · герои и следы`)
+      : tr("shop_sub", "герои · следы · донат");
   }
   const marksEl = document.getElementById("shop-top-marks");
   if (marksEl && state.meta) marksEl.textContent = String(state.meta.marks || 0);
@@ -4770,7 +4895,8 @@ function resize() {
   const prevH = state.height || 1;
   const rect = stage.getBoundingClientRect();
   const canvasRect = canvas.getBoundingClientRect();
-  state.dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const qualityDpr = state.qualityTier === "low" ? 1 : state.qualityTier === "medium" ? 1.5 : 2;
+  state.dpr = Math.min(window.devicePixelRatio || 1, qualityDpr);
   state.width = Math.max(1, Math.floor(rect.width));
   state.height = Math.max(1, Math.floor(rect.height));
   canvas.width = Math.floor(state.width * state.dpr);
@@ -5141,15 +5267,23 @@ function updateModeToggles() {
     coopBtn.classList.toggle("on", !!state.meta?.coopEnabled);
     coopBtn.setAttribute("aria-pressed", state.meta?.coopEnabled ? "true" : "false");
   }
+  document.querySelectorAll(".run-mode-btn").forEach((button) => {
+    const selected = button.dataset.runMode === (state.meta?.runMode || "normal");
+    button.classList.toggle("on", selected);
+    button.setAttribute("aria-pressed", selected ? "true" : "false");
+  });
   const note = document.getElementById("mode-note");
   if (note) {
     const bits = [];
     if (state.meta?.dailyModeEnabled) bits.push("забег дня");
     if (state.meta?.coopEnabled) bits.push("дуэт");
+    if (state.meta?.runMode === "endless") bits.push(tr("mode_endless", "бесконечный океан"));
+    if (state.meta?.runMode === "boss") bits.push(tr("mode_boss", "босс-раш"));
+    if (state.meta?.runMode === "calm") bits.push(tr("mode_calm", "спокойный режим"));
     const pack = packApi();
     const cos = pack?.seasonCosmetic(state.meta?.weekId || weekKey());
     if (cos) bits.push(`сезон · ${cos.name}`);
-    note.textContent = bits.length ? bits.join(" · ") : "обычный забег";
+    note.textContent = bits.length ? bits.join(" · ") : tr("normal_run", "обычный забег");
   }
 }
 
@@ -5164,6 +5298,13 @@ function beginSeededRun() {
   restoreMathRandom();
   state.dailyMode = !!state.meta?.dailyModeEnabled;
   state.coopMode = !!state.meta?.coopEnabled;
+  state.runMode = state.meta?.runMode || "normal";
+  if (state.meta) {
+    if (state.runMode === "endless") state.meta.trophyEndless = true;
+    if (state.runMode === "boss") state.meta.trophyBossRush = true;
+    if (state.runMode === "calm") state.meta.trophyCalm = true;
+    saveMeta();
+  }
   state.rng = null;
   if (state.dailyMode) {
     const pack = packApi();
@@ -5181,6 +5322,9 @@ function beginSeededRun() {
     showMechanicCard("daily", "Забег дня", "Общий сид на сегодня. Соревнуйся с собой.");
   }
   if (state.coopMode) showToast("дуэт · два пальца");
+  if (state.runMode === "endless") showToast(tr("mode_endless", "бесконечный океан"));
+  if (state.runMode === "boss") showToast(tr("mode_boss", "босс-раш"));
+  if (state.runMode === "calm") showToast(tr("mode_calm", "спокойный режим"));
 }
 
 function randGame(a = 0, b = 1) {
@@ -5318,13 +5462,17 @@ function finalizeGameOver(reason) {
     score: state.score,
     hero: activeHeroId(),
     death: analyticsDeathKind(reason),
+    mode: state.dailyMode ? "daily" : state.coopMode ? "coop" : state.runMode,
   });
+  if ((state.meta?.runs || 0) % 5 === 0) {
+    state.tuning = window.OttiskBalanceTuner?.fromAnalytics?.().adjustments || state.tuning;
+  }
   evaluateDaily();
   evaluateWeekly(state.score);
   finalScoreEl.textContent = String(state.score);
   deathReasonEl.textContent = reason;
   const wave = waveForScore(state.score);
-  const waveN = Math.max(1, WAVES.indexOf(wave) + 1);
+  const waveN = waveNumber(wave);
   const hero = activeHero();
   const runSummaryEl = document.getElementById("run-summary");
   if (runSummaryEl) {
@@ -5344,6 +5492,9 @@ function finalizeGameOver(reason) {
     }
     state.meta.dailyBest = Math.max(state.meta.dailyBest || 0, state.score);
     saveMeta();
+    if (window.OttiskCloud?.isLinked?.()) {
+      window.OttiskCloud.submitDailyScore(state.score, state.meta.cloudName || "").catch(() => {});
+    }
   }
   evaluateTrophies({ wordDone: state.wordDone });
   renderSkinResult();
@@ -5584,7 +5735,7 @@ async function purchaseContinueIap() {
 
 function shareText() {
   const wave = waveForScore(state.score);
-  const waveN = Math.max(1, WAVES.indexOf(wave) + 1);
+  const waveN = waveNumber(wave);
   const hero = activeHero();
   return `Мой след в ОТТИСК: ${state.score} света · волна ${waveN} · ${hero.name}. ${SHARE_URL}`;
 }
@@ -5606,7 +5757,7 @@ function buildShareCard() {
   const { width, height } = shareCanvasEl;
   const hero = activeHero();
   const wave = waveForScore(state.score);
-  const waveN = Math.max(1, WAVES.indexOf(wave) + 1);
+  const waveN = waveNumber(wave);
   const accent = cssVar("--life", "#7affd4");
   const gold = cssVar("--gold", "#ffe898");
 
@@ -6175,6 +6326,12 @@ function startGame() {
     state.lastTs = performance.now();
     const coach = state.tutorialRun
       ? "ШАГ 1 · НАЖМИ И ДЕРЖИ"
+      : state.runMode === "boss"
+        ? "БОСС-РАШ"
+        : state.runMode === "endless"
+          ? "БЕСКОНЕЧНЫЙ ОКЕАН"
+          : state.runMode === "calm"
+            ? "СПОКОЙНЫЙ РЕЖИМ"
       : state.coopMode
       ? "ДВА ПАЛЬЦА"
       : state.dailyMode
@@ -6539,7 +6696,7 @@ function updateSparks(dt) {
   const moveFactor = state.life ? clamp((state.life.speed || 0) / 14, 0, 1) : 0;
   // Magnet/veins only help while moving — standing still can't vacuum the map
   const veinPull = hasMut("veins") ? 0.12 * moveFactor : 0;
-  const magnetPull = hasMut("magnet") ? 0.14 * moveFactor : 0;
+  const magnetPull = (hasMut("magnet") ? 0.14 : 0) * moveFactor + (hasMut("current") ? 0.09 : 0) * moveFactor;
   for (let i = state.sparks.length - 1; i >= 0; i -= 1) {
     const spark = state.sparks[i];
     spark.grace = Math.max(0, (spark.grace || 0) - dt);
@@ -6763,12 +6920,14 @@ function updateHunters(dt) {
   let maxHunters = early || opening
     ? 1
     : Math.min(6, Math.max(1, Math.floor((1 + Math.floor(state.score / 55) + wave.maxBonus) * soft * diff.hunters)));
+  if (state.runMode === "calm") maxHunters = Math.max(1, Math.ceil(maxHunters * 0.55));
   if (wave.boss) maxHunters = 1;
   state.hunterAcc += dt;
   let interval = (Math.max(1.55, 4.4 - state.score * 0.008) * wave.intervalMul * diff.spawn) / Math.max(0.55, soft);
   interval /= Math.max(0.75, midgamePace());
   // Mid-game: spawn a bit less often so the field stays readable.
   if (state.score >= 40 && state.score < 220) interval *= 1.14;
+  if (state.runMode === "calm") interval *= 1.65;
   if (opening) interval = Math.max(interval, 2.8);
   if (!state.slowHunterSeen) interval = Math.max(interval, 1.1);
   const firstHunterAt = 0.45;
@@ -6869,6 +7028,8 @@ function updateHunters(dt) {
     }
     const ang = Math.atan2(ty - hunter.y, tx - hunter.x);
     let speed = (0.88 + Math.min(1.55, state.score * 0.0032)) * hunter.anger * wave.speedMul * midgamePace() * diff.speed;
+    speed *= state.tuning?.hunterSpeed || 1;
+    if (state.runMode === "calm") speed *= 0.68;
     if (hunter.stunT > 0) {
       hunter.stunT = Math.max(0, hunter.stunT - dt);
       speed *= 0.18;
@@ -6878,6 +7039,8 @@ function updateHunters(dt) {
     if (hasMut("cool") && state.hunger < 50) speed *= 0.85;
     if (activeEventId() === "calm") speed *= 0.62;
     if (activeEventId() === "raid") speed *= 1.08;
+    if (activeEventId() === "sanctuary") speed *= 0.72;
+    if (activeEventId() === "blackout") speed *= 1.12;
     if (inInkDive()) speed *= 0.35;
     if (species === "dart" && hunter.dashT > 0) speed *= 2.05 * diff.dash;
     if (species === "shark" && hunter.dashT > 0) speed *= 1.75 * diff.dash;
@@ -7097,7 +7260,9 @@ function updateRun(dt) {
   // Standing still drains hunger faster — except while charging / inside ink dive
   const chargingDive = !!state.life && state.stillAcc > 0.15 && !inInkDive();
   const stillPenalty = state.life && (state.life.speed || 0) < 6 && !chargingDive && !inInkDive() ? 1.55 : 1;
-  const calmMul = activeEventId() === "calm" ? 0.55 : 1;
+  const calmMul = activeEventId() === "calm" || activeEventId() === "sanctuary" ? 0.55 : 1;
+  const modeHungerMul = state.runMode === "calm" ? 0.58 : 1;
+  const renewalMul = hasMut("renewal") ? 0.88 : 1;
   const diveMul = inInkDive() ? 0.72 : 1;
   if (state.life) {
     state.heroDashCd = Math.max(0, (state.heroDashCd || 0) - dt);
@@ -7128,7 +7293,7 @@ function updateRun(dt) {
         floatText(state.life.x, state.life.y - 28, "откат готов", cssVar("--gold", "#ffe898"), 14);
       }
     }
-    state.hunger -= HUNGER_DRAIN_PER_SEC * dt * (hasMut("cool") ? 0.7 : 1) * stillPenalty * calmMul * diveMul * (inOpening() ? 0.72 : 1) * playerDifficulty().hunger * heroHungerMul();
+    state.hunger -= HUNGER_DRAIN_PER_SEC * dt * (hasMut("cool") ? 0.7 : 1) * renewalMul * stillPenalty * calmMul * modeHungerMul * diveMul * (inOpening() ? 0.72 : 1) * playerDifficulty().hunger * heroHungerMul() * (state.tuning?.hungerDrain || 1);
     state.hunger = Math.max(0, state.hunger);
   }
   updateHungerUi();
@@ -7145,7 +7310,7 @@ function updateRun(dt) {
   updateParticles(dt);
   const opening = inOpening();
   const targetSparkCount = opening ? 3 : 4 + Math.min(2, Math.floor(state.score / 120));
-  const spawnInterval = opening ? 1.6 : 0.95;
+  const spawnInterval = (opening ? 1.6 : 0.95) * (state.tuning?.sparkInterval || 1);
   while (state.spawnAcc >= spawnInterval) {
     state.spawnAcc -= spawnInterval;
     if (state.sparks.length < targetSparkCount) {
@@ -9462,6 +9627,8 @@ function drawLifeBody(body, alpha = 1, heroOverride = null) {
   else if (hero === "squid") drawSquid(body, alpha);
   else if (hero === "seahorse") drawSeahorse(body, alpha);
   else if (hero === "whale") drawWhale(body, alpha);
+  else if (hero === "dolphin") drawManta(body, alpha);
+  else if (hero === "starfish") drawCrab(body, alpha);
   else if (hero === "custom") drawCustomHero(body, alpha);
   else drawInkPolyp(body, alpha);
 }
@@ -9903,7 +10070,9 @@ function draw() {
 }
 
 function frame(ts) {
-  const rawDt = Math.min(0.033, (ts - (state.lastTs || ts)) / 1000 || 0.016);
+  const measuredMs = ts - (state.lastTs || ts);
+  if (measuredMs > 0) perfMonitor?.sample(measuredMs);
+  const rawDt = Math.min(0.033, measuredMs / 1000 || 0.016);
   state.lastTs = ts;
   if (state.slowmoUntil && ts >= state.slowmoUntil) {
     state.timeScale = 1;
@@ -9937,9 +10106,59 @@ function frame(ts) {
   requestAnimationFrame(frame);
 }
 
+function cloudConfig() {
+  try {
+    return JSON.parse(localStorage.getItem("ottisk-cloud-config-v1") || "{}");
+  } catch (_) {
+    return {};
+  }
+}
+
+function renderCloudStatus(text = "") {
+  const status = document.getElementById("cloud-status");
+  const account = document.getElementById("btn-cloud-account");
+  if (!status) return;
+  const configured = !!cloudConfig().apiUrl;
+  const linked = !!window.OttiskCloud?.isLinked?.();
+  status.textContent = text || (linked
+    ? "подключено · синхронизация активна"
+    : configured ? "сервер настроен · нужен аккаунт" : "не подключено · игра работает офлайн");
+  if (account) account.textContent = linked ? "Отключить" : tr("cloud_setup", "Подключить");
+}
+
+function mergeCloudMeta(local, remote) {
+  if (!remote || typeof remote !== "object") return local;
+  const unionKeys = [
+    "unlockedSkins", "premiumUnlocked", "unlockedHeroes", "unlockedTrails",
+    "unlockedFrames", "seasonalUnlocks", "trophies", "seenRunTips",
+    "seenAbilityTips", "seenMechanicCards",
+  ];
+  const merged = { ...remote, ...local };
+  for (const key of unionKeys) {
+    merged[key] = [...new Set([...(remote[key] || []), ...(local[key] || [])])];
+  }
+  for (const key of ["best", "marks", "streak", "dailyBest", "weekBest", "weekProgress", "runs"]) {
+    merged[key] = Math.max(Number(local[key] || 0), Number(remote[key] || 0));
+  }
+  merged.iapHeroes = local.iapHeroes || [];
+  merged.starterPackBought = !!local.starterPackBought;
+  return merged;
+}
+
 function boot() {
   loadPhotos();
   state.meta = loadMeta();
+  window.OttiskI18n?.apply?.();
+  state.tuning = window.OttiskBalanceTuner?.fromAnalytics?.().adjustments || state.tuning;
+  setupPerformanceMonitor();
+  const declaredApi = document.querySelector('meta[name="ottisk-cloud-api"]')?.content?.trim();
+  if (declaredApi && !cloudConfig().apiUrl) {
+    window.OttiskCloud?.configure?.({
+      apiUrl: declaredApi,
+      release: "1.2.0",
+      platform: window.OttiskNative?.platform || "web",
+    });
+  }
   applyAccessibilityPrefs();
   refreshCssCache();
   ensureSeasonalUnlock();
@@ -9970,6 +10189,7 @@ function boot() {
   resetDemo();
   bindDrawHeroUi();
   window.OttiskAnalytics?.track("app_open");
+  renderCloudStatus();
   document.getElementById("btn-mode-daily")?.addEventListener("click", () => {
     if (!state.meta) return;
     state.meta.dailyModeEnabled = !state.meta.dailyModeEnabled;
@@ -9985,6 +10205,28 @@ function boot() {
     updateModeToggles();
     sfxUiTap(1);
     showToast(state.meta.coopEnabled ? "дуэт · два пальца" : "дуэт · выкл");
+  });
+  document.querySelectorAll(".run-mode-btn").forEach((button) => {
+    button.addEventListener("click", () => {
+      if (!state.meta) return;
+      const requested = button.dataset.runMode || "normal";
+      state.meta.runMode = state.meta.runMode === requested ? "normal" : requested;
+      saveMeta();
+      updateModeToggles();
+      sfxUiTap(1);
+    });
+  });
+  document.getElementById("btn-lang")?.addEventListener("click", () => {
+    window.OttiskI18n?.toggle?.();
+    updateControlCopy();
+    updateModeToggles();
+    renderSettings();
+  });
+  window.addEventListener("ottisk-language", () => {
+    updateControlCopy();
+    updateModeToggles();
+    renderSettings();
+    updateDonateThanks();
   });
   document.getElementById("btn-shop-starter")?.addEventListener("click", () => {
     purchaseStarterPack().catch(() => showToast("покупка недоступна"));
@@ -10114,6 +10356,15 @@ function boot() {
     renderSettings();
     showToast(state.meta.highContrast ? "контраст вкл" : "контраст выкл");
   });
+  document.getElementById("btn-quality")?.addEventListener("click", () => {
+    if (!state.meta) return;
+    const modes = ["auto", "low", "medium", "high"];
+    state.meta.qualityMode = modes[(modes.indexOf(state.meta.qualityMode || "auto") + 1) % modes.length];
+    saveMeta();
+    applyQualityMode();
+    renderSettings();
+    showToast(document.getElementById("btn-quality")?.textContent || "качество");
+  });
   const installBackup = (imported) => {
     if (!state.meta || !imported) return false;
     const next = {
@@ -10159,6 +10410,127 @@ function boot() {
       backupFile.value = "";
     }
   });
+  const ensureCloudEndpoint = () => {
+    if (cloudConfig().apiUrl) return true;
+    const apiUrl = window.prompt("URL сервера ОТТИСК Cloud (Cloudflare Worker):", "");
+    if (!apiUrl) return false;
+    try {
+      window.OttiskCloud?.configure?.({
+        apiUrl,
+        release: "1.2.0",
+        platform: window.OttiskNative?.platform || "web",
+      });
+      renderCloudStatus();
+      return true;
+    } catch (_) {
+      showToast("неверный адрес сервера");
+      return false;
+    }
+  };
+  document.getElementById("btn-cloud-account")?.addEventListener("click", async () => {
+    if (!window.OttiskCloud) return;
+    if (window.OttiskCloud.isLinked()) {
+      if (!window.confirm("Отключить облачный аккаунт на этом устройстве?")) return;
+      await window.OttiskCloud.logout();
+      renderCloudStatus("аккаунт отключён · локальный прогресс сохранён");
+      return;
+    }
+    if (!ensureCloudEndpoint()) return;
+    try {
+      const create = window.confirm("Создать новый анонимный аккаунт?\n\nOK — создать новый\nОтмена — восстановить по коду");
+      if (create) {
+        const name = window.prompt("Имя в таблице рекордов (необязательно):", state.meta.cloudName || "") || "";
+        state.meta.cloudName = name.slice(0, 24);
+        saveMeta();
+        const result = await window.OttiskCloud.register();
+        window.prompt("Сохраните код восстановления. Он показывается только один раз:", result.recoveryCode);
+        await window.OttiskCloud.pushSave(state.meta);
+        renderCloudStatus("аккаунт создан · код восстановления сохраните отдельно");
+      } else {
+        const code = window.prompt("Введите код восстановления:", "");
+        if (!code) return;
+        await window.OttiskCloud.recover(code);
+        renderCloudStatus("аккаунт восстановлен · нажмите «Синхронизировать»");
+      }
+    } catch (error) {
+      renderCloudStatus(`ошибка облака · ${error.code || error.message || "повторите позже"}`);
+    }
+  });
+  document.getElementById("btn-cloud-sync")?.addEventListener("click", async () => {
+    if (!ensureCloudEndpoint()) return;
+    if (!window.OttiskCloud?.isLinked?.()) {
+      showToast("сначала подключи аккаунт");
+      return;
+    }
+    renderCloudStatus("синхронизация…");
+    try {
+      const remote = await window.OttiskCloud.pullSave();
+      if (remote?.save) {
+        state.meta = loadMeta.call(null);
+        const merged = mergeCloudMeta(state.meta, remote.save);
+        localStorage.setItem(META_KEY, JSON.stringify(merged));
+        localStorage.setItem(BEST_KEY, String(merged.best || 0));
+        await window.OttiskCloud.pushSave(merged);
+        renderCloudStatus("прогресс объединён · перезапуск");
+        location.reload();
+        return;
+      }
+      await window.OttiskCloud.pushSave(state.meta);
+      await window.OttiskCloud.sync();
+      renderCloudStatus("прогресс синхронизирован");
+    } catch (error) {
+      renderCloudStatus(`синхронизация отложена · ${error.code || "офлайн"}`);
+    }
+  });
+  document.getElementById("btn-cloud-board")?.addEventListener("click", async () => {
+    if (!ensureCloudEndpoint()) return;
+    const list = document.getElementById("cloud-leaderboard");
+    if (!list) return;
+    list.classList.remove("hidden");
+    list.textContent = "";
+    const wait = document.createElement("li");
+    wait.textContent = "загрузка…";
+    list.appendChild(wait);
+    try {
+      const board = await window.OttiskCloud.fetchDailyBoard(localDayKey());
+      list.textContent = "";
+      for (const entry of board?.entries?.slice(0, 10) || []) {
+        const item = document.createElement("li");
+        item.textContent = `${entry.displayName} · ${entry.score}`;
+        list.appendChild(item);
+      }
+      if (!list.childElementCount) {
+        const empty = document.createElement("li");
+        empty.textContent = "пока нет результатов";
+        list.appendChild(empty);
+      }
+    } catch (_) {
+      list.textContent = "";
+      const failed = document.createElement("li");
+      failed.textContent = "рейтинг временно недоступен";
+      list.appendChild(failed);
+    }
+  });
+  const crashKey = "ottisk-crash-opt-in-v1";
+  const crashButton = document.getElementById("btn-crash-reports");
+  const renderCrashOptIn = () => {
+    const enabled = localStorage.getItem(crashKey) === "1";
+    crashButton?.classList.toggle("on", enabled);
+    crashButton?.setAttribute("aria-pressed", enabled ? "true" : "false");
+  };
+  renderCrashOptIn();
+  crashButton?.addEventListener("click", () => {
+    const enabled = localStorage.getItem(crashKey) !== "1";
+    localStorage.setItem(crashKey, enabled ? "1" : "0");
+    renderCrashOptIn();
+    showToast(enabled ? "анонимные отчёты включены" : "отчёты выключены");
+  });
+  const reportCrash = (error, category) => {
+    if (localStorage.getItem(crashKey) !== "1") return;
+    window.OttiskCloud?.reportCrash?.(error, { category }).catch(() => {});
+  };
+  window.addEventListener("error", (event) => reportCrash(event.error || event.message, "runtime"));
+  window.addEventListener("unhandledrejection", (event) => reportCrash(event.reason, "promise"));
   btnMarksPack?.addEventListener("click", () => {
     purchaseMarksPack().catch(() => showToast("покупка недоступна"));
   });
@@ -10231,7 +10603,7 @@ function boot() {
   const nativeShell = !!window.OttiskNative?.isNative;
   if ("serviceWorker" in navigator && !nativeShell) {
     navigator.serviceWorker
-      .register("./sw.js?v=76")
+      .register("./sw.js?v=77")
       .then((reg) => reg.update())
       .catch(() => {});
   }

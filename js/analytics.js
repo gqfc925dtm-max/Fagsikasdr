@@ -42,17 +42,20 @@
     if (!event || typeof event !== "string") return;
     const data = load();
     const day = dayKey();
-    const row = data[day] || { events: {}, scores: {}, heroes: {}, deaths: {} };
+    const row = data[day] || { events: {}, scores: {}, heroes: {}, deaths: {}, modes: {} };
     row.events[event] = (row.events[event] || 0) + 1;
     if (event === "run_end") {
       const bucket = scoreBucket(details.score);
       row.scores[bucket] = (row.scores[bucket] || 0) + 1;
-      const hero = ["octopus", "manta", "angler", "nautilus", "submarine", "eel", "squid", "seahorse", "whale", "custom"]
+      const hero = ["octopus", "jellyfish", "turtle", "crab", "dolphin", "starfish", "manta", "angler", "nautilus", "sub", "eel", "squid", "seahorse", "whale", "custom"]
         .includes(details.hero) ? details.hero : "other";
       const death = ["hunger", "hunter", "leviathan", "kraken", "release", "other"]
         .includes(details.death) ? details.death : "other";
       row.heroes[hero] = (row.heroes[hero] || 0) + 1;
       row.deaths[death] = (row.deaths[death] || 0) + 1;
+      const mode = ["normal", "endless", "boss", "calm", "daily", "coop"].includes(details.mode)
+        ? details.mode : "normal";
+      row.modes[mode] = (row.modes[mode] || 0) + 1;
     }
     data[day] = row;
     save(data);
@@ -60,7 +63,7 @@
 
   function summary() {
     const data = load();
-    const total = { days: Object.keys(data).length, events: {}, scores: {}, heroes: {}, deaths: {} };
+    const total = { days: Object.keys(data).length, events: {}, scores: {}, heroes: {}, deaths: {}, modes: {} };
     for (const row of Object.values(data)) {
       for (const [key, count] of Object.entries(row.events || {})) {
         total.events[key] = (total.events[key] || 0) + count;
@@ -73,6 +76,9 @@
       }
       for (const [key, count] of Object.entries(row.deaths || {})) {
         total.deaths[key] = (total.deaths[key] || 0) + count;
+      }
+      for (const [key, count] of Object.entries(row.modes || {})) {
+        total.modes[key] = (total.modes[key] || 0) + count;
       }
     }
     return total;

@@ -1,4 +1,4 @@
-const CACHE = "ottisk-v76";
+const CACHE = "ottisk-v77";
 const ASSETS = [
   "./",
   "./index.html",
@@ -9,6 +9,10 @@ const ASSETS = [
   "./css/style.css",
   "./js/analytics.js",
   "./js/backup.js",
+  "./js/i18n.js",
+  "./js/cloud.js",
+  "./js/perf.js",
+  "./js/balance-tuner.js",
   "./js/game.js",
   "./js/pack.js",
   "./js/native.js",
